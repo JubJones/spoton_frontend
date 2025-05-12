@@ -1,54 +1,66 @@
-# React + TypeScript + Vite
+# SpotOn Frontend Application
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+This is the frontend application for the SpotOn Intelligent Multi-Camera Person Tracking and Analytics System. It provides a user interface for visualizing camera feeds, tracking data, and interacting with the backend services.
 
-Currently, two official plugins are available:
+## Prerequisites
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+Before you begin, ensure you have the following installed:
+*   [Node.js](https://nodejs.org/) (v18.x or later recommended)
+*   [npm](https://www.npmjs.com/) (usually comes with Node.js) or [Yarn](https://yarnpkg.com/)
 
-## Expanding the ESLint configuration
+## Installation
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/JubJones/spoton_frontend
+    cd spoton_frontend
+    ```
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
-```
+2.  **Install dependencies:**
+    Using npm:
+    ```bash
+    npm install
+    ```
+    Or using Yarn:
+    ```bash
+    yarn install
+    ```
+    This will download and install all the necessary packages defined in `package.json`.
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+## Running the Development Server
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+To run the application in development mode with hot-reloading:
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
-```
+1.  **Start the Vite development server:**
+    Using npm:
+    ```bash
+    npm run dev
+    ```
+    Or using Yarn:
+    ```bash
+    yarn dev
+    ```
+
+2.  Open your web browser and navigate to the URL provided in the terminal (usually `http://localhost:5173` or a similar port if 5173 is in use).
+
+The application will automatically reload if you make changes to the source files.
+
+## Available Scripts
+
+In the `package.json`, you will find other scripts, including:
+
+*   `npm run build` or `yarn build`: Builds the app for production to the `dist` folder. It correctly bundles React in production mode and optimizes the build for the best performance.
+*   `npm run lint` or `yarn lint`: Lints the project files using ESLint (based on `eslint.config.js`).
+*   `npm run preview` or `yarn preview`: Serves the production build locally to preview it before deployment.
+
+## Key Technologies
+
+*   **React:** A JavaScript library for building user interfaces.
+*   **TypeScript:** A typed superset of JavaScript that compiles to plain JavaScript.
+*   **Vite:** A fast frontend build tool and development server.
+*   **Tailwind CSS:** A utility-first CSS framework for rapid UI development.
+*   **React Router:** For client-side routing.
+
+## Backend Dependency
+
+This frontend application is designed to interact with the SpotOn backend services. Ensure the backend server is running and accessible at the configured URLs (typically `http://localhost:8000` for API and `ws://localhost:8000` for WebSockets, as seen in `GroupViewPage.tsx`). These URLs might need to be configured via environment variables for different deployment environments.
