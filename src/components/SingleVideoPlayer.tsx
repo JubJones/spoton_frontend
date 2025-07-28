@@ -1,5 +1,5 @@
 // src/components/SingleVideoPlayer.tsx
-import React, { useState, useEffect, ChangeEvent, useRef } from 'react';
+import React, { useEffect, ChangeEvent, useRef } from 'react';
 
 interface SingleVideoPlayerProps {
   videoId: string;

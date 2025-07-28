@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import ImageSequencePlayer from "../components/ImageSequencePlayer";
 
-// --- Type Definitions (Keep as before) ---
+// --- Legacy Types (to be migrated) ---
 interface Track {
   track_id: number;
   global_id: number;
@@ -33,7 +33,7 @@ interface CameraConfig {
 interface FrameIndicesState {
   [appCameraId: string]: number;
 }
-// --- End Type Definitions ---
+// --- End Legacy Types ---
 
 // --- Mock Data and Configuration (Keep as before) ---
 const zoneName = "Campus";
@@ -57,12 +57,6 @@ const appCameraIdToJsonId: { [appId: string]: string } = {
     'camera4': 'c16', // VERIFY
 };
 
-const jsonIdToAppCameraId: { [jsonId: string]: string } = Object.entries(
-  appCameraIdToJsonId
-).reduce((acc, [appId, jsonId]) => {
-  acc[jsonId] = appId;
-  return acc;
-}, {} as { [jsonId: string]: string });
 
 
 const SIMULATED_FPS = 1;
@@ -111,7 +105,7 @@ const GroupViewPage: React.FC = () => {
 
 
   const advanceFrames = useCallback(() => {
-      setFrameIndices(prevIndices => {
+      setFrameIndices((prevIndices: FrameIndicesState) => {
           const newIndices = { ...prevIndices };
           appCameraIds.forEach(id => {
               const config = cameraFrameConfig[id];
@@ -169,7 +163,7 @@ const GroupViewPage: React.FC = () => {
     if (!mapElement) return;
 
     const resizeObserver = new ResizeObserver(entries => {
-      for (let entry of entries) {
+      for (const entry of entries) {
         const { width, height } = entry.contentRect;
         setOverallMapDimensions({ width, height });
       }

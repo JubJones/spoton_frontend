@@ -34,7 +34,6 @@ interface ScaleInfo {
 
 // Original image dimensions (important!)
 const ORIGINAL_WIDTH = 1920;
-const ORIGINAL_HEIGHT = 1080;
 
 // --- Component ---
 const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
@@ -71,15 +70,12 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
 
         // Get actual rendered dimensions of the image element
         const renderedWidth = imgElement.width;
-        const renderedHeight = imgElement.height;
 
         // Get the position of the image relative to its offset parent (the container div)
         const offsetX = imgElement.offsetLeft;
         const offsetY = imgElement.offsetTop;
 
         // Calculate the scale factor (use width-based scale, assuming object-contain scales primarily by one dimension)
-        // A more robust approach might check Math.min(renderedWidth/ORIGINAL_WIDTH, renderedHeight/ORIGINAL_HEIGHT)
-        // but renderedWidth/ORIGINAL_WIDTH is often sufficient if aspect ratios match.
         const scale = renderedWidth / ORIGINAL_WIDTH;
 
         setScaleInfo({ scale, offsetX, offsetY });
