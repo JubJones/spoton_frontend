@@ -140,7 +140,340 @@ src/
     - `npm install -D @types/leaflet`
   - **Purpose**: Core dependencies for all three features
 
-### 1.2 Project Structure Refactoring
+---
+
+## API Integration & Data Management
+
+### 🌐 **HTTP API Integration**
+
+#### **Environment & Configuration API**
+- [ ] **Environment Service Implementation**
+  - **Files to Create**: `src/services/environmentAPI.ts`
+  - **API Endpoints**:
+    - `GET /api/v1/environments` - Get available environments
+    - `GET /api/v1/environments/{env_id}` - Get environment details
+    - `GET /api/v1/environments/{env_id}/cameras` - Get camera configs
+  - **Implementation Details**:
+    - Axios-based HTTP client with TypeScript interfaces
+    - Error handling with retry logic
+    - Response caching for static configuration data
+    - Authentication token management
+  - **Purpose**: **Landing Page** - Environment selection and configuration
+  - **Store Integration**: `src/stores/environmentStore.ts`
+
+- [ ] **Camera Configuration API**
+  - **Files to Create**: `src/services/cameraAPI.ts`
+  - **API Endpoints**:
+    - `GET /api/v1/cameras` - Get all cameras
+    - `GET /api/v1/cameras/{camera_id}` - Get camera details
+    - `GET /api/v1/cameras/{camera_id}/calibration` - Get homography data
+  - **Implementation Details**:
+    - Camera status monitoring and health checks
+    - Calibration data fetching and validation
+    - Camera settings management
+    - Real-time camera availability updates
+  - **Purpose**: **Settings Page** - Camera configuration and management
+  - **Store Integration**: `src/stores/cameraStore.ts`
+
+- [ ] **Zone & Layout API**
+  - **Files to Create**: `src/services/zoneAPI.ts`
+  - **API Endpoints**:
+    - `GET /api/v1/zones` - Get all zones
+    - `GET /api/v1/zones/{zone_id}/layout` - Get floor plan data
+    - `GET /api/v1/zones/{zone_id}/cameras` - Get zone camera mappings
+  - **Implementation Details**:
+    - Floor plan data fetching and processing
+    - Zone-based camera grouping
+    - Spatial layout coordinate system setup
+    - Zone metadata and configuration management
+  - **Purpose**: **Group View Page** - Spatial mapping and floor plans
+  - **Store Integration**: `src/stores/mappingStore.ts`
+
+#### **Session Management API**
+- [ ] **Session Service Implementation**
+  - **Files to Create**: `src/services/sessionAPI.ts`
+  - **API Endpoints**:
+    - `POST /api/v1/sessions/start` - Start tracking session
+    - `GET /api/v1/sessions/{session_id}/status` - Session status
+    - `PUT /api/v1/sessions/{session_id}/pause` - Pause/resume
+    - `DELETE /api/v1/sessions/{session_id}` - Stop session
+  - **Implementation Details**:
+    - Session lifecycle management
+    - Session state synchronization
+    - Auto-reconnection on session interruption
+    - Session performance monitoring
+  - **Purpose**: **Group View Page** - Session control and management
+  - **Store Integration**: `src/stores/sessionStore.ts`
+
+#### **Analytics & Historical Data API**
+- [ ] **Analytics Service Implementation**
+  - **Files to Create**: `src/services/analyticsAPI.ts`
+  - **API Endpoints**:
+    - `GET /api/v1/analytics/detections` - Historical detection data
+    - `GET /api/v1/analytics/tracking` - Person tracking history
+    - `GET /api/v1/analytics/heatmap` - Movement heat map data
+    - `GET /api/v1/analytics/occupancy` - Occupancy trends
+  - **Implementation Details**:
+    - Time-range based data queries
+    - Chart data formatting and aggregation
+    - Export functionality for analytics data
+    - Progressive loading for large datasets
+  - **Purpose**: **Analytics Page** - Historical data analysis
+  - **Store Integration**: `src/stores/analyticsStore.ts`
+
+- [ ] **Journey & Tracking API**
+  - **Files to Create**: `src/services/journeyAPI.ts`
+  - **API Endpoints**:
+    - `GET /api/v1/persons/{person_id}/journey` - Complete journey
+    - `GET /api/v1/persons/{person_id}/trajectory` - Spatial trajectory
+    - `GET /api/v1/persons/search` - Search persons by criteria
+  - **Implementation Details**:
+    - Individual person journey reconstruction
+    - Trajectory path visualization data
+    - Person search and filtering capabilities
+    - Detailed tracking timeline generation
+  - **Purpose**: **Detail View Page** - Individual person analysis
+  - **Store Integration**: `src/stores/trackingStore.ts`
+
+### 🔄 **WebSocket Integration**
+
+#### **Real-Time Connection Management**
+- [ ] **WebSocket Service Implementation**
+  - **Files to Create**: `src/services/websocketService.ts`
+  - **Connection Management**:
+    - `wss://host/ws/tracking/{session_id}` - Real-time tracking data
+    - `wss://host/ws/system/{session_id}` - System status updates
+  - **Implementation Details**:
+    - Automatic reconnection with exponential backoff
+    - JWT authentication on WebSocket connection
+    - Connection state monitoring and user feedback
+    - Message queuing for offline scenarios
+  - **Purpose**: Real-time data streaming for all frontend pages
+  - **Store Integration**: Global WebSocket state management
+
+- [ ] **Binary Frame Handler**
+  - **Files to Create**: `src/services/frameHandler.ts`
+  - **Message Type**: `frame_data`
+  - **Implementation Details**:
+    - Binary JPEG data processing and image blob creation
+    - Frame metadata extraction and validation
+    - Multi-camera frame synchronization
+    - Performance monitoring (FPS, frame drops)
+  - **Data Flow**: WebSocket → Frame Handler → Detection Store → Camera Components
+  - **Purpose**: **Group View Page** - Live camera feeds with detection overlays
+
+- [ ] **Tracking Update Handler**
+  - **Files to Create**: `src/services/trackingHandler.ts`
+  - **Message Type**: `tracking_update`
+  - **Implementation Details**:
+    - Person identity updates across cameras
+    - Trajectory path reconstruction
+    - Camera transition notifications
+    - Real-time position updates
+  - **Data Flow**: WebSocket → Tracking Handler → Tracking Store → Map Components
+  - **Purpose**: **Detail View Page** - Person tracking updates
+
+- [ ] **System Status Handler**
+  - **Files to Create**: `src/services/statusHandler.ts`
+  - **Message Type**: `system_status`
+  - **Implementation Details**:
+    - System health monitoring
+    - Performance metrics display
+    - Connection quality indicators
+    - Resource usage alerts
+  - **Data Flow**: WebSocket → Status Handler → System Store → UI Components
+  - **Purpose**: **All Pages** - System health indicators
+
+### 📊 **Data Models & Types**
+
+#### **API Response Types**
+- [ ] **Detection Types**
+  - **Files to Create**: `src/types/detection.ts`
+  - **TypeScript Interfaces**:
+    ```typescript
+    interface DetectionResponse {
+      id: string;
+      camera_id: string;
+      bbox: BoundingBox;
+      confidence: number;
+      timestamp: string;
+      class_id: number;
+      person_crop?: string;
+    }
+    
+    interface BoundingBox {
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      normalized: boolean;
+    }
+    ```
+  - **Purpose**: **Core Feature 1** - Multi-view person detection types
+
+- [ ] **Tracking Types**
+  - **Files to Create**: `src/types/tracking.ts`
+  - **TypeScript Interfaces**:
+    ```typescript
+    interface PersonIdentity {
+      global_id: number;
+      local_tracks: Record<string, number>;
+      first_seen: string;
+      last_seen: string;
+      cameras_seen: string[];
+      confidence: number;
+    }
+    
+    interface TrackData {
+      track_id: number;
+      global_id: number;
+      bbox: BoundingBox;
+      confidence: number;
+      map_coords?: [number, number];
+    }
+    ```
+  - **Purpose**: **Core Feature 2** - Cross-camera re-identification types
+
+- [ ] **Mapping Types**
+  - **Files to Create**: `src/types/mapping.ts`
+  - **TypeScript Interfaces**:
+    ```typescript
+    interface MapCoordinate {
+      x: number;
+      y: number;
+      coordinate_system: string;
+      timestamp: string;
+      confidence: number;
+    }
+    
+    interface Trajectory {
+      person_id: number;
+      path_points: MapCoordinate[];
+      start_time: string;
+      end_time: string;
+      total_distance: number;
+      cameras_traversed: string[];
+    }
+    ```
+  - **Purpose**: **Core Feature 3** - Unified spatial mapping types
+
+#### **WebSocket Message Types**
+- [ ] **WebSocket Protocol Types**
+  - **Files to Create**: `src/types/websocket.ts`
+  - **TypeScript Interfaces**:
+    ```typescript
+    interface FrameMessage {
+      type: 'frame_data';
+      frame_index: number;
+      scene_id: string;
+      timestamp_utc: string;
+      cameras: Record<string, CameraFrame>;
+    }
+    
+    interface TrackingMessage {
+      type: 'tracking_update';
+      person_id: number;
+      global_id: number;
+      camera_transitions: CameraTransition[];
+      current_position: MapCoordinate;
+      trajectory_path: MapCoordinate[];
+    }
+    
+    interface SystemStatusMessage {
+      type: 'system_status';
+      cameras_active: number;
+      processing_fps: number;
+      connection_quality: string;
+      memory_usage: number;
+      gpu_utilization: number;
+    }
+    ```
+  - **Purpose**: Type safety for all WebSocket communications
+
+### 🔐 **Authentication & Security**
+
+#### **Authentication Service**
+- [ ] **Auth Service Implementation**
+  - **Files to Create**: `src/services/authService.ts`
+  - **API Endpoints**:
+    - `POST /api/v1/auth/login` - User authentication
+    - `POST /api/v1/auth/refresh` - Token refresh
+    - `POST /api/v1/auth/logout` - User logout
+  - **Implementation Details**:
+    - JWT token storage and management
+    - Automatic token refresh
+    - Role-based access control
+    - WebSocket authentication
+  - **Purpose**: Secure API access for all features
+  - **Store Integration**: `src/stores/authStore.ts`
+
+#### **API Security**
+- [ ] **HTTP Client Security**
+  - **Files to Create**: `src/services/httpClient.ts`
+  - **Implementation Details**:
+    - Axios interceptors for authentication
+    - Request/response logging
+    - Error handling and retry logic
+    - CORS configuration
+  - **Purpose**: Secure HTTP communications
+
+### 🎯 **Page-Specific API Integration**
+
+#### **Landing Page Integration**
+- [ ] **Environment Selection**
+  - **Files to Modify**: `src/pages/SelectZonePage.tsx`
+  - **API Integration**:
+    - Environment list fetching: `environmentAPI.getEnvironments()`
+    - Environment details loading: `environmentAPI.getEnvironment(envId)`
+    - Camera availability checking: `cameraAPI.getCamerasByEnvironment(envId)`
+  - **State Management**: `useEnvironmentStore()` hook
+  - **Purpose**: **Core Feature Integration** - Environment-based system setup
+
+#### **Group View Page Integration**
+- [ ] **Real-Time Dashboard**
+  - **Files to Modify**: `src/pages/GroupViewPage.tsx`
+  - **API Integration**:
+    - Session management: `sessionAPI.startSession()`, `sessionAPI.getStatus()`
+    - Real-time frames: WebSocket `frame_data` messages
+    - Tracking updates: WebSocket `tracking_update` messages
+    - System status: WebSocket `system_status` messages
+  - **State Management**: `useDetectionStore()`, `useTrackingStore()`, `useMappingStore()`
+  - **Purpose**: **All Three Core Features** - Real-time multi-camera monitoring
+
+#### **Detail View Page Integration**
+- [ ] **Person Detail View**
+  - **Files to Create**: `src/pages/DetailViewPage.tsx`
+  - **API Integration**:
+    - Person journey: `journeyAPI.getPersonJourney(personId)`
+    - Trajectory data: `journeyAPI.getPersonTrajectory(personId)`
+    - Real-time updates: WebSocket `tracking_update` messages
+  - **State Management**: `usePersonStore()`, `useTrackingStore()`
+  - **Purpose**: **Core Feature 2** - Individual person tracking analysis
+
+#### **Analytics Page Integration**
+- [ ] **Historical Analytics**
+  - **Files to Create**: `src/pages/AnalyticsPage.tsx`
+  - **API Integration**:
+    - Detection analytics: `analyticsAPI.getDetectionStats()`
+    - Tracking analytics: `analyticsAPI.getTrackingHistory()`
+    - Heat map data: `analyticsAPI.getHeatmapData()`
+    - Export functions: `analyticsAPI.exportData()`
+  - **State Management**: `useAnalyticsStore()`
+  - **Purpose**: **All Three Core Features** - Historical data analysis
+
+#### **Settings Page Integration**
+- [ ] **Configuration Management**
+  - **Files to Create**: `src/pages/SettingsPage.tsx`
+  - **API Integration**:
+    - Camera settings: `cameraAPI.getCameraSettings()`, `cameraAPI.updateSettings()`
+    - Zone configuration: `zoneAPI.getZoneConfig()`, `zoneAPI.updateConfig()`
+    - System settings: `systemAPI.getSettings()`, `systemAPI.updateSettings()`
+  - **State Management**: `useSettingsStore()`
+  - **Purpose**: System configuration and management
+
+---
+
+### 1.2 **Project Structure Refactoring**
 - [ ] **Atomic Design Implementation**
   - Create atoms/ directory for basic UI components
   - Implement molecules/ for component combinations
