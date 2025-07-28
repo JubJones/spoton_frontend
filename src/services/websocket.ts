@@ -387,11 +387,13 @@ class WebSocketClient {
 
 }
 
+import { apiConfig } from './config/apiConfig';
+
 // Default WebSocket client instance
 export const websocketClient = new WebSocketClient({
-  url: 'ws://localhost:8000/ws',
+  url: apiConfig.environment.wsUrl,
   reconnectInterval: 1000,
-  maxReconnectAttempts: 5,
+  maxReconnectAttempts: 10,
   heartbeatInterval: 30000,
 });
 
