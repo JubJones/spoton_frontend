@@ -22,6 +22,25 @@ src/
 └── hooks/               # Custom React Hooks
 ```
 
+## 🎨 **UI/UX Design Reference**
+The `example_ui/` directory contains visual mockups and design specifications for all pages:
+
+### Available UI Examples:
+- **`Dashboard.png`** - Main Group View Page layout with 4-camera grid
+- **`Dashboard - Select.png`** - Group View with person selection interface
+- **`Dashboard - Select toggle.png`** - Group View with toggle controls
+- **`Group view.png`** - Alternative Group View layout
+- **`Detail view - expand.png`** - Individual person detail view
+- **`Analytics (Optional).png`** - Analytics dashboard design
+- **`Setting (Optional).png`** - Settings page configuration
+
+### Implementation Reference:
+When implementing each page component, refer to the corresponding UI example in `example_ui/` to ensure visual consistency and proper layout structure. These mockups serve as the definitive design specification for:
+- Component placement and sizing
+- Color schemes and styling
+- Interactive element positioning
+- Responsive layout patterns
+
 ## 📊 **Current vs Target Structure**
 - ✅ **Well-Aligned**: React setup, TypeScript, Vite, basic components, routing
 - 🔧 **Needs Refactoring**: Flat component structure → Feature-based organization
@@ -422,6 +441,7 @@ src/
 #### **Landing Page Integration**
 - [ ] **Environment Selection**
   - **Files to Modify**: `src/pages/SelectZonePage.tsx`
+  - **UI Reference**: `example_ui/Dashboard.png` (for environment selection layout)
   - **API Integration**:
     - Environment list fetching: `environmentAPI.getEnvironments()`
     - Environment details loading: `environmentAPI.getEnvironment(envId)`
@@ -432,6 +452,11 @@ src/
 #### **Group View Page Integration**
 - [ ] **Real-Time Dashboard**
   - **Files to Modify**: `src/pages/GroupViewPage.tsx`
+  - **UI Reference**: 
+    - `example_ui/Dashboard.png` - Main 4-camera grid layout
+    - `example_ui/Dashboard - Select.png` - Person selection interface
+    - `example_ui/Dashboard - Select toggle.png` - Toggle controls
+    - `example_ui/Group view.png` - Alternative layout reference
   - **API Integration**:
     - Session management: `sessionAPI.startSession()`, `sessionAPI.getStatus()`
     - Real-time frames: WebSocket `frame_data` messages
@@ -443,6 +468,7 @@ src/
 #### **Detail View Page Integration**
 - [ ] **Person Detail View**
   - **Files to Create**: `src/pages/DetailViewPage.tsx`
+  - **UI Reference**: `example_ui/Detail view - expand.png` - Individual person detail layout
   - **API Integration**:
     - Person journey: `journeyAPI.getPersonJourney(personId)`
     - Trajectory data: `journeyAPI.getPersonTrajectory(personId)`
@@ -453,6 +479,7 @@ src/
 #### **Analytics Page Integration**
 - [ ] **Historical Analytics**
   - **Files to Create**: `src/pages/AnalyticsPage.tsx`
+  - **UI Reference**: `example_ui/Analytics (Optional).png` - Analytics dashboard design
   - **API Integration**:
     - Detection analytics: `analyticsAPI.getDetectionStats()`
     - Tracking analytics: `analyticsAPI.getTrackingHistory()`
@@ -464,6 +491,7 @@ src/
 #### **Settings Page Integration**
 - [ ] **Configuration Management**
   - **Files to Create**: `src/pages/SettingsPage.tsx`
+  - **UI Reference**: `example_ui/Setting (Optional).png` - Settings page configuration
   - **API Integration**:
     - Camera settings: `cameraAPI.getCameraSettings()`, `cameraAPI.updateSettings()`
     - Zone configuration: `zoneAPI.getZoneConfig()`, `zoneAPI.updateConfig()`
@@ -891,16 +919,27 @@ src/
 
 ### Page Implementation Priority
 1. **Landing Page** (Environment Selection) - Week 1
+   - **UI Reference**: `example_ui/Dashboard.png` for layout patterns
 2. **Group View Page** (Main Interface) - Weeks 2-4
+   - **UI Reference**: `example_ui/Dashboard.png`, `example_ui/Dashboard - Select.png`, `example_ui/Dashboard - Select toggle.png`, `example_ui/Group view.png`
 3. **Detail View Page** (Single Camera) - Weeks 3-5
+   - **UI Reference**: `example_ui/Detail view - expand.png`
 4. **Analytics Page** (Optional) - Weeks 4-6
+   - **UI Reference**: `example_ui/Analytics (Optional).png`
 5. **Settings Page** (Optional) - Weeks 5-7
+   - **UI Reference**: `example_ui/Setting (Optional).png`
 
 ### Component Development Order
 1. **Core Components** (Buttons, Inputs, Modals) - Week 1
+   - **UI Reference**: Extract common elements from all `example_ui/*.png` files
 2. **Camera Components** (Views, Overlays) - Weeks 2-3
+   - **UI Reference**: `example_ui/Dashboard.png` for 4-camera grid layout
+   - **UI Reference**: `example_ui/Dashboard - Select.png` for selection overlays
 3. **Map Components** (Interactive Map) - Weeks 3-4
+   - **UI Reference**: `example_ui/Group view.png` for map integration
 4. **Analytics Components** (Charts, Dashboards) - Weeks 4-5
+   - **UI Reference**: `example_ui/Analytics (Optional).png` for dashboard layout
 5. **Advanced Components** (Export, Settings) - Weeks 5-6
+   - **UI Reference**: `example_ui/Setting (Optional).png` for configuration panels
 
 This planning document provides a comprehensive roadmap for frontend implementation, synchronized with backend development phases to ensure efficient parallel development and seamless integration.
