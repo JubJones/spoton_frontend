@@ -119,6 +119,21 @@ export const apiEndpoints = {
   cameraCalibration: (id: string) => `/cameras/${id}/calibration`,
   cameraStatus: (id: string) => `/cameras/${id}/status`,
   
+  // Analytics endpoints
+  analytics: {
+    realTime: '/analytics/real-time',
+    historical: '/analytics/historical',
+    performance: '/analytics/performance',
+    health: '/analytics/health',
+    journey: '/analytics/journey',
+    behavioral: '/analytics/behavioral',
+    dwellTime: '/analytics/dwell-time',
+    trafficPatterns: '/analytics/traffic-patterns',
+    heatmap: '/analytics/heatmap',
+    export: '/analytics/export',
+    report: '/analytics/report'
+  },
+  
   // Health and system endpoints
   health: '/health',
   systemStatus: '/system/status',
@@ -138,7 +153,9 @@ export const wsEndpoints = {
   detections: '/ws/detections',
   tracking: '/ws/tracking',
   mapping: '/ws/mapping',
-  system: '/ws/system'
+  system: '/ws/system',
+  analytics: '/ws/analytics',
+  performance: '/ws/performance'
 };
 
 // Request timeout configurations
@@ -184,6 +201,14 @@ export const cacheConfig = {
   mapping: {
     ttl: 5 * 60 * 1000, // 5 minutes
     maxSize: 100
+  },
+  analytics: {
+    ttl: 60 * 1000, // 1 minute
+    maxSize: 500
+  },
+  performance: {
+    ttl: 30 * 1000, // 30 seconds
+    maxSize: 200
   }
 };
 

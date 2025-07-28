@@ -353,6 +353,340 @@ export interface EnvironmentConfig {
   mockDelay: number;
 }
 
+// Analytics Types
+export interface AnalyticsData {
+  totalDetections: number;
+  activeDetections: number;
+  averageConfidence: number;
+  detectionRate: number;
+  falsePositiveRate: number;
+  trackingAccuracy: number;
+  systemPerformance: {
+    fps: number;
+    latency: number;
+    memoryUsage: number;
+    cpuUsage: number;
+  };
+  timeSeriesData: TimeSeriesDataPoint[];
+  heatmapData: HeatmapPoint[];
+  cameraAnalytics: CameraAnalytics[];
+  timestamp: string;
+}
+
+export interface TimeSeriesDataPoint {
+  timestamp: number;
+  detections: number;
+  confidence: number;
+  fps: number;
+  tracking: number;
+  memoryUsage: number;
+  cpuUsage: number;
+}
+
+export interface HeatmapPoint {
+  x: number;
+  y: number;
+  intensity: number;
+  detectionCount: number;
+  dwellTime: number;
+}
+
+export interface CameraAnalytics {
+  cameraId: string;
+  cameraName: string;
+  detectionCount: number;
+  averageConfidence: number;
+  fps: number;
+  uptime: number;
+  errorRate: number;
+  lastActivity: string;
+  performance: {
+    processingTime: number;
+    memoryUsage: number;
+    temperature: number;
+  };
+}
+
+export interface AnalyticsTimeRange {
+  startTime: number;
+  endTime: number;
+  interval?: 'minute' | 'hour' | 'day' | 'week' | 'month';
+}
+
+export interface AnalyticsFilter {
+  cameraIds?: string[];
+  personIds?: string[];
+  confidenceThreshold?: number;
+  dateRange?: AnalyticsTimeRange;
+  eventTypes?: string[];
+  zones?: string[];
+}
+
+export interface HistoricalData {
+  timeRange: AnalyticsTimeRange;
+  detectionTrends: TrendData[];
+  trackingTrends: TrendData[];
+  performanceTrends: TrendData[];
+  alerts: AlertData[];
+  summary: {
+    totalDetections: number;
+    uniquePersons: number;
+    averageConfidence: number;
+    peakHours: string[];
+    mostActiveCamera: string;
+  };
+}
+
+export interface TrendData {
+  timestamp: number;
+  value: number;
+  metric: string;
+  change: number;
+  trend: 'increasing' | 'decreasing' | 'stable';
+}
+
+export interface AlertData {
+  id: string;
+  type: 'performance' | 'security' | 'system' | 'detection';
+  severity: 'low' | 'medium' | 'high' | 'critical';
+  message: string;
+  timestamp: number;
+  source: string;
+  isAcknowledged: boolean;
+}
+
+export interface PerformanceMetrics {
+  system: {
+    cpuUsage: number;
+    memoryUsage: number;
+    diskUsage: number;
+    networkUsage: number;
+    uptime: number;
+  };
+  application: {
+    fps: number;
+    latency: number;
+    processingTime: number;
+    errorRate: number;
+    throughput: number;
+  };
+  cameras: CameraPerformance[];
+  timestamp: string;
+}
+
+export interface CameraPerformance {
+  cameraId: string;
+  fps: number;
+  latency: number;
+  processingTime: number;
+  errorRate: number;
+  temperature: number;
+  memoryUsage: number;
+  uptime: number;
+  lastFrameTime: number;
+}
+
+export interface SystemHealth {
+  overall: 'healthy' | 'warning' | 'critical';
+  components: {
+    database: ComponentHealth;
+    webSocket: ComponentHealth;
+    fileSystem: ComponentHealth;
+    cameras: ComponentHealth;
+    ai: ComponentHealth;
+    tracking: ComponentHealth;
+  };
+  alerts: AlertData[];
+  uptime: number;
+  lastCheck: string;
+}
+
+export interface ComponentHealth {
+  status: 'healthy' | 'warning' | 'critical';
+  responseTime: number;
+  errorRate: number;
+  lastCheck: string;
+  message?: string;
+}
+
+export interface PersonJourney {
+  personId: string;
+  globalId: string;
+  startTime: string;
+  endTime: string;
+  totalDuration: number;
+  cameraSequence: CameraVisit[];
+  trajectory: TrajectoryPoint[];
+  behaviorAnalysis: {
+    averageSpeed: number;
+    dwellTimes: DwellTime[];
+    routePattern: string;
+    anomalies: string[];
+  };
+  statistics: {
+    totalDistance: number;
+    averageConfidence: number;
+    reidentificationAccuracy: number;
+    cameraTransitions: number;
+  };
+}
+
+export interface CameraVisit {
+  cameraId: string;
+  cameraName: string;
+  entryTime: string;
+  exitTime: string;
+  duration: number;
+  confidence: number;
+  detectionCount: number;
+}
+
+export interface DwellTime {
+  zone: string;
+  duration: number;
+  startTime: string;
+  endTime: string;
+  behavior: string;
+}
+
+export interface BehavioralAnalytics {
+  dwellTimeAnalysis: DwellTimeAnalysis;
+  routePatterns: RoutePattern[];
+  anomalies: BehaviorAnomaly[];
+  crowdAnalysis: CrowdAnalysis;
+  timePatterns: TimePattern[];
+  spatialAnalysis: SpatialAnalysis;
+}
+
+export interface DwellTimeAnalysis {
+  averageDwellTime: number;
+  dwellTimeDistribution: {
+    zone: string;
+    averageTime: number;
+    medianTime: number;
+    maxTime: number;
+    visitorCount: number;
+  }[];
+  heatmap: HeatmapPoint[];
+  trends: TrendData[];
+}
+
+export interface RoutePattern {
+  id: string;
+  path: string[];
+  frequency: number;
+  averageDuration: number;
+  commonTimes: string[];
+  userCount: number;
+}
+
+export interface BehaviorAnomaly {
+  id: string;
+  type: 'speed' | 'route' | 'dwell' | 'crowd' | 'security';
+  severity: 'low' | 'medium' | 'high';
+  description: string;
+  timestamp: string;
+  location: string;
+  confidence: number;
+  personId?: string;
+}
+
+export interface CrowdAnalysis {
+  currentCount: number;
+  peakCount: number;
+  averageCount: number;
+  density: number;
+  distribution: {
+    zone: string;
+    count: number;
+    density: number;
+  }[];
+  trends: TrendData[];
+}
+
+export interface TimePattern {
+  period: 'hour' | 'day' | 'week' | 'month';
+  peak: string;
+  low: string;
+  averageActivity: number;
+  patterns: {
+    time: string;
+    activity: number;
+    trend: 'increasing' | 'decreasing' | 'stable';
+  }[];
+}
+
+export interface SpatialAnalysis {
+  hotspots: HotspotData[];
+  pathAnalysis: PathAnalysis[];
+  zoneUtilization: ZoneUtilization[];
+  flowAnalysis: FlowAnalysis;
+}
+
+export interface HotspotData {
+  zone: string;
+  intensity: number;
+  duration: number;
+  visitorCount: number;
+  peakTime: string;
+}
+
+export interface PathAnalysis {
+  pathId: string;
+  frequency: number;
+  averageSpeed: number;
+  congestionLevel: number;
+  alternativeRoutes: string[];
+}
+
+export interface ZoneUtilization {
+  zone: string;
+  utilizationRate: number;
+  capacity: number;
+  currentOccupancy: number;
+  averageVisitDuration: number;
+}
+
+export interface FlowAnalysis {
+  entryPoints: FlowPoint[];
+  exitPoints: FlowPoint[];
+  bottlenecks: FlowPoint[];
+  flowRate: number;
+  peakFlowTime: string;
+}
+
+export interface FlowPoint {
+  location: string;
+  count: number;
+  rate: number;
+  peakTime: string;
+}
+
+export interface TrafficPattern {
+  id: string;
+  name: string;
+  timeRange: AnalyticsTimeRange;
+  pattern: {
+    hour: number;
+    count: number;
+    avgSpeed: number;
+    congestion: number;
+  }[];
+  peakHours: string[];
+  trends: TrendData[];
+}
+
+export interface HeatmapData {
+  timeRange: AnalyticsTimeRange;
+  resolution: {
+    width: number;
+    height: number;
+  };
+  data: HeatmapPoint[];
+  maxIntensity: number;
+  totalDetections: number;
+}
+
 // Response wrapper
 export interface ApiResponse<T = any> {
   data: T;
