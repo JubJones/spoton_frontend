@@ -9,6 +9,8 @@ import SelectZonePage from './pages/SelectZonePage'; // Legacy zone selection (k
 import GroupViewPage from './pages/GroupViewPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
+import HelpPage from './pages/HelpPage';
+import AboutPage from './pages/AboutPage';
 
 function App() {
   return (
@@ -52,26 +54,8 @@ function App() {
                     </div>
                   }
                 />
-                <Route
-                  path="/help"
-                  element={
-                    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-                      <h1 className="text-2xl" role="heading" aria-level={1}>
-                        Help & Documentation - Coming Soon
-                      </h1>
-                    </div>
-                  }
-                />
-                <Route
-                  path="/about"
-                  element={
-                    <div className="min-h-screen bg-gray-900 text-white flex items-center justify-center">
-                      <h1 className="text-2xl" role="heading" aria-level={1}>
-                        About SpotOn - Coming Soon
-                      </h1>
-                    </div>
-                  }
-                />
+                <Route path="/help" element={<HelpPage />} />
+                <Route path="/about" element={<AboutPage />} />
 
                 {/* 404 fallback */}
                 <Route
