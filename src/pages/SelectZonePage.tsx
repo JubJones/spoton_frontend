@@ -20,15 +20,17 @@ const SelectZonePage: React.FC = () => {
         <nav>
           {/* Add FAQ/Help links if needed */}
           <span className="mr-4">Select the view</span>
-          <a href="#" className="mr-4 hover:text-orange-500">FAQ</a>
-          <a href="#" className="hover:text-orange-500">Help?</a>
+          <a href="#" className="mr-4 hover:text-orange-500">
+            FAQ
+          </a>
+          <a href="#" className="hover:text-orange-500">
+            Help?
+          </a>
         </nav>
       </header>
 
       {/* Tagline */}
-      <p className="text-center text-xl mb-12">
-        Beyond Watching: Intelligent Tracking in Action
-      </p>
+      <p className="text-center text-xl mb-12">Beyond Watching: Intelligent Tracking in Action</p>
 
       {/* Zone Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -47,7 +49,7 @@ const SelectZonePage: React.FC = () => {
           </Link>
         ))}
         {/* Add an empty div if you have 5 items and want the last row aligned left on medium screens */}
-         <div className="hidden md:block"></div>
+        <div className="hidden md:block"></div>
       </div>
     </div>
   );

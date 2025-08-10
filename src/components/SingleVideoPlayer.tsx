@@ -36,32 +36,38 @@ const SingleVideoPlayer: React.FC<SingleVideoPlayerProps> = ({
   }, [videoSrc]);
 
   return (
-    <div className={`relative flex flex-col items-center justify-center bg-black rounded-md overflow-hidden ${className}`}>
+    <div
+      className={`relative flex flex-col items-center justify-center bg-black rounded-md overflow-hidden ${className}`}
+    >
       {videoSrc ? (
-        <video controls width="100%" height="auto" src={videoSrc} className="w-full h-full object-contain">
+        <video
+          controls
+          width="100%"
+          height="auto"
+          src={videoSrc}
+          className="w-full h-full object-contain"
+        >
           Your browser doesn't support embedded videos.
         </video>
       ) : (
-        <div className="text-gray-500 text-center p-4">
-          No video selected for {videoId}
-        </div>
+        <div className="text-gray-500 text-center p-4">No video selected for {videoId}</div>
       )}
       {/* --- Conditionally render the file input based on the prop --- */}
       {showFileInput && (
-         <div className="absolute bottom-2 left-2">
-            <label className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded cursor-pointer">
-                Choose {videoId} File
-                <input
-                    type="file"
-                    accept="video/*"
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
-                    className="hidden"
-                />
-            </label>
-         </div>
+        <div className="absolute bottom-2 left-2">
+          <label className="bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded cursor-pointer">
+            Choose {videoId} File
+            <input
+              type="file"
+              accept="video/*"
+              ref={fileInputRef}
+              onChange={handleFileChange}
+              className="hidden"
+            />
+          </label>
+        </div>
       )}
-       {/* --- End conditional rendering --- */}
+      {/* --- End conditional rendering --- */}
     </div>
   );
 };

@@ -23,13 +23,14 @@ interface ImageSequencePlayerProps {
   tracks: Track[] | null;
   className?: string;
   imageExtension?: string;
+  base64Image?: string; // NEW: Support for base64 images from WebSocket
 }
 
 // Interface for storing calculated scaling information
 interface ScaleInfo {
-    scale: number;
-    offsetX: number;
-    offsetY: number;
+  scale: number;
+  offsetX: number;
+  offsetY: number;
 }
 
 // Original image dimensions (important!)
@@ -46,21 +47,29 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
   tracks,
   className = '',
   imageExtension = 'jpg',
+  base64Image, // NEW: Base64 image data from WebSocket
 }) => {
   // Ref to access the img DOM element
   const imgRef = useRef<HTMLImageElement>(null);
   // State to store the calculated scale and offset
   const [scaleInfo, setScaleInfo] = useState<ScaleInfo | null>(null);
 
-  // Calculate image URL (same as before)
+  // Calculate image URL (prioritize base64Image from WebSocket)
   let frameUrl = `/placeholder.png`;
   let displayFrameNumber = startFrame;
   const safeIndex = frameCount > 0 ? currentFrameIndex % frameCount : 0;
-  if (frameCount > 0 && startFrame >= 0) {
-      const actualFrameNumber = startFrame + safeIndex;
-      displayFrameNumber = actualFrameNumber;
-      const paddedFrameNumber = String(actualFrameNumber).padStart(6, '0');
-      frameUrl = `${basePath}${paddedFrameNumber}.${imageExtension}`;
+  
+  if (base64Image) {
+    // Use base64 image from WebSocket (backend integration)
+    frameUrl = `data:image/jpeg;base64,${base64Image}`;
+    console.log(`📷 Using base64 image for camera ${cameraId}`);
+  } else if (frameCount > 0 && startFrame >= 0) {
+    // Fallback to static file path (legacy approach)
+    const actualFrameNumber = startFrame + safeIndex;
+    displayFrameNumber = actualFrameNumber;
+    const paddedFrameNumber = String(actualFrameNumber).padStart(6, '0');
+    frameUrl = `${basePath}${paddedFrameNumber}.${imageExtension}`;
+    console.log(`💼 Fallback to static image for camera ${cameraId}: ${frameUrl}`);
   }
 
   // --- Effect to calculate scaling when image or container size changes ---
@@ -84,8 +93,8 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
 
         setScaleInfo({ scale, offsetX, offsetY });
       } else {
-         // Image not loaded or available yet
-         setScaleInfo(null);
+        // Image not loaded or available yet
+        setScaleInfo(null);
       }
     };
 
@@ -96,7 +105,7 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
     // Re-calculate when the image fully loads (important!)
     const imgElement = imgRef.current;
     if (imgElement) {
-        imgElement.addEventListener('load', calculateScale);
+      imgElement.addEventListener('load', calculateScale);
     }
 
     // Re-calculate on window resize
@@ -104,39 +113,42 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
 
     // Cleanup function
     return () => {
-       if (imgElement) {
-            imgElement.removeEventListener('load', calculateScale);
-       }
-       window.removeEventListener('resize', calculateScale);
+      if (imgElement) {
+        imgElement.removeEventListener('load', calculateScale);
+      }
+      window.removeEventListener('resize', calculateScale);
     };
     // Dependencies: recalculate if the image source changes
   }, [frameUrl]);
 
-
   return (
     // Container needs relative positioning
-    <div className={`relative w-full h-full bg-black flex items-center justify-center overflow-hidden ${className}`}>
-
+    <div
+      className={`relative w-full h-full bg-black flex items-center justify-center overflow-hidden ${className}`}
+    >
       {/* Image Display - Add ref and potentially onLoad */}
       {frameCount > 0 && startFrame >= 0 ? (
-         <img
-           ref={imgRef} // Assign the ref here
-           key={`${cameraId}-${safeIndex}-${frameUrl}`} // More specific key including frameUrl
-           src={frameUrl}
-           alt={`Camera ${cameraId} - Frame ${displayFrameNumber}`}
-           className="object-contain w-full h-full" // Crucial style for scaling
-           // onLoad={calculateScale} // Alternative way to trigger calculation
-           onError={(e) => {
-             console.error(`Error loading image: ${frameUrl}`);
-             (e.target as HTMLImageElement).src = '/placeholder.png';
-           }}
-         />
+        <img
+          ref={imgRef} // Assign the ref here
+          key={`${cameraId}-${safeIndex}-${frameUrl}`} // More specific key including frameUrl
+          src={frameUrl}
+          alt={`Camera ${cameraId} - Frame ${displayFrameNumber}`}
+          className="object-contain w-full h-full" // Crucial style for scaling
+          // onLoad={calculateScale} // Alternative way to trigger calculation
+          onError={(e) => {
+            console.error(`Error loading image: ${frameUrl}`);
+            (e.target as HTMLImageElement).src = '/placeholder.png';
+          }}
+        />
       ) : (
-          <span className="text-gray-500">No frames available</span>
+        <span className="text-gray-500">No frames available</span>
       )}
 
       {/* Bounding Box Overlay - Render only if scaleInfo is calculated */}
-      {scaleInfo && tracks && tracks.length > 0 && tracks.map((track) => {
+      {scaleInfo &&
+        tracks &&
+        tracks.length > 0 &&
+        tracks.map((track) => {
           // Original coordinates from JSON
           const [x1, y1, x2, y2] = track.bbox_xyxy;
 
@@ -148,28 +160,33 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
 
           // CSS styles for the transformed box
           const boxStyle: React.CSSProperties = {
-              position: 'absolute',
-              left: `${scaledX1}px`,
-              top: `${scaledY1}px`,
-              width: `${scaledWidth}px`,
-              height: `${scaledHeight}px`,
-              border: '2px solid lime',
-              pointerEvents: 'none',
+            position: 'absolute',
+            left: `${scaledX1}px`,
+            top: `${scaledY1}px`,
+            width: `${scaledWidth}px`,
+            height: `${scaledHeight}px`,
+            border: '2px solid lime',
+            pointerEvents: 'none',
           };
 
-          const labelStyle : React.CSSProperties = {
-              position: 'absolute', top: '-16px', left: '0px',
-              backgroundColor: 'rgba(0, 0, 0, 0.6)', color: 'white',
-              padding: '1px 3px', fontSize: '10px', fontWeight: 'bold',
-              whiteSpace: 'nowrap',
+          const labelStyle: React.CSSProperties = {
+            position: 'absolute',
+            top: '-16px',
+            left: '0px',
+            backgroundColor: 'rgba(0, 0, 0, 0.6)',
+            color: 'white',
+            padding: '1px 3px',
+            fontSize: '10px',
+            fontWeight: 'bold',
+            whiteSpace: 'nowrap',
           };
 
           return (
-              <div key={track.global_id} style={boxStyle}>
-                  <span style={labelStyle}>ID: {track.global_id}</span>
-              </div>
+            <div key={track.global_id} style={boxStyle}>
+              <span style={labelStyle}>ID: {track.global_id}</span>
+            </div>
           );
-      })}
+        })}
     </div> // End container div
   );
 };

@@ -1,66 +1,176 @@
-# SpotOn Frontend Application
+# SpotOn Person Tracking System
 
-This is the frontend application for the SpotOn Intelligent Multi-Camera Person Tracking and Analytics System. It provides a user interface for visualizing camera feeds, tracking data, and interacting with the backend services.
+A real-time multi-camera person tracking and analytics system with an intuitive web interface.
 
-## Prerequisites
+## 🚀 Quick Start
 
-Before you begin, ensure you have the following installed:
-*   [Node.js](https://nodejs.org/) (v18.x or later recommended)
-*   [npm](https://www.npmjs.com/) (usually comes with Node.js) or [Yarn](https://yarnpkg.com/)
+### Prerequisites
+- Node.js 18+ installed ([Download here](https://nodejs.org/))
+- SpotOn backend running on port 3847
 
-## Installation
+### Running the Application
 
-1.  **Clone the repository:**
-    ```bash
-    git clone https://github.com/JubJones/spoton_frontend
-    cd spoton_frontend
-    ```
+1. **Install dependencies:**
+   ```bash
+   npm install
+   ```
 
-2.  **Install dependencies:**
-    Using npm:
-    ```bash
-    npm install
-    ```
-    Or using Yarn:
-    ```bash
-    yarn install
-    ```
-    This will download and install all the necessary packages defined in `package.json`.
+2. **Start the development server:**
+   ```bash
+   npm run dev
+   ```
 
-## Running the Development Server
+3. **Open your browser:**
+   Navigate to `http://localhost:5173`
 
-To run the application in development mode with hot-reloading:
+That's it! The application will connect to the backend automatically.
 
-1.  **Start the Vite development server:**
-    Using npm:
-    ```bash
-    npm run dev
-    ```
-    Or using Yarn:
-    ```bash
-    yarn dev
-    ```
+## 🎯 Features Overview
 
-2.  Open your web browser and navigate to the URL provided in the terminal (usually `http://localhost:5173` or a similar port if 5173 is in use).
+SpotOn provides **5 main features** across **4 key pages**:
 
-The application will automatically reload if you make changes to the source files.
+### 1. **Real-Time Person Tracking** 
+- Live video feeds from multiple cameras
+- Automatic person detection with bounding boxes
+- Cross-camera person identification
+- Real-time movement tracking on interactive map
 
-## Available Scripts
+### 2. **Focus Track System**
+- Click any person to highlight them across all cameras
+- Follow individuals as they move between camera views
+- Detailed person information and movement history
 
-In the `package.json`, you will find other scripts, including:
+### 3. **Interactive Analytics**
+- Live person counts per camera
+- Traffic flow analysis and heatmaps
+- Occupancy trends and peak hour insights
+- System performance monitoring
 
-*   `npm run build` or `yarn build`: Builds the app for production to the `dist` folder. It correctly bundles React in production mode and optimizes the build for the best performance.
-*   `npm run lint` or `yarn lint`: Lints the project files using ESLint (based on `eslint.config.js`).
-*   `npm run preview` or `yarn preview`: Serves the production build locally to preview it before deployment.
+### 4. **Playback Controls**
+- Video-like controls (play, pause, seek)
+- Historical data analysis
+- Timeline navigation with bookmarks
 
-## Key Technologies
+### 5. **Multi-Environment Support**
+- Campus environment (4 cameras: c01, c02, c03, c05)
+- Factory environment (4 cameras: c09, c12, c13, c16)
+- Seamless environment switching
 
-*   **React:** A JavaScript library for building user interfaces.
-*   **TypeScript:** A typed superset of JavaScript that compiles to plain JavaScript.
-*   **Vite:** A fast frontend build tool and development server.
-*   **Tailwind CSS:** A utility-first CSS framework for rapid UI development.
-*   **React Router:** For client-side routing.
+## 📱 How to Use Each Page
 
-## Backend Dependency
+### **Landing Page** - Environment Selection
+**What you see:** Environment selection cards with camera previews
 
-This frontend application is designed to interact with the SpotOn backend services. Ensure the backend server is running and accessible at the configured URLs (typically `http://localhost:8000` for API and `ws://localhost:8000` for WebSockets, as seen in `GroupViewPage.tsx`). These URLs might need to be configured via environment variables for different deployment environments.
+**How to interact:**
+1. **Choose Environment:** Click "Campus" or "Factory" card
+2. **Set Time Range:** Use date/time pickers for historical analysis
+3. **Start Tracking:** Click "Start Processing" to begin
+
+### **Group View Page** - Main Dashboard  
+**What you see:** 2x2 camera grid, interactive map, person list, controls
+
+**How to interact:**
+1. **View Live Feeds:** Watch real-time camera feeds with person detection
+2. **Track Persons:** 
+   - Click any person (bounding box or thumbnail) to focus on them
+   - Focused persons are highlighted in **yellow** across all cameras
+   - View their path on the interactive map
+3. **Control Playback:**
+   - Use play/pause buttons for video-like control
+   - Drag timeline slider to seek through footage
+   - Adjust playback speed (0.5x to 4x)
+4. **Navigate Map:**
+   - Zoom and pan the map to see person locations
+   - Click person markers for details
+   - Camera positions shown as icons
+
+### **Analytics Page** - Insights Dashboard
+**What you see:** Charts, metrics, and trend analysis
+
+**How to interact:**
+1. **View Real-Time Metrics:** Person counts, detection rates, system health
+2. **Analyze Trends:** Daily/weekly/monthly traffic patterns
+3. **Monitor Performance:** Camera status, processing speed, error rates
+4. **Export Data:** Download reports and analytics data
+
+### **Settings Page** - Configuration  
+**What you see:** System settings and preferences
+
+**How to interact:**
+1. **Adjust Detection:** Confidence thresholds, tracking sensitivity
+2. **Customize Display:** Colors, labels, overlay options
+3. **Configure Cameras:** Resolution, frame rate, calibration
+4. **Manage Users:** Permissions, access control (if enabled)
+
+## 🎮 Key Interactions
+
+### **Person Focus System**
+- **Click any person** → Highlights across all cameras
+- **Yellow highlighting** → Currently focused person
+- **Person thumbnails** → Quick selection below cameras
+- **Map markers** → Click for person details
+
+### **Camera Controls**
+- **Click camera view** → Expand to fullscreen
+- **Mouse wheel** → Zoom in/out on camera feeds
+- **Drag** → Pan around zoomed camera view
+
+### **Timeline Navigation**
+- **Play button** → Start/resume real-time processing
+- **Pause button** → Freeze current frame
+- **Timeline slider** → Seek to specific time
+- **Speed buttons** → 0.5x, 1x, 2x, 4x playback
+
+### **Map Interaction**
+- **Zoom controls** → +/- buttons or mouse wheel
+- **Pan** → Click and drag to move around
+- **Person markers** → Click for tracking details
+- **Camera icons** → Show camera positions and coverage
+
+## 🔧 Technical Details
+
+### Built With
+- **React 19** - Modern UI framework
+- **TypeScript** - Type safety and better development
+- **Vite** - Fast development server and build tool
+- **Tailwind CSS** - Utility-first styling
+- **WebSocket** - Real-time data communication
+
+### Backend Integration
+- **API Endpoint:** `http://localhost:3847`
+- **WebSocket:** `ws://localhost:3847`
+- **Auto-reconnection** with error recovery
+- **Real-time data** at 23 FPS processing rate
+
+### Performance
+- **Sub-100ms latency** for real-time tracking
+- **Automatic scaling** for different screen sizes
+- **Efficient rendering** for smooth 60fps display
+- **Smart caching** to minimize bandwidth usage
+
+## 🛠️ Development Scripts
+
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production  
+npm run preview  # Preview production build
+npm run lint     # Check code quality
+```
+
+## 🔍 Troubleshooting
+
+**No camera feeds?**
+- Check that backend is running on port 3847
+- Verify environment has available data
+
+**Person tracking not working?**
+- Ensure processing task is in "PROCESSING" status
+- Check WebSocket connection in browser dev tools
+
+**Slow performance?**
+- Try reducing playback speed
+- Check system requirements and browser compatibility
+
+---
+
+**Need Help?** Check the console (F12) for detailed error messages and connection status.
