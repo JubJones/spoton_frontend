@@ -1,5 +1,5 @@
-// Enhanced GroupViewPage with Phase 11 Data Management & State Integration
-// src/pages/GroupViewPage.tsx
+// Enhanced GroupViewPage with Zustand Store Integration
+// src/pages/GroupViewPageIntegrated.tsx
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -13,44 +13,45 @@ import {
 import { useViewportSize, getResponsiveClasses } from '../utils/responsive';
 import { useErrorRecovery, useNetworkStatus } from '../hooks/useErrorRecovery';
 
-// Phase 11 Integration: WebSocket and Store Integration
-import { useWebSocketIntegration } from '../hooks/useWebSocketIntegration';
-
-// Phase 11 Integration: Performance Optimization
-import { 
-  useAdvancedPerformance, 
-  useRenderPerformance, 
-  useTrackingDataPerformance 
-} from '../hooks/usePerformanceOptimization';
-
-// Zustand Store Hooks - Phase 11 State Management
+// Zustand Store Hooks
 import {
   useSystemActions,
   useCurrentEnvironment,
   useTaskInfo,
   useSystemHealth,
+  useUIState,
   useIsSystemReady,
   useIsTaskProcessing,
   useHasSystemErrors,
 } from '../stores/systemStore';
-
 import {
   useTrackingActions,
+  useWebSocketState,
   useCameraData,
   usePersonTracking,
   useTrackingStatistics,
+  useDisplayConfig,
   useIsTrackingActive,
 } from '../stores/trackingStore';
+import {
+  useUIActions,
+  useViewConfig,
+  useCameraDisplayConfig,
+  useMapConfig,
+  useLayout,
+  usePreferences,
+  useIsHighPerformanceMode,
+} from '../stores/uiStore';
 
-// Configuration and Types
+// Types and Configuration
 import type { EnvironmentId, BackendCameraId } from '../types/api';
+import { CameraTrackingDisplayData } from '../types/ui';
 import { 
   getCameraMapping, 
   getEnvironmentConfig, 
   getFrontendCameraId, 
   getBackendCameraId 
 } from '../config/environments';
-
 
 // =============================================================================
 // Constants and Configuration
@@ -66,11 +67,19 @@ const FRONTEND_CAMERA_IDS = ['camera1', 'camera2', 'camera3', 'camera4'];
 
 type TabType = 'all' | string;
 
+// Mock detection data - will be replaced with real data from stores
+const getMockDetections = (cameraData: Record<BackendCameraId, CameraTrackingDisplayData>) => {
+  return CAMERA_NAMES.map((_, index) => {
+    const backendId = getBackendCameraId(`camera${index + 1}` as any, 'factory'); // Default to factory
+    return cameraData[backendId]?.tracks?.length || 0;
+  });
+};
+
 // =============================================================================
-// Enhanced GroupViewPage Component with Phase 11 Integration
+// Enhanced GroupViewPage Component
 // =============================================================================
 
-const GroupViewPage: React.FC = () => {
+const GroupViewPageIntegrated: React.FC = () => {
   // URL Parameters
   const [searchParams] = useSearchParams();
   const environmentParam = searchParams.get('environment') as EnvironmentId;
@@ -83,34 +92,29 @@ const GroupViewPage: React.FC = () => {
   const currentEnvironment = useCurrentEnvironment();
   const taskInfo = useTaskInfo();
   const systemHealth = useSystemHealth();
+  const uiState = useUIState();
   const isSystemReady = useIsSystemReady();
   const isTaskProcessing = useIsTaskProcessing();
   const hasSystemErrors = useHasSystemErrors();
   
   // Zustand Store Hooks - Tracking Store
   const trackingActions = useTrackingActions();
+  const webSocketState = useWebSocketState();
   const cameraData = useCameraData();
   const personTracking = usePersonTracking();
   const trackingStats = useTrackingStatistics();
+  const displayConfig = useDisplayConfig();
   const isTrackingActive = useIsTrackingActive();
   
-  // Phase 11: WebSocket Integration Hook
-  const webSocketIntegration = useWebSocketIntegration({
-    autoConnect: true,
-    autoSubscribe: true,
-    reconnectOnError: true,
-  });
+  // Zustand Store Hooks - UI Store
+  const uiActions = useUIActions();
+  const viewConfig = useViewConfig();
+  const cameraDisplayConfig = useCameraDisplayConfig();
+  const mapConfig = useMapConfig();
+  const layout = useLayout();
+  const preferences = usePreferences();
+  const isHighPerformanceMode = useIsHighPerformanceMode();
   
-  // Phase 11: Performance Optimization Hooks
-  const [performanceState, performanceActions] = useAdvancedPerformance({
-    enableAutoOptimization: true,
-    memoryThreshold: 80,
-    updateInterval: 1000,
-  });
-  
-  const getPerformanceMetrics = useRenderPerformance('GroupViewPage');
-  const { optimizeTrackingUpdate } = useTrackingDataPerformance();
-
   // Responsive and Error Handling
   const { screenSize } = useViewportSize();
   const { isOnline } = useNetworkStatus();
@@ -127,11 +131,10 @@ const GroupViewPage: React.FC = () => {
   const environmentConfig = getEnvironmentConfig(environment);
   const zoneName = ZONE_NAMES[environment] || 'Unknown Zone';
   const cameraMapping = getCameraMapping(environment);
-
+  
   // =============================================================================
-  // Phase 11: Backend Integration and Task Management
+  // Backend Integration and Task Management
   // =============================================================================
-
   
   // Initialize system and start task when component mounts
   useEffect(() => {
@@ -143,16 +146,20 @@ const GroupViewPage: React.FC = () => {
             await systemActions.setEnvironment(environmentParam);
           }
           
-          // Check system health first
+          // Check system health
           await systemActions.checkSystemHealth();
           
-          // Start processing task if environment is set and no task is running
-          if (environment && !taskInfo.taskId && !webSocketIntegration.isConnected) {
+          // Start processing task if environment is set
+          if (environment && !taskInfo.taskId) {
             console.log('🚀 Starting processing task for environment:', environment);
-            const taskId = await webSocketIntegration.startTask(environment);
+            const taskId = await systemActions.startProcessingTask(environment);
             
             if (taskId) {
-              console.log('✅ Task and WebSocket initialized successfully:', taskId);
+              console.log('✅ Task started successfully:', taskId);
+              
+              // Connect WebSocket for real-time tracking
+              await trackingActions.connectWebSocket(taskId);
+              console.log('🔌 WebSocket connection initiated');
             }
           }
         });
@@ -172,11 +179,11 @@ const GroupViewPage: React.FC = () => {
     isSystemReady,
     isLoading,
     systemActions,
-    webSocketIntegration,
+    trackingActions,
     executeWithRecovery,
   ]);
   
-  // Monitor task progress
+  // Monitor task progress and handle completion
   useEffect(() => {
     if (taskInfo.taskId && taskInfo.taskStatus !== 'COMPLETED' && isTaskProcessing) {
       const monitorTask = async () => {
@@ -191,14 +198,26 @@ const GroupViewPage: React.FC = () => {
       return () => clearInterval(interval);
     }
   }, [taskInfo.taskId, taskInfo.taskStatus, isTaskProcessing, systemActions]);
-
+  
   // =============================================================================
   // UI Event Handlers
   // =============================================================================
   
   const handleTabChange = useCallback((tab: TabType) => {
     setActiveTab(tab);
-  }, []);
+    
+    // Track tab change for analytics
+    if (preferences.highPerformanceMode) {
+      // In high performance mode, optimize rendering
+      if (tab !== 'all') {
+        // Focus on single camera
+        uiActions.setGridLayout('focus');
+      } else {
+        // Show all cameras
+        uiActions.setGridLayout('grid');
+      }
+    }
+  }, [preferences.highPerformanceMode, uiActions]);
   
   const handlePersonSelection = useCallback((globalPersonId: string | undefined) => {
     trackingActions.selectPerson(globalPersonId);
@@ -216,16 +235,16 @@ const GroupViewPage: React.FC = () => {
     await trackingActions.clearTrackingData();
     
     if (taskInfo.taskId) {
-      await webSocketIntegration.connect(taskInfo.taskId);
+      await trackingActions.connectWebSocket(taskInfo.taskId);
     } else if (environment) {
       // Restart the entire process
-      const taskId = await webSocketIntegration.startTask(environment);
+      const taskId = await systemActions.startProcessingTask(environment);
       if (taskId) {
-        console.log('♾️ System restarted successfully');
+        await trackingActions.connectWebSocket(taskId);
       }
     }
-  }, [reset, environment, taskInfo.taskId, webSocketIntegration, trackingActions]);
-
+  }, [reset, environment, taskInfo.taskId, systemActions, trackingActions]);
+  
   // =============================================================================
   // Data Processing and Utilities
   // =============================================================================
@@ -261,13 +280,6 @@ const GroupViewPage: React.FC = () => {
     return cameraTrackingData?.frameImage;
   }, [cameraData, environment]);
   
-  const getMockDetections = useCallback(() => {
-    return CAMERA_NAMES.map((_, index) => {
-      const frontendId = FRONTEND_CAMERA_IDS[index];
-      return getTrackingDataForCamera(frontendId).length;
-    });
-  }, [getTrackingDataForCamera]);
-
   // =============================================================================
   // Render Helpers
   // =============================================================================
@@ -350,14 +362,15 @@ const GroupViewPage: React.FC = () => {
       </div>
     );
   }, [cameraData, environment, cameraMapping]);
-
-
+  
+  // =============================================================================
+  // Main Render
+  // =============================================================================
+  
   return (
     <ErrorBoundary>
-      <div
-        className={`flex flex-col h-screen bg-gray-900 text-gray-200 ${responsiveClasses.container}`}
-      >
-        {/* Header Section - Responsive */}
+      <div className={`flex flex-col h-screen bg-gray-900 text-gray-200 ${responsiveClasses.container}`}>
+        {/* Header Section */}
         <header className={`mb-4 flex-shrink-0 ${responsiveClasses.headerSection}`}>
           <Link
             to="/"
@@ -390,7 +403,7 @@ const GroupViewPage: React.FC = () => {
               status={
                 hasSystemErrors ? 'error' :
                 !isOnline ? 'disconnected' :
-                isTrackingActive && webSocketIntegration.isConnected ? 'connected' :
+                isTrackingActive && webSocketState.isConnected ? 'connected' :
                 isTaskProcessing ? 'connecting' :
                 'disconnected'
               }
@@ -422,7 +435,7 @@ const GroupViewPage: React.FC = () => {
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-gray-800 p-3 rounded-md flex-shrink-0 gap-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1">
             <div>
-              Cameras: <span className="font-semibold">{Object.keys(cameraMapping.frontendToBackend).length}</span>
+              Cameras: <span className="font-semibold">{Object.keys(cameraMapping.backendToFrontend).length}</span>
             </div>
             <div className="flex space-x-4">
               <span className="text-green-400 flex items-center">
@@ -489,20 +502,20 @@ const GroupViewPage: React.FC = () => {
           {/* Camera Views Section */}
           <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`}>
             <LoadingOverlay
-              isLoading={!isTrackingActive && isTaskProcessing}
+              isLoading={uiState.isLoading || (!isTrackingActive && isTaskProcessing)}
               message={
                 isTaskProcessing 
                   ? `Processing... ${Math.round((taskInfo.taskProgress || 0) * 100)}%` 
                   : "Loading camera feeds..."
               }
             >
-              {hasSystemErrors || error || webSocketIntegration.connectionError ? (
+              {hasSystemErrors || error ? (
                 <div className="flex items-center justify-center h-full">
                   <div className="text-center p-6">
                     <div className="text-red-400 text-4xl mb-4">⚠️</div>
                     <h3 className="text-lg font-semibold text-red-400 mb-2">System Error</h3>
                     <p className="text-gray-300 text-sm mb-4">
-                      {webSocketIntegration.connectionError || error?.message || taskInfo.taskError || 'System unavailable'}
+                      {uiState.error || error?.message || taskInfo.taskError || 'System unavailable'}
                     </p>
                     <button
                       onClick={handleRetry}
@@ -514,17 +527,15 @@ const GroupViewPage: React.FC = () => {
                 </div>
               ) : (
                 <>
+                  {/* Multi-camera grid view */}
                   {activeTab === 'all' && (
-                    <div
-                      className={`gap-1 w-full h-full ${
-                        screenSize === 'mobile'
-                          ? 'grid grid-cols-1'
-                          : 'grid grid-cols-2 grid-rows-2'
-                      }`}
-                    >
+                    <div className={`gap-1 w-full h-full ${
+                      screenSize === 'mobile' ? 'grid grid-cols-1' : 'grid grid-cols-2 grid-rows-2'
+                    }`}>
                       {FRONTEND_CAMERA_IDS.map(renderCameraView)}
                     </div>
                   )}
+                  
                   {/* Single camera view */}
                   {FRONTEND_CAMERA_IDS.includes(activeTab) && (
                     <div className="w-full h-full">
@@ -550,7 +561,9 @@ const GroupViewPage: React.FC = () => {
                   {CAMERA_NAMES.map((name, idx) => {
                     const frontendId = FRONTEND_CAMERA_IDS[idx];
                     const detectionCount = getTrackingDataForCamera(frontendId).length;
-                    const maxDetections = Math.max(1, ...getMockDetections());
+                    const maxDetections = Math.max(1, ...CAMERA_NAMES.map((_, i) => 
+                      getTrackingDataForCamera(FRONTEND_CAMERA_IDS[i]).length
+                    ));
                     
                     return (
                       <div key={name} className="flex items-center justify-between">
@@ -571,6 +584,7 @@ const GroupViewPage: React.FC = () => {
                   })}
                 </div>
               </div>
+              
               {/* Selected Person Info */}
               <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
                 <div>
@@ -626,4 +640,4 @@ const GroupViewPage: React.FC = () => {
   );
 };
 
-export default GroupViewPage;
+export default GroupViewPageIntegrated;

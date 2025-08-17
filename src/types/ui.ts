@@ -91,6 +91,7 @@ export interface UIControlState {
 export interface CameraTrackingDisplayData {
   cameraId: BackendCameraId;
   frameImageUrl?: string; // Base64 data URL or regular URL
+  frameImage?: string; // Base64 image data for WebSocket frames
   tracks: TrackedPersonDisplay[];
   isActive: boolean;
   lastUpdated: string;

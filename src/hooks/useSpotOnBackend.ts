@@ -11,10 +11,11 @@ import type {
   EnvironmentId,
 } from '../types/api';
 import { useBackendHealth } from './useBackendHealth';
+import { APP_CONFIG } from '../config/app';
 
-// Real backend configuration
-const API_BASE_URL = 'http://localhost:3847';
-const WS_BASE_URL = 'ws://localhost:3847';
+// Real backend configuration - FIXED to use environment variables
+const API_BASE_URL = APP_CONFIG.API_BASE_URL;
+const WS_BASE_URL = APP_CONFIG.WS_BASE_URL;
 
 export interface SpotOnBackendState {
   // Connection status

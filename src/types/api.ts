@@ -634,10 +634,10 @@ export const WEBSOCKET_ENDPOINTS = {
   ANALYTICS: (taskId: string) => `/ws/analytics/${taskId}`,
 } as const;
 
-// Default configuration values
+// Default configuration values - FIXED for backend port 8000
 export const DEFAULT_CONFIG = {
-  API_BASE_URL: 'http://localhost:3847',
-  WS_BASE_URL: 'ws://localhost:3847',
+  API_BASE_URL: 'http://localhost:8000',
+  WS_BASE_URL: 'ws://localhost:8000',
   DETECTION_CONFIDENCE_THRESHOLD: 0.7,
   REID_SIMILARITY_THRESHOLD: 0.65,
   TARGET_FPS: 23,

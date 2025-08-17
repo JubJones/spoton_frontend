@@ -251,6 +251,27 @@ export function getEnvironmentConfig(environment: EnvironmentId): EnvironmentCon
 }
 
 /**
+ * Get camera mapping configuration for an environment
+ */
+export function getCameraMapping(environment: EnvironmentId) {
+  return {
+    frontendToBackend: CAMERA_MAPPINGS[environment],
+    backendToFrontend: REVERSE_CAMERA_MAPPINGS[environment],
+    colors: {
+      // Define colors per backend camera ID for consistent UI display
+      c09: 'bg-cyan-400',
+      c12: 'bg-red-500', 
+      c13: 'bg-yellow-400',
+      c16: 'bg-purple-500',
+      c01: 'bg-blue-400',
+      c02: 'bg-green-500',
+      c03: 'bg-orange-400',
+      c05: 'bg-pink-500',
+    } as Record<BackendCameraId, string>
+  };
+}
+
+/**
  * Get all available environments
  */
 export function getAvailableEnvironments(): EnvironmentConfiguration[] {

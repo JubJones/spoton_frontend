@@ -226,3 +226,223 @@ export function useAnimationFrame(callback: () => void, active = true) {
 
 // React import fix
 import React from 'react';
+
+// =============================================================================
+// Phase 11: Advanced Performance Monitoring and Optimization
+// =============================================================================
+
+import { performanceOptimizationService } from '../services/performanceOptimizationService';
+import { APP_CONFIG } from '../config/app';
+
+interface AdvancedPerformanceState {
+  isOptimized: boolean;
+  memoryUsage: number; // percentage
+  frameRate: number;
+  cacheHitRate: number;
+  networkLatency: number;
+  lastUpdate: number;
+}
+
+interface PerformanceActions {
+  startMeasurement: (name: string) => void;
+  endMeasurement: (name: string) => number;
+  cacheData: (key: string, data: any, ttl?: number) => void;
+  getCachedData: (key: string) => any | null;
+  clearCache: () => void;
+  optimizeComponent: (componentName: string) => void;
+  reportPerformance: () => void;
+}
+
+/**
+ * Phase 11: Advanced Performance Optimization Hook
+ * Integrates with performanceOptimizationService for comprehensive monitoring
+ */
+export function useAdvancedPerformance(options?: {
+  enableAutoOptimization?: boolean;
+  memoryThreshold?: number;
+  updateInterval?: number;
+}): [AdvancedPerformanceState, PerformanceActions] {
+  
+  const config = {
+    enableAutoOptimization: true,
+    memoryThreshold: 85,
+    updateInterval: 2000,
+    ...options,
+  };
+
+  const [performanceState, setPerformanceState] = React.useState<AdvancedPerformanceState>({
+    isOptimized: true,
+    memoryUsage: 0,
+    frameRate: 60,
+    cacheHitRate: 0,
+    networkLatency: 0,
+    lastUpdate: Date.now(),
+  });
+
+  const componentMetrics = useRef(new Map<string, { renders: number; avgTime: number }>());
+  
+  // Monitor performance metrics
+  React.useEffect(() => {
+    if (!APP_CONFIG.ENABLE_PERFORMANCE_MONITORING) {
+      return;
+    }
+
+    const updateMetrics = () => {
+      const metrics = performanceOptimizationService.getMetrics();
+      
+      setPerformanceState({
+        isOptimized: metrics.memoryUsage.percentage < config.memoryThreshold,
+        memoryUsage: metrics.memoryUsage.percentage,
+        frameRate: metrics.frameRate,
+        cacheHitRate: metrics.cacheMetrics.hitRate,
+        networkLatency: metrics.networkLatency,
+        lastUpdate: Date.now(),
+      });
+
+      // Auto-optimization
+      if (config.enableAutoOptimization) {
+        if (metrics.memoryUsage.percentage > config.memoryThreshold) {
+          console.log('🚨 High memory usage detected, triggering optimization');
+          performOptimization();
+        }
+
+        if (metrics.frameRate < 30) {
+          console.log('🚨 Low frame rate detected, reducing rendering complexity');
+          optimizeRendering();
+        }
+      }
+    };
+
+    updateMetrics();
+    const interval = setInterval(updateMetrics, config.updateInterval);
+    return () => clearInterval(interval);
+  }, [config.enableAutoOptimization, config.memoryThreshold, config.updateInterval]);
+
+  // Performance actions
+  const startMeasurement = useCallback((name: string) => {
+    if (APP_CONFIG.ENABLE_PERFORMANCE_MONITORING) {
+      performanceOptimizationService.startPerformanceMeasure(name);
+    }
+  }, []);
+
+  const endMeasurement = useCallback((name: string): number => {
+    if (APP_CONFIG.ENABLE_PERFORMANCE_MONITORING) {
+      return performanceOptimizationService.endPerformanceMeasure(name);
+    }
+    return 0;
+  }, []);
+
+  const cacheData = useCallback((key: string, data: any, ttl?: number) => {
+    performanceOptimizationService.cacheData(key, data, ttl);
+  }, []);
+
+  const getCachedData = useCallback((key: string): any | null => {
+    return performanceOptimizationService.getCachedData(key);
+  }, []);
+
+  const clearCache = useCallback(() => {
+    console.log('🧹 Clearing performance cache');
+    // Cache clearing would be implemented in the service
+  }, []);
+
+  const optimizeComponent = useCallback((componentName: string) => {
+    const existing = componentMetrics.current.get(componentName) || { renders: 0, avgTime: 0 };
+    existing.renders++;
+    componentMetrics.current.set(componentName, existing);
+
+    if (existing.renders > 10 && existing.avgTime > 16) {
+      console.warn(`⚠️ Component ${componentName} may need optimization:`, existing);
+    }
+  }, []);
+
+  const reportPerformance = useCallback(() => {
+    performanceOptimizationService.reportPerformanceData();
+  }, []);
+
+  // Internal optimization methods
+  const performOptimization = useCallback(() => {
+    if (typeof (window as any).gc === 'function') {
+      (window as any).gc();
+    }
+    clearCache();
+  }, [clearCache]);
+
+  const optimizeRendering = useCallback(() => {
+    document.documentElement.style.setProperty('--animation-duration', '0ms');
+    setTimeout(() => {
+      document.documentElement.style.removeProperty('--animation-duration');
+    }, 5000);
+  }, []);
+
+  const actions: PerformanceActions = {
+    startMeasurement,
+    endMeasurement,
+    cacheData,
+    getCachedData,
+    clearCache,
+    optimizeComponent,
+    reportPerformance,
+  };
+
+  return [performanceState, actions];
+}
+
+/**
+ * Phase 11: WebSocket Performance Monitoring Hook
+ */
+export function useWebSocketPerformance() {
+  const [, { startMeasurement, endMeasurement, cacheData, getCachedData }] = useAdvancedPerformance();
+
+  const measureLatency = useCallback((sendTime: number) => {
+    const latency = Date.now() - sendTime;
+    performanceOptimizationService.measureWebSocketLatency(sendTime);
+    return latency;
+  }, []);
+
+  const cacheMessage = useCallback((messageId: string, message: any) => {
+    cacheData(`ws-message-${messageId}`, message, 30000);
+  }, [cacheData]);
+
+  const getCachedMessage = useCallback((messageId: string) => {
+    return getCachedData(`ws-message-${messageId}`);
+  }, [getCachedData]);
+
+  return {
+    measureLatency,
+    cacheMessage,
+    getCachedMessage,
+    startMeasurement,
+    endMeasurement,
+  };
+}
+
+/**
+ * Phase 11: Tracking Data Performance Hook
+ */
+export function useTrackingDataPerformance() {
+  const [performanceState, { startMeasurement, endMeasurement, cacheData }] = useAdvancedPerformance();
+
+  const optimizeTrackingUpdate = useCallback((trackingData: any) => {
+    startMeasurement('tracking-update-processing');
+
+    const processedData = {
+      ...trackingData,
+      timestamp: Date.now(),
+    };
+
+    cacheData(`tracking-${trackingData.global_frame_index}`, processedData, 60000);
+    
+    const duration = endMeasurement('tracking-update-processing');
+    
+    return {
+      data: processedData,
+      processingTime: duration,
+      shouldThrottle: duration > 50,
+    };
+  }, [startMeasurement, endMeasurement, cacheData]);
+
+  return {
+    optimizeTrackingUpdate,
+    performanceState,
+  };
+}

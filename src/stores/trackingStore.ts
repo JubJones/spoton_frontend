@@ -44,7 +44,17 @@ interface TrackingStoreState extends TrackingState {
 
     // Tracking data updates
     updateTrackingData: (payload: WebSocketTrackingMessagePayload) => void;
+    processTrackingUpdate: (payload: WebSocketTrackingMessagePayload) => void;
     clearTrackingData: () => void;
+    
+    // WebSocket state management
+    setWebSocketState: (state: Partial<{ 
+      isConnected: boolean;
+      lastConnectedAt?: string;
+      lastDisconnectedAt?: string;
+      lastError?: string;
+      connectionAttempts?: number;
+    }>) => void;
 
     // Person management
     selectPerson: (globalPersonId: string | undefined) => void;
@@ -642,6 +652,48 @@ export const useTrackingStore = create<TrackingStoreState>()(
             },
             false,
             'highlightPerson'
+          );
+        },
+
+        // ================================================================
+        // Phase 11: Enhanced WebSocket Integration Methods
+        // ================================================================
+
+        processTrackingUpdate: (payload: WebSocketTrackingMessagePayload) => {
+          // Enhanced version of updateTrackingData with additional processing
+          const startTime = Date.now();
+          
+          try {
+            // Call existing updateTrackingData method
+            get().actions.updateTrackingData(payload);
+            
+            // Additional processing for Phase 11 integration
+            set(
+              (state) => ({
+                isTrackingActive: true,
+                lastUpdateTimestamp: payload.timestamp_processed_utc,
+                wsConnectionState: 'connected',
+              }),
+              false,
+              'processTrackingUpdate'
+            );
+
+            console.log(`📊 Processed tracking update in ${Date.now() - startTime}ms`);
+          } catch (error) {
+            console.error('❌ Error processing tracking update:', error);
+            throw error;
+          }
+        },
+
+        setWebSocketState: (newState) => {
+          set(
+            (state) => ({
+              wsConnectionState: newState.isConnected ? 'connected' : 'disconnected',
+              isTrackingActive: newState.isConnected || state.isTrackingActive,
+              // Store additional WebSocket state if needed in future
+            }),
+            false,
+            'setWebSocketState'
           );
         },
 
