@@ -242,7 +242,7 @@ const BackendIntegratedView: React.FC = () => {
             <div className="text-yellow-700 space-y-2">
               <p>1. Start the SpotOn backend server:</p>
               <code className="block bg-yellow-100 p-2 rounded text-sm">
-                cd ../spoton_backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 8000
+                cd ../spoton_backend && python -m uvicorn app.main:app --host 0.0.0.0 --port 3847
                 --reload
               </code>
               <p>2. Ensure the backend health check passes</p>

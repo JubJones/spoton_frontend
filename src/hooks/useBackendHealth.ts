@@ -2,8 +2,9 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import type { EnvironmentId } from '../types/api';
+import { APP_CONFIG } from '../config/app';
 
-const API_BASE_URL = 'http://localhost:3847';
+const API_BASE_URL = APP_CONFIG.API_BASE_URL;
 
 export interface BackendHealthStatus {
   status: 'healthy' | 'unhealthy' | 'unknown';

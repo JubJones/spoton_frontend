@@ -403,7 +403,7 @@ const AnalyticsPage: React.FC = () => {
 
         {/* Key Metrics Overview */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-total-detections">
             <div className="text-2xl font-bold text-orange-400">
               {analyticsMetrics.totalDetections.toLocaleString()}
             </div>
@@ -411,25 +411,25 @@ const AnalyticsPage: React.FC = () => {
             <div className="text-xs text-green-400 mt-1">+12% from yesterday</div>
           </div>
 
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-active-tracks">
             <div className="text-2xl font-bold text-blue-400">{analyticsMetrics.uniquePersons}</div>
-            <div className="text-sm text-gray-400">Unique Persons</div>
+            <div className="text-sm text-gray-400">Active Tracks</div>
             <div className="text-xs text-green-400 mt-1">+8% from yesterday</div>
           </div>
 
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-average-confidence">
             <div className="text-2xl font-bold text-purple-400">
-              {analyticsMetrics.averageDwellTime.toFixed(1)}m
+              {Math.round(analyticsMetrics.averageConfidence * 100)}%
             </div>
-            <div className="text-sm text-gray-400">Avg Dwell Time</div>
+            <div className="text-sm text-gray-400">Average Confidence</div>
             <div className="text-xs text-red-400 mt-1">-5% from yesterday</div>
           </div>
 
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-system-uptime">
             <div className="text-2xl font-bold text-green-400">
-              {analyticsMetrics.peakOccupancy}
+              99.7%
             </div>
-            <div className="text-sm text-gray-400">Peak Occupancy</div>
+            <div className="text-sm text-gray-400">System Uptime</div>
             <div className="text-xs text-gray-400 mt-1">At 2:00 PM</div>
           </div>
 

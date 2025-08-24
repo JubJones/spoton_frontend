@@ -37,12 +37,12 @@ const LandingPage: React.FC = () => {
       {/* Hero Section */}
       <main className="container mx-auto px-6 py-12">
         <div className="text-center mb-16">
-          <h2 className="text-6xl font-bold mb-6 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
-            Beyond Watching:
+          <h1 className="text-6xl font-bold mb-6 bg-gradient-to-r from-white via-gray-200 to-gray-400 bg-clip-text text-transparent">
+            SpotOn
+          </h1>
+          <h2 className="text-4xl font-bold mb-6 text-white">
+            Beyond Watching: Intelligent Tracking in Action
           </h2>
-          <p className="text-3xl text-orange-400 font-semibold mb-8">
-            Intelligent Tracking in Action
-          </p>
           <p className="text-xl text-gray-300 max-w-3xl mx-auto leading-relaxed">
             Real-time multi-camera person tracking with advanced AI-powered analytics. Monitor,
             analyze, and understand movement patterns across complex environments.

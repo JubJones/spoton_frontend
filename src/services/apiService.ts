@@ -365,8 +365,8 @@ export class APIService {
     try {
       const response = await this.http.get<SystemHealthResponse>(API_ENDPOINTS.HEALTH);
 
-      // Validate response
-      if (!response.status || !response.timestamp) {
+      // Validate response - only status is required
+      if (!response.status) {
         throw new ValidationError('Invalid system health response format');
       }
 

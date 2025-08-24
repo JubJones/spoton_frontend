@@ -33,9 +33,9 @@ const Header: React.FC<HeaderProps> = ({
           <div className="w-10 h-10 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg flex items-center justify-center">
             <span className="text-white font-bold text-xl">S</span>
           </div>
-          <h1 className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
+          <div className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
             SpotOn
-          </h1>
+          </div>
         </Link>
 
         {showBackButton && (
@@ -52,7 +52,7 @@ const Header: React.FC<HeaderProps> = ({
       <nav className="flex items-center space-x-6">
         {/* Connection Status */}
         {connectionStatus && (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center space-x-2" data-testid="connection-indicator">
             {typeof connectionStatus === 'string' ? (
               <span className="text-sm text-gray-300">{connectionStatus}</span>
             ) : (

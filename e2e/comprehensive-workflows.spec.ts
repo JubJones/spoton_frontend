@@ -5,15 +5,15 @@ import { test, expect, Page } from '@playwright/test';
 const TEST_ENVIRONMENTS = {
   campus: {
     id: 'campus',
-    name: 'Campus Environment', 
+    name: 'University Campus', 
     cameras: ['c01', 'c02', 'c03', 'c05'],
-    description: 'Educational or corporate campuses'
+    description: 'Educational facility monitoring with cameras at main entrance, library, cafeteria, and courtyard.'
   },
   factory: {
     id: 'factory',
-    name: 'Factory Environment',
+    name: 'Factory Floor',
     cameras: ['c09', 'c12', 'c13', 'c16'],
-    description: 'Industrial settings'
+    description: 'Industrial monitoring with 4 cameras covering entrance, assembly line, storage, and quality control areas.'
   },
 };
 
@@ -66,10 +66,10 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       await expect(page.locator('text=Intelligent Tracking in Action')).toBeVisible();
       
       // Verify system status cards
-      await expect(page.locator('text=System Uptime')).toBeVisible();
-      await expect(page.locator('text=Environments')).toBeVisible();
-      await expect(page.locator('text=Total Cameras')).toBeVisible();
-      await expect(page.locator('text=Processing Speed')).toBeVisible();
+      await expect(page.locator('[data-testid="status-card-system-uptime"]')).toBeVisible();
+      await expect(page.locator('[data-testid="status-card-environments"]')).toBeVisible();
+      await expect(page.locator('[data-testid="status-card-total-cameras"]')).toBeVisible();
+      await expect(page.locator('[data-testid="status-card-processing-speed"]')).toBeVisible();
       
       // Verify main action buttons
       await expect(page.locator('text=Browse Environments')).toBeVisible();
@@ -90,7 +90,7 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       await expect(page.locator('h1')).toContainText('Help & Documentation');
       
       // Return to home via logo
-      await page.click('h1:has-text("SpotOn")');
+      await page.click('a[href="/"] div:has-text("SpotOn")');
       await expect(page).toHaveURL('/');
       
       // Test navigation to About page
@@ -109,7 +109,8 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       // Should show connected status with green indicator
       const connectionStatus = page.locator('[data-testid="connection-indicator"]');
       if (await connectionStatus.count() > 0) {
-        await expect(connectionStatus).toHaveClass(/bg-green/);
+        const greenDot = connectionStatus.locator('.bg-green-400');
+        await expect(greenDot).toBeVisible();
       }
       
       // Verify connection text
@@ -122,8 +123,8 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       await page.goto('/environments');
       
       // Verify page title and description
-      await expect(page.locator('h1')).toContainText('Select Environment');
-      await expect(page.locator('text=Choose your monitoring environment')).toBeVisible();
+      await expect(page.locator('h1')).toContainText('Select Your Environment');
+      await expect(page.locator('text=Choose from our pre-configured monitoring environments')).toBeVisible();
       
       // Verify environment options
       for (const env of Object.values(TEST_ENVIRONMENTS)) {
@@ -317,15 +318,15 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       await expect(page.locator('h1')).toContainText('Analytics');
       
       // Verify key metrics are displayed
-      const metricsExpected = [
-        'Total Detections',
-        'Active Tracks', 
-        'Average Confidence',
-        'System Uptime'
+      const metricTestIds = [
+        'metric-total-detections',
+        'metric-active-tracks', 
+        'metric-average-confidence',
+        'metric-system-uptime'
       ];
       
-      for (const metric of metricsExpected) {
-        const metricElement = page.locator(`text=${metric}`);
+      for (const testId of metricTestIds) {
+        const metricElement = page.locator(`[data-testid="${testId}"]`);
         if (await metricElement.count() > 0) {
           await expect(metricElement).toBeVisible();
         }
@@ -379,15 +380,15 @@ test.describe('SpotOn Comprehensive Application Workflows', () => {
       await page.goto('/settings');
       
       // Verify settings categories
-      const expectedCategories = [
-        'Camera Configuration',
-        'Detection Settings',
-        'Alert Preferences',
-        'System Settings'
+      const expectedCategoryIds = [
+        'settings-section-cameras',
+        'settings-section-detection',
+        'settings-section-alerts',
+        'settings-section-system'
       ];
       
-      for (const category of expectedCategories) {
-        const categoryElement = page.locator(`text=${category}`);
+      for (const categoryId of expectedCategoryIds) {
+        const categoryElement = page.locator(`[data-testid="${categoryId}"]`);
         if (await categoryElement.count() > 0) {
           await expect(categoryElement).toBeVisible();
         }

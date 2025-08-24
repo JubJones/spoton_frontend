@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import { devtools, subscribeWithSelector } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
 import {
   TrackingState,
   CameraTrackingDisplayData,
@@ -932,7 +933,7 @@ export const useWebSocketState = () =>
     connectionState: state.wsConnectionState,
     isConnected: state.wsConnectionState === 'connected',
     service: state.wsService,
-  }));
+  }), shallow);
 
 /**
  * Get camera tracking data
@@ -954,7 +955,7 @@ export const usePersonTracking = () =>
     focusedPersonId: state.focusedPersonId,
     highlightedPersonId: state.highlightedPersonId,
     trajectories: state.personTrajectories,
-  }));
+  }), shallow);
 
 /**
  * Get tracking statistics
@@ -966,7 +967,7 @@ export const useTrackingStatistics = () =>
     averageConfidence: state.averageConfidence,
     lastUpdateTimestamp: state.lastUpdateTimestamp,
     isTrackingActive: state.isTrackingActive,
-  }));
+  }), shallow);
 
 /**
  * Get display configuration
@@ -977,7 +978,7 @@ export const useDisplayConfig = () =>
     showPersonIds: state.showPersonIds,
     showTrajectories: state.showTrajectories,
     displaySizes: state.displaySizes,
-  }));
+  }), shallow);
 
 // ============================================================================
 // Utility Functions

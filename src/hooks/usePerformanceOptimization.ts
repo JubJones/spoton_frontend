@@ -1,11 +1,11 @@
 // src/hooks/usePerformanceOptimization.ts
-import { useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useRef, useCallback, useMemo, useEffect, useState } from 'react';
 
 // Hook for debouncing expensive operations
 export function useDebounce<T>(value: T, delay: number): T {
-  const [debouncedValue, setDebouncedValue] = React.useState<T>(value);
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handler = setTimeout(() => {
       setDebouncedValue(value);
     }, delay);
@@ -74,10 +74,10 @@ export function useIntersectionObserver(
   targetRef: React.RefObject<Element>,
   options: IntersectionObserverInit = {}
 ) {
-  const [isIntersecting, setIsIntersecting] = React.useState(false);
-  const [hasIntersected, setHasIntersected] = React.useState(false);
+  const [isIntersecting, setIsIntersecting] = useState(false);
+  const [hasIntersected, setHasIntersected] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const target = targetRef.current;
     if (!target) return;
 
@@ -169,9 +169,9 @@ export function useStableList<T>(
 // Hook for managing component visibility based on viewport
 export function useViewportVisibility(threshold = 0.1) {
   const elementRef = useRef<HTMLElement>(null);
-  const [isVisible, setIsVisible] = React.useState(true);
+  const [isVisible, setIsVisible] = useState(true);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const element = elementRef.current;
     if (!element) return;
 
@@ -203,7 +203,7 @@ export function useAnimationFrame(callback: () => void, active = true) {
     }
   }, [callback, active]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (active) {
       requestRef.current = requestAnimationFrame(animate);
     }
@@ -264,13 +264,13 @@ export function useAdvancedPerformance(options?: {
 }): [AdvancedPerformanceState, PerformanceActions] {
   
   const config = {
-    enableAutoOptimization: true,
+    enableAutoOptimization: false, // Disabled by default to prevent infinite loops
     memoryThreshold: 85,
-    updateInterval: 2000,
+    updateInterval: 5000, // Increased interval to reduce frequency
     ...options,
   };
 
-  const [performanceState, setPerformanceState] = React.useState<AdvancedPerformanceState>({
+  const [performanceState, setPerformanceState] = useState<AdvancedPerformanceState>({
     isOptimized: true,
     memoryUsage: 0,
     frameRate: 60,
@@ -280,35 +280,72 @@ export function useAdvancedPerformance(options?: {
   });
 
   const componentMetrics = useRef(new Map<string, { renders: number; avgTime: number }>());
+  const lastOptimizationTime = useRef(0);
+  const optimizationInProgress = useRef(false);
+  const consecutiveOptimizations = useRef(0);
   
   // Monitor performance metrics
-  React.useEffect(() => {
+  useEffect(() => {
     if (!APP_CONFIG.ENABLE_PERFORMANCE_MONITORING) {
       return;
     }
 
     const updateMetrics = () => {
+      // Skip if optimization is currently in progress to prevent cascading
+      if (optimizationInProgress.current) {
+        return;
+      }
+
       const metrics = performanceOptimizationService.getMetrics();
       
-      setPerformanceState({
-        isOptimized: metrics.memoryUsage.percentage < config.memoryThreshold,
-        memoryUsage: metrics.memoryUsage.percentage,
-        frameRate: metrics.frameRate,
-        cacheHitRate: metrics.cacheMetrics.hitRate,
-        networkLatency: metrics.networkLatency,
-        lastUpdate: Date.now(),
+      setPerformanceState(prevState => {
+        // Only update if metrics have meaningfully changed to prevent infinite loops
+        const significantChange = 
+          Math.abs(prevState.memoryUsage - metrics.memoryUsage.percentage) > 5 ||
+          Math.abs(prevState.frameRate - metrics.frameRate) > 5 ||
+          Date.now() - prevState.lastUpdate > 5000; // Force update every 5 seconds
+        
+        if (!significantChange) {
+          return prevState;
+        }
+        
+        return {
+          isOptimized: metrics.memoryUsage.percentage < config.memoryThreshold,
+          memoryUsage: metrics.memoryUsage.percentage,
+          frameRate: metrics.frameRate,
+          cacheHitRate: metrics.cacheMetrics.hitRate,
+          networkLatency: metrics.networkLatency,
+          lastUpdate: Date.now(),
+        };
       });
 
-      // Auto-optimization
-      if (config.enableAutoOptimization) {
-        if (metrics.memoryUsage.percentage > config.memoryThreshold) {
-          console.log('🚨 High memory usage detected, triggering optimization');
-          performOptimization();
-        }
-
-        if (metrics.frameRate < 30) {
-          console.log('🚨 Low frame rate detected, reducing rendering complexity');
-          optimizeRendering();
+      // Auto-optimization with enhanced throttling
+      if (config.enableAutoOptimization && !optimizationInProgress.current) {
+        const now = Date.now();
+        const timeSinceLastOptimization = now - lastOptimizationTime.current;
+        
+        // Progressive throttling: longer delays after consecutive optimizations
+        const minDelayMs = Math.min(10000 + (consecutiveOptimizations.current * 5000), 60000);
+        
+        // Only trigger optimization if enough time has passed and we haven't had too many consecutive optimizations
+        if (timeSinceLastOptimization > minDelayMs && consecutiveOptimizations.current < 3) {
+          if (metrics.memoryUsage.percentage > config.memoryThreshold) {
+            console.log('🚨 High memory usage detected, triggering optimization');
+            performOptimization();
+            lastOptimizationTime.current = now;
+            consecutiveOptimizations.current++;
+          } else if (metrics.frameRate < 30) {
+            console.log('🚨 Low frame rate detected, reducing rendering complexity');
+            optimizeRendering();
+            lastOptimizationTime.current = now;
+            consecutiveOptimizations.current++;
+          } else {
+            // Reset consecutive count if metrics are good
+            consecutiveOptimizations.current = 0;
+          }
+        } else if (timeSinceLastOptimization > 60000) {
+          // Reset consecutive count after 1 minute
+          consecutiveOptimizations.current = 0;
         }
       }
     };
@@ -360,11 +397,34 @@ export function useAdvancedPerformance(options?: {
   }, []);
 
   // Internal optimization methods
-  const performOptimization = useCallback(() => {
-    if (typeof (window as any).gc === 'function') {
-      (window as any).gc();
+  const performOptimization = useCallback(async () => {
+    if (optimizationInProgress.current) {
+      return; // Prevent overlapping optimizations
     }
-    clearCache();
+    
+    optimizationInProgress.current = true;
+    
+    try {
+      // Clear cache first
+      clearCache();
+      
+      // Wait a bit for cache clearing to complete
+      await new Promise(resolve => setTimeout(resolve, 100));
+      
+      // Trigger garbage collection if available
+      if (typeof (window as any).gc === 'function') {
+        (window as any).gc();
+      }
+      
+      // Wait for GC to complete
+      await new Promise(resolve => setTimeout(resolve, 500));
+      
+    } finally {
+      // Always reset the flag after a delay to ensure operations complete
+      setTimeout(() => {
+        optimizationInProgress.current = false;
+      }, 1000);
+    }
   }, [clearCache]);
 
   const optimizeRendering = useCallback(() => {
@@ -391,7 +451,9 @@ export function useAdvancedPerformance(options?: {
  * Phase 11: WebSocket Performance Monitoring Hook
  */
 export function useWebSocketPerformance() {
-  const [, { startMeasurement, endMeasurement, cacheData, getCachedData }] = useAdvancedPerformance();
+  const [, { startMeasurement, endMeasurement, cacheData, getCachedData }] = useAdvancedPerformance({
+    enableAutoOptimization: false // Prevent optimization loops
+  });
 
   const measureLatency = useCallback((sendTime: number) => {
     const latency = Date.now() - sendTime;
@@ -420,7 +482,9 @@ export function useWebSocketPerformance() {
  * Phase 11: Tracking Data Performance Hook
  */
 export function useTrackingDataPerformance() {
-  const [performanceState, { startMeasurement, endMeasurement, cacheData }] = useAdvancedPerformance();
+  const [performanceState, { startMeasurement, endMeasurement, cacheData }] = useAdvancedPerformance({
+    enableAutoOptimization: false // Prevent optimization loops
+  });
 
   const optimizeTrackingUpdate = useCallback((trackingData: any) => {
     startMeasurement('tracking-update-processing');

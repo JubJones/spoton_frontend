@@ -91,6 +91,8 @@ export type WebSocketMessageType =
   | 'connection_established'
   | 'tracking_update'
   | 'status_update'
+  | 'system_status'
+  | 'control_message'
   | 'pong'
   | 'subscribe_tracking'
   | 'unsubscribe_tracking'
@@ -156,10 +158,14 @@ export interface UserInfo {
 
 export interface SystemHealthResponse {
   status: 'healthy' | 'degraded' | 'error';
-  detector_model_status: 'loaded' | 'loading' | 'error';
-  tracker_factory_status: 'ready' | 'initializing' | 'error';
-  homography_matrices_status: 'loaded' | 'missing' | 'error';
-  timestamp: string;
+  detector_model_loaded?: boolean;
+  'prototype_tracker_loaded (reid_model)'?: boolean;
+  homography_matrices_precomputed?: boolean;
+  // Legacy fields for backward compatibility
+  detector_model_status?: 'loaded' | 'loading' | 'error';
+  tracker_factory_status?: 'ready' | 'initializing' | 'error';
+  homography_matrices_status?: 'loaded' | 'missing' | 'error';
+  timestamp?: string;
 }
 
 // ============================================================================
@@ -552,6 +558,8 @@ export function isValidWebSocketMessageType(value: string): value is WebSocketMe
     'connection_established',
     'tracking_update',
     'status_update',
+    'system_status',
+    'control_message',
     'pong',
     'subscribe_tracking',
     'unsubscribe_tracking',
@@ -634,10 +642,10 @@ export const WEBSOCKET_ENDPOINTS = {
   ANALYTICS: (taskId: string) => `/ws/analytics/${taskId}`,
 } as const;
 
-// Default configuration values - FIXED for backend port 8000
+// Default configuration values - Using port 3847 (OrbStack backend)
 export const DEFAULT_CONFIG = {
-  API_BASE_URL: 'http://localhost:8000',
-  WS_BASE_URL: 'ws://localhost:8000',
+  API_BASE_URL: 'http://localhost:3847',
+  WS_BASE_URL: 'ws://localhost:3847',
   DETECTION_CONFIDENCE_THRESHOLD: 0.7,
   REID_SIMILARITY_THRESHOLD: 0.65,
   TARGET_FPS: 23,

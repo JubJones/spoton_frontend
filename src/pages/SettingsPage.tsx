@@ -39,7 +39,7 @@ const SettingsPage: React.FC = () => {
     () => [
       {
         id: 'system',
-        title: 'System Configuration',
+        title: 'System Settings',
         description: 'Core system settings and backend configuration',
         icon: '⚙️',
         component: SystemSettings,
@@ -47,9 +47,17 @@ const SettingsPage: React.FC = () => {
       },
       {
         id: 'cameras',
-        title: 'Camera Settings',
+        title: 'Camera Configuration',
         description: 'Camera configuration and detection parameters',
         icon: '📹',
+        component: CameraSettings,
+        requiresBackend: true,
+      },
+      {
+        id: 'detection',
+        title: 'Detection Settings',
+        description: 'Person detection and tracking parameters',
+        icon: '🎯',
         component: CameraSettings,
         requiresBackend: true,
       },
@@ -63,7 +71,7 @@ const SettingsPage: React.FC = () => {
       },
       {
         id: 'alerts',
-        title: 'Alert Settings',
+        title: 'Alert Preferences',
         description: 'Notification and alert configuration',
         icon: '🔔',
         component: AlertSettings,
@@ -259,6 +267,7 @@ const SettingsPage: React.FC = () => {
                       key={section.id}
                       onClick={() => handleSectionChange(section.id)}
                       disabled={!status.available}
+                      data-testid={`settings-section-${section.id}`}
                       className={`w-full text-left p-3 rounded-lg transition-colors flex items-center space-x-3 ${
                         isActive
                           ? 'bg-orange-500 text-white'

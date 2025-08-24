@@ -45,6 +45,7 @@ const StatusCard: React.FC<StatusCardProps> = ({
   return (
     <div
       className={`bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-gray-700 ${className}`}
+      data-testid={`status-card-${label.toLowerCase().replace(/\s+/g, '-')}`}
     >
       <div className="flex items-center justify-between mb-2">
         <span className="text-gray-400 text-sm">{label}</span>

@@ -97,11 +97,11 @@ const BackendTestPage: React.FC = () => {
             <div>
               <h3 className="font-medium mb-2">2. Verify Environment Configuration</h3>
               <p className="text-sm text-gray-400 mb-2">
-                Ensure <code>.env.local</code> has correct backend URLs (port 8000):
+                Ensure <code>.env.local</code> has correct backend URLs (port 3847):
               </p>
               <div className="bg-gray-900 p-3 rounded text-sm">
-                <code className="text-blue-400">VITE_API_BASE_URL=http://localhost:8000</code><br />
-                <code className="text-blue-400">VITE_WS_BASE_URL=ws://localhost:8000</code>
+                <code className="text-blue-400">VITE_API_BASE_URL=http://localhost:3847</code><br />
+                <code className="text-blue-400">VITE_WS_BASE_URL=ws://localhost:3847</code>
               </div>
             </div>
             

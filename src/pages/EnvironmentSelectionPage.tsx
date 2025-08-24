@@ -6,6 +6,7 @@ import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import Header from '../components/common/Header';
 import LoadingSpinner from '../components/common/LoadingSpinner';
 import DateTimeRangePicker, { DateTimeRange } from '../components/DateTimeRangePicker';
+import { APP_CONFIG } from '../config/app';
 import type { EnvironmentConfiguration, EnvironmentId } from '../types/api';
 
 interface EnvironmentCardProps {
@@ -62,6 +63,7 @@ const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
 
   return (
     <div
+      data-testid={`environment-${environment.id}`}
       className={`relative p-6 rounded-xl border-2 transition-all duration-300 cursor-pointer transform hover:scale-105 ${
         isSelected
           ? 'border-orange-400 bg-gradient-to-br from-orange-500/10 to-red-500/10 shadow-lg shadow-orange-500/25'
@@ -214,7 +216,7 @@ const EnvironmentSelectionPage: React.FC = () => {
       <main className="container mx-auto px-6 py-12">
         {/* Page Header */}
         <div className="text-center mb-12">
-          <h2 className="text-4xl font-bold mb-4 text-white">Select Your Environment</h2>
+          <h1 className="text-4xl font-bold mb-4 text-white">Select Your Environment</h1>
           <p className="text-xl text-gray-300 max-w-2xl mx-auto">
             Choose from our pre-configured monitoring environments. Each environment includes
             multiple camera feeds with specialized tracking capabilities.
@@ -226,7 +228,7 @@ const EnvironmentSelectionPage: React.FC = () => {
           <div className="mb-8 p-4 bg-red-500/20 border border-red-500/50 rounded-lg text-center">
             <p className="text-red-400">
               ⚠️ Backend connection required for environment validation. Please ensure the SpotOn
-              backend is running on port 3847.
+              backend is running on {new URL(APP_CONFIG.API_BASE_URL).port || '3847'}.
             </p>
           </div>
         )}

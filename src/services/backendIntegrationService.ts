@@ -83,8 +83,8 @@ class BackendIntegrationService {
         }
         
         // Check for common port misconfigurations
-        if (apiUrl.port === '3847') {
-          warnings.push('API configured for port 3847 - backend typically runs on port 8000');
+        if (apiUrl.port === '8000') {
+          warnings.push('API configured for port 8000 - backend now runs on port 3847 (OrbStack)');
         }
       } catch (error) {
         issues.push(`Invalid API URL format: ${APP_CONFIG.API_BASE_URL}`);
@@ -396,7 +396,7 @@ class BackendIntegrationService {
         recommendations.push('Backend integration is fully operational');
       } else if (issues.length > 0) {
         recommendations.push('Resolve critical issues before proceeding');
-        recommendations.push('Check backend service is running on correct port (8000)');
+        recommendations.push('Check backend service is running on correct port (3847)');
         recommendations.push('Verify .env.local configuration matches backend setup');
       }
 

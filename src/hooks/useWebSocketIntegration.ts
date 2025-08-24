@@ -1,7 +1,7 @@
 // WebSocket Integration Hook - Connects WebSocket service to Zustand stores
 // src/hooks/useWebSocketIntegration.ts
 
-import { useEffect, useRef, useCallback, useState } from 'react';
+import { useEffect, useRef, useCallback, useState, useMemo } from 'react';
 import { WebSocketService } from '../services/websocketService';
 import { apiService } from '../services/apiService';
 import { getWebSocketUrl, APP_CONFIG } from '../config/app';
@@ -14,6 +14,7 @@ import type {
 // Store hooks
 import { useSystemActions, useSystemStore } from '../stores/systemStore';
 import { useTrackingActions } from '../stores/trackingStore';
+import { shallow } from 'zustand/shallow';
 
 // =============================================================================
 // WebSocket Integration Hook
@@ -69,20 +70,25 @@ export function useWebSocketIntegration(
   const systemActions = useSystemActions();
   const trackingActions = useTrackingActions();
   
-  // Store state
-  const { currentEnvironment, taskInfo, systemHealth } = useSystemStore((state) => ({
-    currentEnvironment: state.currentEnvironment,
-    taskInfo: {
-      taskId: state.taskId,
-      taskStatus: state.taskStatus,
-      taskProgress: state.taskProgress,
-    },
-    systemHealth: state.systemHealth,
-  }));
+  // Store state - use individual selectors to avoid object creation
+  const currentEnvironment = useSystemStore((state) => state.currentEnvironment);
+  const taskId = useSystemStore((state) => state.taskId);
+  const taskStatus = useSystemStore((state) => state.taskStatus);
+  const taskProgress = useSystemStore((state) => state.taskProgress);
+  const systemHealth = useSystemStore((state) => state.systemHealth);
+  
+  // Create stable taskInfo object
+  const taskInfo = useMemo(() => ({
+    taskId,
+    taskStatus,
+    taskProgress,
+  }), [taskId, taskStatus, taskProgress]);
   
   // WebSocket service reference
   const wsServiceRef = useRef<WebSocketService | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const connectRef = useRef<((taskId: string) => Promise<void>) | null>(null);
+  const disconnectRef = useRef<(() => void) | null>(null);
   
   // Connection state
   const [connectionState, setConnectionState] = useState({
@@ -258,6 +264,9 @@ export function useWebSocketIntegration(
     handleReconnectAttempt,
   ]);
   
+  // Store connect function in ref for stable access
+  connectRef.current = connect;
+  
   const disconnect = useCallback(() => {
     console.log('🔌 Disconnecting WebSocket');
     
@@ -279,6 +288,9 @@ export function useWebSocketIntegration(
       connectionAttempts: 0,
     });
   }, [trackingActions]);
+  
+  // Store disconnect function in ref for stable access
+  disconnectRef.current = disconnect;
   
   // =============================================================================
   // Task Management
@@ -352,29 +364,33 @@ export function useWebSocketIntegration(
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      disconnect();
+      if (disconnectRef.current) {
+        disconnectRef.current();
+      }
     };
-  }, [disconnect]);
+  }, []); // Empty dependency array - cleanup function doesn't change
   
   // Auto-reconnect on system health recovery
   useEffect(() => {
     if (
-      systemHealth.health?.status === 'healthy' &&
+      systemHealth?.health?.status === 'healthy' &&
       taskInfo.taskId &&
       !connectionState.isConnected &&
       !connectionState.isConnecting &&
-      mergedConfig.reconnectOnError
+      mergedConfig.reconnectOnError &&
+      connectRef.current
     ) {
       console.log('🔄 System healthy, attempting auto-reconnect');
-      connect(taskInfo.taskId);
+      // Use stable reference to avoid infinite loop
+      connectRef.current(taskInfo.taskId);
     }
   }, [
-    systemHealth.health?.status,
+    systemHealth?.health?.status,
     taskInfo.taskId,
     connectionState.isConnected,
     connectionState.isConnecting,
     mergedConfig.reconnectOnError,
-    connect,
+    // connectRef.current is stable and won't cause re-renders
   ]);
   
   // =============================================================================

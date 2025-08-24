@@ -1,7 +1,7 @@
 // Enhanced GroupViewPage with Phase 11 Data Management & State Integration
 // src/pages/GroupViewPage.tsx
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ImageSequencePlayer from '../components/ImageSequencePlayer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
@@ -28,6 +28,10 @@ import {
   useSystemActions,
   useCurrentEnvironment,
   useTaskInfo,
+  useTaskId,
+  useTaskStatus,
+  useTaskProgress,
+  useTaskError,
   useSystemHealth,
   useIsSystemReady,
   useIsTaskProcessing,
@@ -77,39 +81,57 @@ const GroupViewPage: React.FC = () => {
   
   // Local UI State
   const [activeTab, setActiveTab] = useState<TabType>('all');
+  const [isInitialized, setIsInitialized] = useState(false);
   
   // Zustand Store Hooks - System Store
   const systemActions = useSystemActions();
   const currentEnvironment = useCurrentEnvironment();
-  const taskInfo = useTaskInfo();
-  const systemHealth = useSystemHealth();
+  // const taskInfo = useTaskInfo();
+  const taskId = useTaskId();
+  const taskStatus = useTaskStatus();
+  const taskProgress = useTaskProgress();
+  const taskError = useTaskError();
+  
+  // Create stable taskInfo object
+  const taskInfo = useMemo(() => ({
+    taskId,
+    taskStatus,
+    taskProgress,
+    taskError,
+  }), [taskId, taskStatus, taskProgress, taskError]);
+  // const systemHealth = useSystemHealth();
   const isSystemReady = useIsSystemReady();
   const isTaskProcessing = useIsTaskProcessing();
   const hasSystemErrors = useHasSystemErrors();
   
-  // Zustand Store Hooks - Tracking Store
+  // Zustand Store Hooks - Tracking Store - TEMPORARILY DISABLED
   const trackingActions = useTrackingActions();
   const cameraData = useCameraData();
-  const personTracking = usePersonTracking();
-  const trackingStats = useTrackingStatistics();
+  // const personTracking = usePersonTracking();
+  // const trackingStats = useTrackingStatistics();
   const isTrackingActive = useIsTrackingActive();
   
-  // Phase 11: WebSocket Integration Hook
+  // Phase 11: WebSocket Integration Hook - RE-ENABLED
   const webSocketIntegration = useWebSocketIntegration({
     autoConnect: true,
     autoSubscribe: true,
     reconnectOnError: true,
   });
   
-  // Phase 11: Performance Optimization Hooks
-  const [performanceState, performanceActions] = useAdvancedPerformance({
-    enableAutoOptimization: true,
-    memoryThreshold: 80,
-    updateInterval: 1000,
-  });
+  // Mock minimal data for components that don't have full implementation yet
+  const systemHealth = { health: { status: 'unknown' } };
+  const personTracking = { selectedPersonId: null, focusedPersonId: null, highlightedPersonId: null, trajectories: {} };
+  const trackingStats = { totalDetections: 0, uniquePersonCount: 0, averageConfidence: 0, lastUpdateTimestamp: null, isTrackingActive: false };
   
-  const getPerformanceMetrics = useRenderPerformance('GroupViewPage');
-  const { optimizeTrackingUpdate } = useTrackingDataPerformance();
+  // Phase 11: Performance Optimization Hooks - TEMPORARILY DISABLED
+  // const [performanceState, performanceActions] = useAdvancedPerformance({
+  //   enableAutoOptimization: false, // Disabled to prevent optimization loops
+  //   memoryThreshold: 80,
+  //   updateInterval: 2000,
+  // });
+  
+  // const getPerformanceMetrics = useRenderPerformance('GroupViewPage');
+  // const { optimizeTrackingUpdate } = useTrackingDataPerformance();
 
   // Responsive and Error Handling
   const { screenSize } = useViewportSize();
@@ -133,26 +155,27 @@ const GroupViewPage: React.FC = () => {
   // =============================================================================
 
   
-  // Initialize system and start task when component mounts
+  // Initialize system and start task when component mounts - RE-ENABLED
   useEffect(() => {
     const initializeSystem = async () => {
       try {
         await executeWithRecovery(async () => {
           // Set environment if not already set
           if (!currentEnvironment && environmentParam) {
-            await systemActions.setEnvironment(environmentParam);
+            systemActions.setEnvironment(environmentParam);
           }
           
           // Check system health first
           await systemActions.checkSystemHealth();
           
           // Start processing task if environment is set and no task is running
-          if (environment && !taskInfo.taskId && !webSocketIntegration.isConnected) {
+          if (environment && !taskId && !webSocketIntegration.isConnected) {
             console.log('🚀 Starting processing task for environment:', environment);
-            const taskId = await webSocketIntegration.startTask(environment);
+            const newTaskId = await webSocketIntegration.startTask(environment);
             
-            if (taskId) {
-              console.log('✅ Task and WebSocket initialized successfully:', taskId);
+            if (newTaskId) {
+              console.log('✅ Task and WebSocket initialized successfully:', newTaskId);
+              setIsInitialized(true);
             }
           }
         });
@@ -161,36 +184,32 @@ const GroupViewPage: React.FC = () => {
       }
     };
     
-    if (!isSystemReady && !isLoading) {
+    if (!isInitialized && environment && !isLoading) {
       initializeSystem();
     }
   }, [
     environment,
     environmentParam,
-    currentEnvironment,
-    taskInfo.taskId,
-    isSystemReady,
+    isInitialized,
     isLoading,
-    systemActions,
-    webSocketIntegration,
-    executeWithRecovery,
+    // Remove problematic dependencies that cause loops
   ]);
   
-  // Monitor task progress
-  useEffect(() => {
-    if (taskInfo.taskId && taskInfo.taskStatus !== 'COMPLETED' && isTaskProcessing) {
-      const monitorTask = async () => {
-        try {
-          await systemActions.updateTaskStatus(taskInfo.taskId!);
-        } catch (error) {
-          console.error('Failed to monitor task status:', error);
-        }
-      };
-      
-      const interval = setInterval(monitorTask, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [taskInfo.taskId, taskInfo.taskStatus, isTaskProcessing, systemActions]);
+  // Monitor task progress - TEMPORARILY DISABLED
+  // useEffect(() => {
+  //   if (taskInfo.taskId && taskInfo.taskStatus !== 'COMPLETED' && isTaskProcessing) {
+  //     const monitorTask = async () => {
+  //       try {
+  //         await systemActions.updateTaskStatus(taskInfo.taskId!);
+  //       } catch (error) {
+  //         console.error('Failed to monitor task status:', error);
+  //       }
+  //     };
+  //     
+  //     const interval = setInterval(monitorTask, 2000);
+  //     return () => clearInterval(interval);
+  //   }
+  // }, [taskInfo.taskId, taskInfo.taskStatus, isTaskProcessing, systemActions]);
 
   // =============================================================================
   // UI Event Handlers
@@ -400,12 +419,12 @@ const GroupViewPage: React.FC = () => {
             {/* System Health Indicators */}
             <div className="flex items-center space-x-2 text-sm">
               <div className={`flex items-center ${
-                systemHealth.health?.status === 'healthy' ? 'text-green-400' : 'text-red-400'
+                systemHealth?.health?.status === 'healthy' ? 'text-green-400' : 'text-red-400'
               }`}>
                 <span className={`h-2 w-2 rounded-full mr-1 ${
-                  systemHealth.health?.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'
+                  systemHealth?.health?.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'
                 }`}></span>
-                {systemHealth.health?.status === 'healthy' ? 'System OK' : 'System Error'}
+                {systemHealth?.health?.status === 'healthy' ? 'System OK' : 'System Error'}
               </div>
               
               {isTaskProcessing && (
@@ -487,7 +506,7 @@ const GroupViewPage: React.FC = () => {
         {/* Main Content Area */}
         <div className="flex flex-grow min-h-0 gap-4">
           {/* Camera Views Section */}
-          <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`}>
+          <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`} data-testid="camera-grid">
             <LoadingOverlay
               isLoading={!isTrackingActive && isTaskProcessing}
               message={
@@ -539,7 +558,9 @@ const GroupViewPage: React.FC = () => {
           {/* Right Sidebar with Map and Statistics */}
           <div className={`flex flex-col gap-4 ${responsiveClasses.sidebarSection}`}>
             {/* Map Visualization */}
-            {renderMapVisualization()}
+            <div data-testid="tracking-map">
+              {renderMapVisualization()}
+            </div>
 
             {/* Statistics Panels */}
             <div className="flex flex-grow gap-4 h-1/2">

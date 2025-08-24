@@ -1,5 +1,5 @@
 // src/components/ImageSequencePlayer.tsx
-import React, { useState, useEffect, useRef } from 'react'; // Added useState, useEffect, useRef
+import React, { useState, useEffect, useRef, useMemo } from 'react'; // Added useState, useEffect, useRef, useMemo
 // import { Track } from '../types'; // Import if types are external
 
 // --- Type Definitions (if not imported) ---
@@ -54,23 +54,31 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
   // State to store the calculated scale and offset
   const [scaleInfo, setScaleInfo] = useState<ScaleInfo | null>(null);
 
-  // Calculate image URL (prioritize base64Image from WebSocket)
-  let frameUrl = `/placeholder.png`;
-  let displayFrameNumber = startFrame;
-  const safeIndex = frameCount > 0 ? currentFrameIndex % frameCount : 0;
-  
-  if (base64Image) {
-    // Use base64 image from WebSocket (backend integration)
-    frameUrl = `data:image/jpeg;base64,${base64Image}`;
-    console.log(`📷 Using base64 image for camera ${cameraId}`);
-  } else if (frameCount > 0 && startFrame >= 0) {
-    // Fallback to static file path (legacy approach)
-    const actualFrameNumber = startFrame + safeIndex;
-    displayFrameNumber = actualFrameNumber;
-    const paddedFrameNumber = String(actualFrameNumber).padStart(6, '0');
-    frameUrl = `${basePath}${paddedFrameNumber}.${imageExtension}`;
-    console.log(`💼 Fallback to static image for camera ${cameraId}: ${frameUrl}`);
-  }
+  // Calculate image URL (prioritize base64Image from WebSocket) - memoized to prevent infinite loops
+  const { frameUrl, displayFrameNumber } = useMemo(() => {
+    const safeIndex = frameCount > 0 ? currentFrameIndex % frameCount : 0;
+    
+    if (base64Image) {
+      // Use base64 image from WebSocket (backend integration)
+      return {
+        frameUrl: `data:image/jpeg;base64,${base64Image}`,
+        displayFrameNumber: startFrame
+      };
+    } else if (frameCount > 0 && startFrame >= 0) {
+      // Fallback to static file path (legacy approach)
+      const actualFrameNumber = startFrame + safeIndex;
+      const paddedFrameNumber = String(actualFrameNumber).padStart(6, '0');
+      return {
+        frameUrl: `${basePath}${paddedFrameNumber}.${imageExtension}`,
+        displayFrameNumber: actualFrameNumber
+      };
+    }
+    
+    return {
+      frameUrl: `/placeholder.png`,
+      displayFrameNumber: startFrame
+    };
+  }, [base64Image, frameCount, currentFrameIndex, startFrame, basePath, imageExtension]);
 
   // --- Effect to calculate scaling when image or container size changes ---
   useEffect(() => {
@@ -130,7 +138,7 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
       {frameCount > 0 && startFrame >= 0 ? (
         <img
           ref={imgRef} // Assign the ref here
-          key={`${cameraId}-${safeIndex}-${frameUrl}`} // More specific key including frameUrl
+          key={`${cameraId}-${currentFrameIndex}-${frameUrl}`} // More specific key including frameUrl
           src={frameUrl}
           alt={`Camera ${cameraId} - Frame ${displayFrameNumber}`}
           className="object-contain w-full h-full" // Crucial style for scaling

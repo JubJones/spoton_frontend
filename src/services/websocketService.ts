@@ -286,6 +286,14 @@ export class WebSocketService {
         this.emit('pong', message.payload as PongPayload);
         break;
 
+      case 'system_status':
+        this.emit('system-status', message.payload);
+        break;
+
+      case 'control_message':
+        this.emit('control-message', message.payload);
+        break;
+
       default:
         console.warn('Unhandled message type:', message.type);
     }

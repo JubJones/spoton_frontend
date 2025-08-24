@@ -3,6 +3,7 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
+import { shallow } from 'zustand/shallow';
 import { AppState, EnvironmentId, TaskStatus, SystemHealthResponse } from '../types/api';
 import { apiService } from '../services/apiService';
 import { statePersistenceService } from '../services/statePersistenceService';
@@ -105,7 +106,7 @@ export const useSystemStore = create<SystemState>()(
           // Environment Management
           // ================================================================
 
-          setEnvironment: async (environment: EnvironmentId) => {
+          setEnvironment: (environment: EnvironmentId) => {
             // Validate environment ID
             const validationResult = dataValidationService.validateEnvironmentId(environment);
             if (!validationResult.isValid) {
@@ -128,11 +129,13 @@ export const useSystemStore = create<SystemState>()(
               'setEnvironment'
             );
 
-            // Cache validated environment selection
-            await dataCacheService.set('current-environment', environment, {
+            // Cache validated environment selection (async operation in background)
+            dataCacheService.set('current-environment', environment, {
               priority: 3, // High priority
               ttl: 24 * 60 * 60 * 1000, // 24 hours
               tags: ['environment', 'system'],
+            }).catch(error => {
+              console.warn('Failed to cache environment selection:', error);
             });
           },
 
@@ -599,21 +602,54 @@ export const useSystemStore = create<SystemState>()(
         // Custom storage implementation using our enhanced service
         storage: {
           getItem: async (name: string): Promise<string | null> => {
-            return statePersistenceService
-              .loadState(name)
-              .then((data) => (data ? JSON.stringify(data) : null))
-              .catch(() => null);
+            try {
+              const data = await statePersistenceService.loadState(name);
+              if (!data) return null;
+              
+              // Ensure we return a proper JSON string, avoiding circular references
+              return JSON.stringify(data, (key, value) => {
+                // Skip functions, undefined values, and circular references
+                if (typeof value === 'function' || value === undefined) {
+                  return null;
+                }
+                // Skip WebSocket objects and other complex objects
+                if (value && typeof value === 'object' && value.constructor !== Object && value.constructor !== Array) {
+                  return null;
+                }
+                return value;
+              });
+            } catch (error) {
+              console.warn('Storage getItem error:', error);
+              return null;
+            }
           },
           setItem: async (name: string, value: string): Promise<void> => {
-            const parsedValue = JSON.parse(value);
-            return statePersistenceService.saveState(name, parsedValue, {
-              version: 2,
-              compression: true,
-              ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
-            });
+            try {
+              // Value should already be a JSON string from Zustand persist
+              let parsedValue;
+              try {
+                parsedValue = JSON.parse(value);
+              } catch (parseError) {
+                // If parsing fails, skip persisting this value to avoid corruption
+                console.warn('Skipping persistence for invalid JSON:', typeof value === 'string' ? value.substring(0, 100) + '...' : value);
+                return;
+              }
+              
+              return await statePersistenceService.saveState(name, parsedValue, {
+                version: 2,
+                compression: true,
+                ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+              });
+            } catch (error) {
+              console.warn('Storage setItem error:', error);
+            }
           },
           removeItem: async (name: string): Promise<void> => {
-            return statePersistenceService.removeState(name);
+            try {
+              return await statePersistenceService.removeState(name);
+            } catch (error) {
+              console.warn('Storage removeItem error:', error);
+            }
           },
         },
         migrate: (persistedState: any, version: number) => {
@@ -653,13 +689,25 @@ export const useCurrentEnvironment = () => useSystemStore((state) => state.curre
 /**
  * Get task information
  */
-export const useTaskInfo = () =>
-  useSystemStore((state) => ({
-    taskId: state.taskId,
-    taskStatus: state.taskStatus,
-    taskProgress: state.taskProgress,
-    taskError: state.taskError,
-  }));
+export const useTaskInfo = () => {
+  return useSystemStore(
+    (state) => ({
+      taskId: state.taskId,
+      taskStatus: state.taskStatus,
+      taskProgress: state.taskProgress,
+      taskError: state.taskError,
+    }),
+    shallow // Use Zustand's built-in shallow comparison
+  );
+};
+
+/**
+ * Individual task selectors to avoid object creation
+ */
+export const useTaskId = () => useSystemStore((state) => state.taskId);
+export const useTaskStatus = () => useSystemStore((state) => state.taskStatus);
+export const useTaskProgress = () => useSystemStore((state) => state.taskProgress);
+export const useTaskError = () => useSystemStore((state) => state.taskError);
 
 /**
  * Get system health
@@ -668,7 +716,7 @@ export const useSystemHealth = () =>
   useSystemStore((state) => ({
     health: state.systemHealth,
     lastCheck: state.lastHealthCheck,
-  }));
+  }), shallow);
 
 /**
  * Get UI state
@@ -678,7 +726,7 @@ export const useUIState = () =>
     isLoading: state.isLoading,
     error: state.error,
     connectionStatus: state.connectionStatus,
-  }));
+  }), shallow);
 
 /**
  * Get date/time range

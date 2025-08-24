@@ -95,26 +95,39 @@ export const SYSTEM_HEALTH_SCHEMA: ValidationSchema = {
     status: {
       type: 'string',
       required: true,
-      enum: ['healthy', 'warning', 'error'],
+      enum: ['healthy', 'degraded', 'error'],
     },
+    detector_model_loaded: {
+      type: 'boolean',
+      required: false,
+    },
+    'prototype_tracker_loaded (reid_model)': {
+      type: 'boolean',
+      required: false,
+    },
+    homography_matrices_precomputed: {
+      type: 'boolean',
+      required: false,
+    },
+    // Legacy fields for backward compatibility
     detector_model_status: {
       type: 'string',
-      required: true,
-      enum: ['healthy', 'warning', 'error'],
+      required: false,
+      enum: ['loaded', 'loading', 'error'],
     },
     tracker_factory_status: {
       type: 'string',
-      required: true,
-      enum: ['healthy', 'warning', 'error'],
+      required: false,
+      enum: ['ready', 'initializing', 'error'],
     },
     homography_matrices_status: {
       type: 'string',
-      required: true,
-      enum: ['healthy', 'warning', 'error'],
+      required: false,
+      enum: ['loaded', 'missing', 'error'],
     },
     timestamp: {
       type: 'string',
-      required: true,
+      required: false,
       pattern: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d{3})?Z?$/,
     },
   },
@@ -123,7 +136,7 @@ export const SYSTEM_HEALTH_SCHEMA: ValidationSchema = {
 export const ENVIRONMENT_ID_SCHEMA: ValidationSchema = {
   type: 'string',
   required: true,
-  enum: ['scene_1', 'scene_2', 'scene_3', 'scene_4'],
+  enum: ['factory', 'campus'],
 };
 
 export const CAMERA_ID_SCHEMA: ValidationSchema = {

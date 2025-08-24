@@ -55,8 +55,8 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
   const defaultConfig: SystemConfiguration = useMemo(
     () => ({
       backend: {
-        apiBaseUrl: 'http://localhost:8000',
-        wsBaseUrl: 'ws://localhost:8000',
+        apiBaseUrl: 'http://localhost:3847',
+        wsBaseUrl: 'ws://localhost:3847',
         timeout: 30000,
         retryAttempts: 3,
         enableTLS: false,
@@ -194,7 +194,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
               value={config.backend.apiBaseUrl}
               onChange={(e) => handleConfigChange('backend', 'apiBaseUrl', e.target.value)}
               className="w-full px-3 py-2 bg-gray-800 text-white rounded border border-gray-600 focus:border-orange-500"
-              placeholder="http://localhost:8000"
+              placeholder="http://localhost:3847"
             />
           </div>
 
@@ -205,7 +205,7 @@ const SystemSettings: React.FC<SystemSettingsProps> = ({
               value={config.backend.wsBaseUrl}
               onChange={(e) => handleConfigChange('backend', 'wsBaseUrl', e.target.value)}
               className="w-full px-3 py-2 bg-gray-800 text-white rounded border border-gray-600 focus:border-orange-500"
-              placeholder="ws://localhost:8000"
+              placeholder="ws://localhost:3847"
             />
           </div>
 
