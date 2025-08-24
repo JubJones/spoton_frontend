@@ -13,7 +13,7 @@ interface Track {
 }
 // --- End Type Definitions ---
 
-// Props Interface
+// Props Interface  
 interface ImageSequencePlayerProps {
   cameraId: string;
   basePath: string;
@@ -24,6 +24,7 @@ interface ImageSequencePlayerProps {
   className?: string;
   imageExtension?: string;
   base64Image?: string; // NEW: Support for base64 images from WebSocket
+  taskId?: string; // NEW: Task ID for API integration
 }
 
 // Interface for storing calculated scaling information
@@ -48,37 +49,60 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
   className = '',
   imageExtension = 'jpg',
   base64Image, // NEW: Base64 image data from WebSocket
+  taskId, // NEW: Task ID for API integration
 }) => {
   // Ref to access the img DOM element
   const imgRef = useRef<HTMLImageElement>(null);
   // State to store the calculated scale and offset
   const [scaleInfo, setScaleInfo] = useState<ScaleInfo | null>(null);
 
-  // Calculate image URL (prioritize base64Image from WebSocket) - memoized to prevent infinite loops
-  const { frameUrl, displayFrameNumber } = useMemo(() => {
+  // Calculate image URL with proper fallback handling - memoized to prevent infinite loops
+  const { frameUrl, displayFrameNumber, isPlaceholder } = useMemo(() => {
     const safeIndex = frameCount > 0 ? currentFrameIndex % frameCount : 0;
     
     if (base64Image) {
-      // Use base64 image from WebSocket (backend integration)
+      // Use base64 image from WebSocket (primary backend integration)
       return {
         frameUrl: `data:image/jpeg;base64,${base64Image}`,
-        displayFrameNumber: startFrame
+        displayFrameNumber: startFrame,
+        isPlaceholder: false
       };
-    } else if (frameCount > 0 && startFrame >= 0) {
-      // Fallback to static file path (legacy approach)
+    } else if (taskId && cameraId) {
+      // Use backend media API for frame serving (when task is active)
+      const baseUrl = window.location.protocol === 'https:' ? 'https://localhost:3847' : 'http://localhost:3847';
+      return {
+        frameUrl: `${baseUrl}/api/v1/media/frames/${taskId}/${cameraId}?quality=85&v=${Date.now()}`,
+        displayFrameNumber: startFrame,
+        isPlaceholder: false
+      };
+    } else if (frameCount > 0 && startFrame >= 0 && basePath) {
+      // Fallback to static file path (legacy approach - only if basePath provided)
       const actualFrameNumber = startFrame + safeIndex;
       const paddedFrameNumber = String(actualFrameNumber).padStart(6, '0');
       return {
         frameUrl: `${basePath}${paddedFrameNumber}.${imageExtension}`,
-        displayFrameNumber: actualFrameNumber
+        displayFrameNumber: actualFrameNumber,
+        isPlaceholder: false
       };
     }
     
+    // Use placeholder for missing frames or when no data is available
     return {
-      frameUrl: `/placeholder.png`,
-      displayFrameNumber: startFrame
+      frameUrl: `data:image/svg+xml;base64,${btoa(`
+        <svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
+          <rect width="100%" height="100%" fill="#1a1a1a"/>
+          <text x="50%" y="45%" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="14">
+            Camera ${cameraId}
+          </text>
+          <text x="50%" y="55%" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="12">
+            Waiting for frame data...
+          </text>
+        </svg>
+      `)}`,
+      displayFrameNumber: startFrame,
+      isPlaceholder: true
     };
-  }, [base64Image, frameCount, currentFrameIndex, startFrame, basePath, imageExtension]);
+  }, [base64Image, taskId, cameraId, frameCount, currentFrameIndex, startFrame, basePath, imageExtension]);
 
   // --- Effect to calculate scaling when image or container size changes ---
   useEffect(() => {
@@ -144,8 +168,21 @@ const ImageSequencePlayer: React.FC<ImageSequencePlayerProps> = ({
           className="object-contain w-full h-full" // Crucial style for scaling
           // onLoad={calculateScale} // Alternative way to trigger calculation
           onError={(e) => {
-            console.error(`Error loading image: ${frameUrl}`);
-            (e.target as HTMLImageElement).src = '/placeholder.png';
+            if (!isPlaceholder) {
+              console.warn(`Frame not available for camera ${cameraId}: ${frameUrl.split('/').pop() || frameUrl.substring(0, 50) + '...'}`);
+              // Set placeholder SVG on error
+              (e.target as HTMLImageElement).src = `data:image/svg+xml;base64,${btoa(`
+                <svg width="320" height="180" xmlns="http://www.w3.org/2000/svg">
+                  <rect width="100%" height="100%" fill="#1a1a1a"/>
+                  <text x="50%" y="45%" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="14">
+                    Camera ${cameraId}
+                  </text>
+                  <text x="50%" y="55%" text-anchor="middle" fill="#666" font-family="Arial, sans-serif" font-size="12">
+                    Frame not available
+                  </text>
+                </svg>
+              `)}`;
+            }
           }}
         />
       ) : (

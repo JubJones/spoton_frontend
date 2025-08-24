@@ -299,12 +299,13 @@ const GroupViewPageIntegrated: React.FC = () => {
           imageExtension="jpg"
           tracks={tracks}
           base64Image={base64Image}
+          taskId={taskId}
           className="min-h-0"
           onPersonClick={handlePersonSelection}
         />
       </ErrorBoundary>
     );
-  }, [getTrackingDataForCamera, getFrameImageForCamera, handlePersonSelection]);
+  }, [getTrackingDataForCamera, getFrameImageForCamera, handlePersonSelection, taskId]);
   
   const renderMapVisualization = useCallback(() => {
     return (
