@@ -4,7 +4,7 @@
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
 import { shallow } from 'zustand/shallow';
-import { AppState, EnvironmentId, TaskStatus, SystemHealthResponse } from '../types/api';
+import { AppState, EnvironmentId, TaskStatus, SystemHealthResponse, API_ENDPOINTS } from '../types/api';
 import { apiService } from '../services/apiService';
 import { statePersistenceService } from '../services/statePersistenceService';
 import { dataCacheService } from '../services/dataCacheService';
@@ -234,7 +234,7 @@ export const useSystemStore = create<SystemState>()(
                         'queue-retry-request',
                         () =>
                           queueApiRequest(
-                            '/processing/start',
+                            API_ENDPOINTS.START_TASK,
                             { environment_id: environment },
                             {
                               priority: 3,
@@ -357,7 +357,7 @@ export const useSystemStore = create<SystemState>()(
               // Queue status update for retry if network error
               if (error instanceof Error && error.name === 'NetworkError') {
                 await queueApiRequest(
-                  `/processing/${sanitizedTaskId}/status`,
+                  API_ENDPOINTS.TASK_STATUS(sanitizedTaskId),
                   {},
                   {
                     method: 'GET',

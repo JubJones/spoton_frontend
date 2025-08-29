@@ -10,6 +10,10 @@ import {
   CameraSkeleton,
   ConnectionStatus,
 } from '../components/common/LoadingStates';
+import {
+  TaskInitializationLoading,
+  TaskProcessingStatus,
+} from '../components/common/TaskLoadingStates';
 import { useViewportSize, getResponsiveClasses } from '../utils/responsive';
 import { useErrorRecovery, useNetworkStatus } from '../hooks/useErrorRecovery';
 
@@ -412,6 +416,7 @@ const GroupViewPage: React.FC = () => {
                 !isOnline ? 'disconnected' :
                 isTrackingActive && webSocketIntegration.isConnected ? 'connected' :
                 isTaskProcessing ? 'connecting' :
+                systemHealth?.health?.status === 'healthy' ? 'ready' :
                 'disconnected'
               }
               compact={screenSize === 'mobile'}
@@ -475,6 +480,19 @@ const GroupViewPage: React.FC = () => {
           </div>
         </div>
 
+        {/* Task Processing Status Bar */}
+        {taskInfo.taskStatus && !['COMPLETED', null, undefined].includes(taskInfo.taskStatus) && (
+          <div className="mb-4">
+            <TaskProcessingStatus
+              taskStatus={taskInfo.taskStatus}
+              progress={taskInfo.taskProgress ? Math.round(taskInfo.taskProgress * 100) : 0}
+              isConnected={webSocketIntegration.isConnected}
+              connectionError={webSocketIntegration.connectionError}
+              onRetry={handleRetry}
+            />
+          </div>
+        )}
+
         {/* Tab Bar */}
         <div className="mb-4 border-b border-gray-700 flex-shrink-0">
           <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
@@ -504,12 +522,27 @@ const GroupViewPage: React.FC = () => {
           </nav>
         </div>
 
+        {/* Task Initialization Loading Overlay */}
+        <TaskInitializationLoading
+          isLoading={taskInfo.taskStatus === 'INITIALIZING' || taskInfo.taskStatus === 'QUEUED' || taskInfo.taskStatus === 'CONNECTING'}
+          progress={taskInfo.taskProgress ? Math.round(taskInfo.taskProgress * 100) : 0}
+          currentStep={
+            taskInfo.taskStatus === 'INITIALIZING' ? 'Initializing processing pipeline...' :
+            taskInfo.taskStatus === 'QUEUED' ? 'Task queued for processing...' :
+            taskInfo.taskStatus === 'CONNECTING' ? 'Establishing WebSocket connection...' :
+            undefined
+          }
+          message={`Initializing ${environment || 'system'}...`}
+          environment={environment}
+          onCancel={handleRetry}
+        />
+
         {/* Main Content Area */}
         <div className="flex flex-grow min-h-0 gap-4">
           {/* Camera Views Section */}
           <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`} data-testid="camera-grid">
             <LoadingOverlay
-              isLoading={!isTrackingActive && isTaskProcessing}
+              isLoading={!isTrackingActive && isTaskProcessing && !['INITIALIZING', 'QUEUED', 'CONNECTING'].includes(taskInfo.taskStatus || '')}
               message={
                 isTaskProcessing 
                   ? `Processing... ${Math.round((taskInfo.taskProgress || 0) * 100)}%` 

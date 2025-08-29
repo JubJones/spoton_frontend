@@ -406,10 +406,29 @@ const GroupViewPageIntegrated: React.FC = () => {
                 !isOnline ? 'disconnected' :
                 isTrackingActive && webSocketState.isConnected ? 'connected' :
                 isTaskProcessing ? 'connecting' :
+                systemHealth.health?.status === 'healthy' ? 'ready' :
                 'disconnected'
               }
               compact={screenSize === 'mobile'}
             />
+            
+            {/* System Status Info */}
+            <div className="flex flex-col text-xs text-gray-300 bg-gray-800 px-3 py-2 rounded">
+              <div className="font-semibold text-gray-200">System Status:</div>
+              <div>Backend Health: {systemHealth.health?.status || 'checking...'}</div>
+              <div>Network: {isOnline ? 'online' : 'offline'}</div>
+              <div>Active Tracking: {isTrackingActive ? 'yes' : 'no'}</div>
+              <div>WebSocket: {webSocketState.isConnected ? 'connected' : 'disconnected'}</div>
+              {isTaskProcessing && <div className="text-yellow-400">Processing task...</div>}
+              <button 
+                onClick={() => {
+                  systemActions.checkSystemHealth();
+                }}
+                className="mt-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
+              >
+                Refresh Status
+              </button>
+            </div>
             
             {/* System Health Indicators */}
             <div className="flex items-center space-x-2 text-sm">

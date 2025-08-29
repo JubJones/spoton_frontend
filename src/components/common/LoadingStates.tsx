@@ -230,7 +230,7 @@ export const ProgressBar: React.FC<ProgressBarProps> = ({
 
 // Connection status component
 interface ConnectionStatusProps {
-  status: 'connecting' | 'connected' | 'disconnected' | 'error';
+  status: 'connecting' | 'connected' | 'ready' | 'disconnected' | 'error';
   message?: string;
   showIcon?: boolean;
   compact?: boolean;
@@ -259,6 +259,13 @@ export const ConnectionStatus: React.FC<ConnectionStatusProps> = ({
           bgColor: 'bg-green-400',
           icon: '✓',
           defaultMessage: 'Connected',
+        };
+      case 'ready':
+        return {
+          color: 'text-blue-400',
+          bgColor: 'bg-blue-400',
+          icon: '●',
+          defaultMessage: 'Ready',
         };
       case 'disconnected':
         return {

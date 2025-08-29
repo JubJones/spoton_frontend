@@ -300,7 +300,19 @@ export function useWebSocketIntegration(
     console.log('🚀 Starting processing task for environment:', environmentId);
     
     try {
-      // Start processing task via API
+      // Set initial loading state with user-friendly message
+      systemActions.setTaskInfo({
+        taskId: null,
+        taskStatus: 'INITIALIZING',
+        taskProgress: 10,
+        websocketUrl: null,
+        statusUrl: null,
+      });
+      systemActions.setError(null); // Clear any previous errors
+      
+      console.log('📡 Sending task start request...');
+      
+      // Start processing task via API (now with extended timeout)
       const response: ProcessingTaskCreateResponse = await apiService.startProcessingTask({
         environment_id: environmentId,
       });
@@ -311,13 +323,22 @@ export function useWebSocketIntegration(
       await systemActions.setTaskInfo({
         taskId: response.task_id,
         taskStatus: 'QUEUED',
-        taskProgress: 0,
+        taskProgress: 30,
         websocketUrl: response.websocket_url,
         statusUrl: response.status_url,
       });
       
       // Auto-connect WebSocket if configured
       if (mergedConfig.autoConnect) {
+        console.log('🔌 Connecting to WebSocket...');
+        systemActions.setTaskInfo({
+          taskId: response.task_id,
+          taskStatus: 'CONNECTING',
+          taskProgress: 50,
+          websocketUrl: response.websocket_url,
+          statusUrl: response.status_url,
+        });
+        
         await connect(response.task_id);
       }
       
@@ -325,7 +346,26 @@ export function useWebSocketIntegration(
       
     } catch (error) {
       console.error('❌ Failed to start processing task:', error);
-      systemActions.setError(`Failed to start task: ${error.message}`);
+      
+      // Provide user-friendly error messages
+      let errorMessage = 'Failed to start processing task';
+      if (error.name === 'AbortError' || error.message?.includes('timeout')) {
+        errorMessage = 'Task initialization timed out. The system may be busy loading AI models. Please try again in a moment.';
+      } else if (error.message?.includes('NetworkError')) {
+        errorMessage = 'Network connection failed. Please check your connection and try again.';
+      } else if (error.message) {
+        errorMessage = `Failed to start task: ${error.message}`;
+      }
+      
+      systemActions.setError(errorMessage);
+      systemActions.setTaskInfo({
+        taskId: null,
+        taskStatus: 'FAILED',
+        taskProgress: 0,
+        websocketUrl: null,
+        statusUrl: null,
+      });
+      
       return null;
     }
   }, [systemActions, connect, mergedConfig.autoConnect]);

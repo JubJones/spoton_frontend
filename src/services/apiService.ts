@@ -42,6 +42,14 @@ const DEFAULT_CONFIG: APIServiceConfig = {
   enableRetry: true,
 };
 
+// Special config for long-running operations
+const LONG_RUNNING_CONFIG: APIServiceConfig = {
+  ...DEFAULT_CONFIG,
+  timeout: 180000, // 3 minutes for task initialization
+  retryAttempts: 2, // Fewer retries for long operations
+  retryDelay: 3000, // 3 second delay between retries
+};
+
 // ============================================================================
 // Error Classes
 // ============================================================================
@@ -314,7 +322,7 @@ export class APIService {
   // ========================================================================
 
   /**
-   * Start a new processing task
+   * Start a new processing task (uses extended timeout for model loading)
    */
   async startProcessingTask(
     request: ProcessingTaskStartRequest
@@ -322,7 +330,8 @@ export class APIService {
     try {
       const response = await this.http.post<ProcessingTaskCreateResponse>(
         API_ENDPOINTS.START_TASK,
-        request
+        request,
+        LONG_RUNNING_CONFIG // Use extended timeout for task initialization
       );
 
       // Validate response
