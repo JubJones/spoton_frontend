@@ -1,665 +1,390 @@
-// Enhanced GroupViewPage with Zustand Store Integration
-// src/pages/GroupViewPageIntegrated.tsx
+// src/pages/GroupViewPage.tsx
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { Link } from "react-router-dom";
+import ImageSequencePlayer from "../components/ImageSequencePlayer";
 
-import React, { useState, useEffect, useCallback } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
-import ImageSequencePlayer from '../components/ImageSequencePlayer';
-import ErrorBoundary from '../components/common/ErrorBoundary';
-import MockModeIndicator from '../components/MockModeIndicator';
-import {
-  LoadingOverlay,
-  CameraSkeleton,
-  ConnectionStatus,
-} from '../components/common/LoadingStates';
-import { useViewportSize, getResponsiveClasses } from '../utils/responsive';
-import { useErrorRecovery, useNetworkStatus } from '../hooks/useErrorRecovery';
+// --- Type Definitions (Keep as before) ---
+interface Track {
+  track_id: number;
+  global_id: number;
+  bbox_xyxy: [number, number, number, number];
+  confidence: number;
+  class_id: number;
+  map_coords?: [number, number];
+}
+interface CameraData {
+  image_source: string;
+  tracks: Track[];
+}
+interface FrameData {
+  frame_index: number;
+  scene_id: string;
+  timestamp_processed_utc: string;
+  cameras: {
+    [jsonCameraId: string]: CameraData;
+  };
+}
+interface CameraConfig {
+  basePath: string;
+  startFrame: number;
+  frameCount: number;
+  extension?: string;
+}
+interface FrameIndicesState {
+  [appCameraId: string]: number;
+}
+// --- End Type Definitions ---
 
-// Zustand Store Hooks
-import {
-  useSystemActions,
-  useCurrentEnvironment,
-  useTaskInfo,
-  useSystemHealth,
-  useUIState,
-  useIsSystemReady,
-  useIsTaskProcessing,
-  useHasSystemErrors,
-} from '../stores/systemStore';
-import {
-  useTrackingActions,
-  useWebSocketState,
-  useCameraData,
-  usePersonTracking,
-  useTrackingStatistics,
-  useDisplayConfig,
-  useIsTrackingActive,
-} from '../stores/trackingStore';
-import {
-  useUIActions,
-  useViewConfig,
-  useCameraDisplayConfig,
-  useMapConfig,
-  useLayout,
-  usePreferences,
-  useIsHighPerformanceMode,
-} from '../stores/uiStore';
+// --- Mock Data and Configuration (Keep as before) ---
+const zoneName = "Campus";
+const totalCameras = 4;
+const activeCameras = 4;
+const appCameraIds = ["camera1", "camera2", "camera3", "camera4"];
+const cameraNames = ["Camera 1", "Camera 2", "Camera 3", "Camera 4"];
+const mockDetections = [145, 117, 82, 29];
 
-// Types and Configuration
-import type { EnvironmentId, BackendCameraId } from '../types/api';
-import { CameraTrackingDisplayData } from '../types/ui';
-import { 
-  getCameraMapping, 
-  getEnvironmentConfig, 
-  getFrontendCameraId, 
-  getBackendCameraId 
-} from '../config/environments';
-
-// =============================================================================
-// Constants and Configuration
-// =============================================================================
-
-const ZONE_NAMES = {
-  campus: 'Campus',
-  factory: 'Factory',
-} as const;
-
-const CAMERA_NAMES = ['Camera 1', 'Camera 2', 'Camera 3', 'Camera 4'];
-const FRONTEND_CAMERA_IDS = ['camera1', 'camera2', 'camera3', 'camera4'];
-
-type TabType = 'all' | string;
-
-// Mock detection data - will be replaced with real data from stores
-const getMockDetections = (cameraData: Record<BackendCameraId, CameraTrackingDisplayData>) => {
-  return CAMERA_NAMES.map((_, index) => {
-    const backendId = getBackendCameraId(`camera${index + 1}` as any, 'factory'); // Default to factory
-    return cameraData[backendId]?.tracks?.length || 0;
-  });
+const cameraFrameConfig: { [key: string]: CameraConfig } = {
+  camera1: { basePath: "/frames/camera1/", startFrame: 0, frameCount: 51, extension: "jpg" },
+  camera2: { basePath: "/frames/camera2/", startFrame: 0, frameCount: 51, extension: "jpg" },
+  camera3: { basePath: "/frames/camera3/", startFrame: 0, frameCount: 51, extension: "jpg" },
+  camera4: { basePath: "/frames/camera4/", startFrame: 0, frameCount: 51, extension: "jpg" }
 };
 
-// =============================================================================
-// Enhanced GroupViewPage Component
-// =============================================================================
+const appCameraIdToJsonId: { [appId: string]: string } = {
+    'camera1': 'c09',
+    'camera2': 'c12', // VERIFY
+    'camera3': 'c13', // VERIFY
+    'camera4': 'c16', // VERIFY
+};
 
-const GroupViewPageIntegrated: React.FC = () => {
-  // URL Parameters
-  const [searchParams] = useSearchParams();
-  const environmentParam = searchParams.get('environment') as EnvironmentId;
-  
-  // Local UI State
-  const [activeTab, setActiveTab] = useState<TabType>('all');
-  
-  // Zustand Store Hooks - System Store
-  const systemActions = useSystemActions();
-  const currentEnvironment = useCurrentEnvironment();
-  const taskInfo = useTaskInfo();
-  const systemHealth = useSystemHealth();
-  const uiState = useUIState();
-  const isSystemReady = useIsSystemReady();
-  const isTaskProcessing = useIsTaskProcessing();
-  const hasSystemErrors = useHasSystemErrors();
-  
-  // Zustand Store Hooks - Tracking Store
-  const trackingActions = useTrackingActions();
-  const webSocketState = useWebSocketState();
-  const cameraData = useCameraData();
-  const personTracking = usePersonTracking();
-  const trackingStats = useTrackingStatistics();
-  const displayConfig = useDisplayConfig();
-  const isTrackingActive = useIsTrackingActive();
-  
-  // Zustand Store Hooks - UI Store
-  const uiActions = useUIActions();
-  const viewConfig = useViewConfig();
-  const cameraDisplayConfig = useCameraDisplayConfig();
-  const mapConfig = useMapConfig();
-  const layout = useLayout();
-  const preferences = usePreferences();
-  const isHighPerformanceMode = useIsHighPerformanceMode();
-  
-  // Responsive and Error Handling
-  const { screenSize } = useViewportSize();
-  const { isOnline } = useNetworkStatus();
-  const { error, isLoading, executeWithRecovery, retry, reset } = useErrorRecovery({
-    maxRetries: 3,
-    retryDelay: 2000,
-    exponentialBackoff: true,
-  });
-  
-  const responsiveClasses = getResponsiveClasses(screenSize);
-  
-  // Environment Configuration
-  const environment = currentEnvironment || environmentParam || 'factory';
-  const environmentConfig = getEnvironmentConfig(environment);
-  const zoneName = ZONE_NAMES[environment] || 'Unknown Zone';
-  const cameraMapping = getCameraMapping(environment);
-  
-  // =============================================================================
-  // Backend Integration and Task Management
-  // =============================================================================
-  
-  // Initialize system and start task when component mounts
+const jsonIdToAppCameraId: { [jsonId: string]: string } = Object.entries(
+  appCameraIdToJsonId
+).reduce((acc, [appId, jsonId]) => {
+  acc[jsonId] = appId;
+  return acc;
+}, {} as { [jsonId: string]: string });
+
+
+const SIMULATED_FPS = 1;
+type TabType = "all" | string;
+const initialFrameIndices = appCameraIds.reduce((acc, id) => {
+  acc[id] = 0;
+  return acc;
+}, {} as FrameIndicesState);
+
+const CURRENT_SCENE_ID = 's10';
+const JSON_DATA_BASE_PATH = `/coords/scene_${CURRENT_SCENE_ID}/`;
+
+const MAP_SOURCE_WIDTH = 1920; // Source width for map_coords (per camera)
+const MAP_SOURCE_HEIGHT = 1080; // Source height for map_coords (per camera)
+
+// --- MODIFIED: Type for storing calculated map points (per camera) ---
+interface SingleCameraMapPoint {
+    x: number;         // Scaled x-coordinate for display within a quadrant
+    y: number;         // Scaled y-coordinate for display within a quadrant
+    globalId: number;
+}
+
+// --- NEW: Color mapping for cameras (using JSON IDs) ---
+const cameraColorMap: { [jsonCameraId: string]: string } = {
+    'c09': 'bg-cyan-400',
+    'c12': 'bg-red-500',
+    'c13': 'bg-yellow-400',
+    'c16': 'bg-purple-500',
+};
+const defaultDotColor = 'bg-gray-500';
+
+// --- GroupViewPage Component ---
+const GroupViewPage: React.FC = () => {
+  const [activeTab, setActiveTab] = useState<TabType>("all");
+  const [isPlaying, setIsPlaying] = useState(true);
+  const [frameIndices, setFrameIndices] = useState<FrameIndicesState>(initialFrameIndices);
+  const [currentFrameData, setCurrentFrameData] = useState<FrameData | null>(null);
+  const intervalRef = useRef<number | null>(null);
+
+  const overallMapContainerRef = useRef<HTMLDivElement>(null); // Ref for the main 2x2 grid container
+  const [overallMapDimensions, setOverallMapDimensions] = useState({ width: 0, height: 0 });
+
+  // --- MODIFIED: State to store points per camera ---
+  // Key is jsonCameraId (e.g., 'c09'), value is an array of points for that camera
+  const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
+
+
+  const advanceFrames = useCallback(() => {
+      setFrameIndices(prevIndices => {
+          const newIndices = { ...prevIndices };
+          appCameraIds.forEach(id => {
+              const config = cameraFrameConfig[id];
+              if (config && config.frameCount > 0) {
+                   newIndices[id] = (prevIndices[id] + 1) % config.frameCount;
+              }
+          });
+          return newIndices;
+      });
+  }, []);
+
   useEffect(() => {
-    const initializeSystem = async () => {
-      try {
-        await executeWithRecovery(async () => {
-          // Set environment if not already set
-          if (!currentEnvironment && environmentParam) {
-            await systemActions.setEnvironment(environmentParam);
-          }
-          
-          // Check system health
-          await systemActions.checkSystemHealth();
-          
-          // Start processing task if environment is set
-          if (environment && !taskInfo.taskId) {
-            console.log('🚀 Starting processing task for environment:', environment);
-            const taskId = await systemActions.startProcessingTask(environment);
-            
-            if (taskId) {
-              console.log('✅ Task started successfully:', taskId);
-              
-              // Connect WebSocket for real-time tracking
-              await trackingActions.connectWebSocket(taskId);
-              console.log('🔌 WebSocket connection initiated');
-            }
+      const stopInterval = () => {
+        if (intervalRef.current !== null) { clearInterval(intervalRef.current); intervalRef.current = null; }
+      }
+      stopInterval();
+      if (isPlaying) {
+          const intervalDuration = 1000 / SIMULATED_FPS;
+          intervalRef.current = window.setInterval(advanceFrames, intervalDuration);
+      }
+      return stopInterval;
+  }, [isPlaying, advanceFrames]);
+
+  useEffect(() => {
+    const representativeAppId = appCameraIds[0];
+    const representativeIndex = frameIndices[representativeAppId];
+    const config = cameraFrameConfig[representativeAppId];
+
+    if (config && representativeIndex !== undefined && representativeIndex < config.frameCount) {
+        const actualFrameNumber = config.startFrame + representativeIndex;
+        const frameString = String(actualFrameNumber).padStart(6, '0');
+        const scenePrefix = `scene_${CURRENT_SCENE_ID}`;
+        const jsonFilename = `${scenePrefix}_frame_${frameString}.json`;
+        const jsonPath = `${JSON_DATA_BASE_PATH}${jsonFilename}`;
+
+        fetch(jsonPath)
+            .then(response => {
+                if (!response.ok) {
+                    if (response.status === 404) { console.warn(`Scene JSON data not found: ${jsonPath}`); return null; }
+                    throw new Error(`HTTP error! status: ${response.status} for ${jsonPath}`);
+                }
+                return response.json();
+            })
+            .then((jsonData: FrameData | null) => { setCurrentFrameData(jsonData); })
+            .catch(error => { console.error(`Error fetching/parsing scene data:`, error); setCurrentFrameData(null); });
+    } else {
+        setCurrentFrameData(null);
+    }
+  }, [frameIndices]);
+
+
+  // --- Effect to measure Overall Map Container Size ---
+  useEffect(() => {
+    const mapElement = overallMapContainerRef.current;
+    if (!mapElement) return;
+
+    const resizeObserver = new ResizeObserver(entries => {
+      for (let entry of entries) {
+        const { width, height } = entry.contentRect;
+        setOverallMapDimensions({ width, height });
+      }
+    });
+    resizeObserver.observe(mapElement);
+    setOverallMapDimensions({ width: mapElement.offsetWidth, height: mapElement.offsetHeight });
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  // --- MODIFIED: Effect to Calculate Scaled Map Points PER CAMERA for their quadrant ---
+  useEffect(() => {
+    if (!currentFrameData || !overallMapDimensions.width || !overallMapDimensions.height || MAP_SOURCE_WIDTH <= 0 || MAP_SOURCE_HEIGHT <= 0) {
+      setPerCameraMapPoints({});
+      return;
+    }
+
+    const newPerCameraPoints: { [jsonCameraId: string]: SingleCameraMapPoint[] } = {};
+
+    // Calculate dimensions of each quadrant
+    const quadrantWidth = overallMapDimensions.width / 2;
+    const quadrantHeight = overallMapDimensions.height / 2;
+
+    // Scaling factors are now based on quadrant size
+    const scaleX = quadrantWidth / MAP_SOURCE_WIDTH;
+    const scaleY = quadrantHeight / MAP_SOURCE_HEIGHT;
+
+    Object.entries(currentFrameData.cameras).forEach(([jsonCameraId, cameraData]) => {
+      newPerCameraPoints[jsonCameraId] = []; // Initialize array for this camera
+      if (cameraData && cameraData.tracks) {
+        cameraData.tracks.forEach(track => {
+          if (track.map_coords && typeof track.global_id === 'number') {
+            const [mapX, mapY] = track.map_coords;
+
+            // Scale coordinates to fit within a quadrant
+            const displayX = mapX * scaleX;
+            const displayY = mapY * scaleY;
+
+            newPerCameraPoints[jsonCameraId].push({
+                x: displayX,
+                y: displayY,
+                globalId: track.global_id
+            });
           }
         });
-      } catch (error) {
-        console.error('❌ System initialization failed:', error);
       }
-    };
-    
-    if (!isSystemReady && !isLoading) {
-      initializeSystem();
-    }
-  }, [
-    environment,
-    environmentParam,
-    currentEnvironment,
-    taskInfo.taskId,
-    isSystemReady,
-    isLoading,
-    systemActions,
-    trackingActions,
-    executeWithRecovery,
-  ]);
-  
-  // Monitor task progress and handle completion
-  useEffect(() => {
-    if (taskInfo.taskId && taskInfo.taskStatus !== 'COMPLETED' && isTaskProcessing) {
-      const monitorTask = async () => {
-        try {
-          await systemActions.updateTaskStatus(taskInfo.taskId!);
-        } catch (error) {
-          console.error('Failed to monitor task status:', error);
-        }
-      };
-      
-      const interval = setInterval(monitorTask, 2000);
-      return () => clearInterval(interval);
-    }
-  }, [taskInfo.taskId, taskInfo.taskStatus, isTaskProcessing, systemActions]);
-  
-  // =============================================================================
-  // UI Event Handlers
-  // =============================================================================
-  
-  const handleTabChange = useCallback((tab: TabType) => {
-    setActiveTab(tab);
-    
-    // Track tab change for analytics
-    if (preferences.highPerformanceMode) {
-      // In high performance mode, optimize rendering
-      if (tab !== 'all') {
-        // Focus on single camera
-        uiActions.setGridLayout('focus');
-      } else {
-        // Show all cameras
-        uiActions.setGridLayout('grid');
-      }
-    }
-  }, [preferences.highPerformanceMode, uiActions]);
-  
-  const handlePersonSelection = useCallback((globalPersonId: string | undefined) => {
-    trackingActions.selectPerson(globalPersonId);
-    
-    if (globalPersonId) {
-      trackingActions.focusPerson(globalPersonId);
-      console.log('👤 Person selected and focused:', globalPersonId);
-    }
-  }, [trackingActions]);
-  
-  const handleRetry = useCallback(async () => {
-    reset();
-    
-    // Clear any cached data and restart
-    await trackingActions.clearTrackingData();
-    
-    if (taskInfo.taskId) {
-      await trackingActions.connectWebSocket(taskInfo.taskId);
-    } else if (environment) {
-      // Restart the entire process
-      const taskId = await systemActions.startProcessingTask(environment);
-      if (taskId) {
-        await trackingActions.connectWebSocket(taskId);
-      }
-    }
-  }, [reset, environment, taskInfo.taskId, systemActions, trackingActions]);
-  
-  // =============================================================================
-  // Data Processing and Utilities
-  // =============================================================================
-  
-  const getTrackingDataForCamera = useCallback((frontendCameraId: string): any[] => {
-    const backendCameraId = getBackendCameraId(frontendCameraId as any, environment);
-    const cameraTrackingData = cameraData[backendCameraId];
-    
-    if (!cameraTrackingData || !cameraTrackingData.tracks) {
-      return [];
-    }
-    
-    // Convert to legacy format expected by ImageSequencePlayer
-    return cameraTrackingData.tracks.map(track => ({
-      trackId: track.track_id,
-      x1: track.bbox_xyxy[0],
-      y1: track.bbox_xyxy[1],
-      x2: track.bbox_xyxy[2],
-      y2: track.bbox_xyxy[3],
-      globalId: track.global_id,
-      confidence: track.confidence,
-      mapCoords: track.map_coords,
-      isSelected: track.isSelected,
-      isFocused: track.isFocused,
-      isHighlighted: track.isHighlighted,
-    }));
-  }, [cameraData, environment]);
-  
-  const getFrameImageForCamera = useCallback((frontendCameraId: string): string | undefined => {
-    const backendCameraId = getBackendCameraId(frontendCameraId as any, environment);
-    const cameraTrackingData = cameraData[backendCameraId];
-    
-    return cameraTrackingData?.frameImage;
-  }, [cameraData, environment]);
-  
-  // =============================================================================
-  // Render Helpers
-  // =============================================================================
-  
-  const renderCameraView = useCallback((frontendCameraId: string) => {
-    const tracks = getTrackingDataForCamera(frontendCameraId);
-    const base64Image = getFrameImageForCamera(frontendCameraId);
-    
-    return (
-      <ErrorBoundary key={frontendCameraId}>
-        <ImageSequencePlayer
-          cameraId={frontendCameraId}
-          basePath="" // Not used in real-time mode
-          startFrame={0}
-          frameCount={1}
-          currentFrameIndex={0}
-          imageExtension="jpg"
-          tracks={tracks}
-          base64Image={base64Image}
-          taskId={taskId}
-          className="min-h-0"
-          onPersonClick={handlePersonSelection}
-        />
-      </ErrorBoundary>
-    );
-  }, [getTrackingDataForCamera, getFrameImageForCamera, handlePersonSelection, taskId]);
-  
-  const renderMapVisualization = useCallback(() => {
-    return (
-      <div className="bg-gray-700 rounded-md h-1/2 grid grid-cols-2 grid-rows-2 gap-px overflow-hidden">
-        {FRONTEND_CAMERA_IDS.map((frontendCameraId, index) => {
-          const backendCameraId = getBackendCameraId(frontendCameraId as any, environment);
-          const cameraTrackingData = cameraData[backendCameraId];
-          const cameraName = CAMERA_NAMES[index];
-          
-          // Calculate map points for this camera's quadrant
-          const quadrantPoints = cameraTrackingData?.tracks?.map(track => ({
-            x: track.map_coords?.[0] || 0,
-            y: track.map_coords?.[1] || 0,
-            globalId: track.global_id,
-            isSelected: track.isSelected,
-            isFocused: track.isFocused,
-            isHighlighted: track.isHighlighted,
-          })) || [];
-          
-          const quadrantColor = cameraMapping.colors[backendCameraId] || 'bg-gray-500';
-          
-          return (
-            <div
-              key={frontendCameraId}
-              className="relative w-full h-full bg-gray-800 p-1"
-              title={`Map - ${cameraName}`}
-            >
-              <div className="absolute top-1 left-1 text-xs text-gray-400 opacity-75 pointer-events-none">
-                {cameraName}
-              </div>
-              
-              {quadrantPoints.map((point) => (
-                <div
-                  key={point.globalId}
-                  title={`ID: ${point.globalId} (from ${cameraName})`}
-                  className={`absolute w-2 h-2 ${
-                    point.isSelected ? 'bg-orange-400' :
-                    point.isFocused ? 'bg-yellow-400' :
-                    point.isHighlighted ? 'bg-red-400' :
-                    quadrantColor
-                  } rounded-full shadow-md ${
-                    point.isSelected || point.isFocused ? 'ring-2 ring-white' : ''
-                  }`}
-                  style={{
-                    left: `${Math.max(0, Math.min(100, point.x))}%`,
-                    top: `${Math.max(0, Math.min(100, point.y))}%`,
-                    transform: 'translate(-50%, -50%)',
-                    pointerEvents: 'none',
-                  }}
-                />
-              ))}
-            </div>
-          );
-        })}
-      </div>
-    );
-  }, [cameraData, environment, cameraMapping]);
-  
-  // =============================================================================
-  // Main Render
-  // =============================================================================
-  
+    });
+
+    setPerCameraMapPoints(newPerCameraPoints);
+
+  }, [currentFrameData, overallMapDimensions]);
+
+
+  const handlePlayAll = () => setIsPlaying(true);
+  const handleStopAll = () => setIsPlaying(false);
+
   return (
-    <ErrorBoundary>
-      <MockModeIndicator showDetails={true} />
-      <div className={`flex flex-col h-screen bg-gray-900 text-gray-200 ${responsiveClasses.container}`}>
-        {/* Header Section */}
-        <header className={`mb-4 flex-shrink-0 ${responsiveClasses.headerSection}`}>
-          <Link
-            to="/"
-            className={`flex items-center hover:text-orange-400 ${
-              screenSize === 'mobile' ? 'text-base' : 'text-lg'
-            }`}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-5 w-5 mr-2"
-              viewBox="0 0 20 20"
-              fill="currentColor"
-            >
-              <path
-                fillRule="evenodd"
-                d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z"
-                clipRule="evenodd"
-              />
-            </svg>
+    <div className="flex flex-col h-screen bg-gray-900 text-gray-200 p-4 sm:p-6">
+      {/* Header Section (Keep as before) */}
+      <header className="flex items-center justify-between mb-4 flex-shrink-0">
+        <Link to="/" className="flex items-center text-lg hover:text-orange-400">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
             Back
-          </Link>
+        </Link>
+        <h1 className="text-2xl font-semibold">{zoneName}</h1>
+        <div></div>
+      </header>
 
-          <h1 className={`font-semibold ${screenSize === 'mobile' ? 'text-xl' : 'text-2xl'}`}>
-            {zoneName}
-          </h1>
-
-          {/* Enhanced Connection Status */}
-          <div className="flex items-center space-x-4">
-            <ConnectionStatus
-              status={
-                hasSystemErrors ? 'error' :
-                !isOnline ? 'disconnected' :
-                isTrackingActive && webSocketState.isConnected ? 'connected' :
-                isTaskProcessing ? 'connecting' :
-                systemHealth.health?.status === 'healthy' ? 'ready' :
-                'disconnected'
-              }
-              compact={screenSize === 'mobile'}
-            />
-            
-            {/* System Status Info */}
-            <div className="flex flex-col text-xs text-gray-300 bg-gray-800 px-3 py-2 rounded">
-              <div className="font-semibold text-gray-200">System Status:</div>
-              <div>Backend Health: {systemHealth.health?.status || 'checking...'}</div>
-              <div>Network: {isOnline ? 'online' : 'offline'}</div>
-              <div>Active Tracking: {isTrackingActive ? 'yes' : 'no'}</div>
-              <div>WebSocket: {webSocketState.isConnected ? 'connected' : 'disconnected'}</div>
-              {isTaskProcessing && <div className="text-yellow-400">Processing task...</div>}
-              <button 
-                onClick={() => {
-                  systemActions.checkSystemHealth();
-                }}
-                className="mt-2 px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded transition-colors"
-              >
-                Refresh Status
-              </button>
-            </div>
-            
-            {/* System Health Indicators */}
-            <div className="flex items-center space-x-2 text-sm">
-              <div className={`flex items-center ${
-                systemHealth.health?.status === 'healthy' ? 'text-green-400' : 'text-red-400'
-              }`}>
-                <span className={`h-2 w-2 rounded-full mr-1 ${
-                  systemHealth.health?.status === 'healthy' ? 'bg-green-400' : 'bg-red-400'
-                }`}></span>
-                {systemHealth.health?.status === 'healthy' ? 'System OK' : 'System Error'}
-              </div>
-              
-              {isTaskProcessing && (
-                <div className="flex items-center text-yellow-400">
-                  <span className="h-2 w-2 bg-yellow-400 rounded-full mr-1 animate-pulse"></span>
-                  Processing ({Math.round((taskInfo.taskProgress || 0) * 100)}%)
-                </div>
-              )}
-            </div>
-          </div>
-        </header>
-
-        {/* Info Bar with Real-time Statistics */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-gray-800 p-3 rounded-md flex-shrink-0 gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1">
-            <div>
-              Cameras: <span className="font-semibold">{Object.keys(cameraMapping.backendToFrontend).length}</span>
-            </div>
+      {/* Info Bar & Global Controls (Keep as before) */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-gray-800 p-3 rounded-md flex-shrink-0 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1">
+            <div>Num cameras: <span className="font-semibold">{totalCameras}</span></div>
             <div className="flex space-x-4">
-              <span className="text-green-400 flex items-center">
-                <span className="h-2 w-2 bg-green-400 rounded-full mr-1"></span>
-                Active: {Object.values(cameraData).filter(cam => cam.isActive).length}
-              </span>
-              <span className="text-gray-400 flex items-center">
-                <span className="h-2 w-2 bg-gray-400 rounded-full mr-1"></span>
-                Detections: {trackingStats.totalDetections}
-              </span>
-              <span className="text-blue-400 flex items-center">
-                <span className="h-2 w-2 bg-blue-400 rounded-full mr-1"></span>
-                Persons: {trackingStats.uniquePersonCount}
-              </span>
+                <span className="text-green-400 flex items-center"><span className="h-2 w-2 bg-green-400 rounded-full mr-1"></span> Active: {activeCameras}</span>
+                <span className="text-red-400 flex items-center"><span className="h-2 w-2 bg-red-400 rounded-full mr-1"></span> Inactive: {totalCameras - activeCameras}</span>
             </div>
-            <div>
-              Environment: <span className="font-semibold">{zoneName}</span>
-            </div>
-          </div>
-          
-          {/* Real-time Controls */}
-          <div className="flex space-x-2 flex-shrink-0">
-            <div className="text-sm text-gray-300">
-              {isTrackingActive ? (
-                <span className="text-green-400">● LIVE</span>
-              ) : (
-                <span className="text-red-400">● OFFLINE</span>
-              )}
-            </div>
-          </div>
+            <div>Map: <span className="font-semibold">floor 1</span></div>
         </div>
-
-        {/* Tab Bar */}
-        <div className="mb-4 border-b border-gray-700 flex-shrink-0">
-          <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-            <button
-              onClick={() => handleTabChange('all')}
-              className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-                activeTab === 'all'
-                  ? 'border-orange-500 text-orange-500'
-                  : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-              }`}
-            >
-              View all
-            </button>
-            {FRONTEND_CAMERA_IDS.map((id, index) => (
-              <button
-                key={id}
-                onClick={() => handleTabChange(id)}
-                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${
-                  activeTab === id
-                    ? 'border-orange-500 text-orange-500'
-                    : 'border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500'
-                }`}
-              >
-                {CAMERA_NAMES[index]}
-              </button>
-            ))}
-          </nav>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex flex-grow min-h-0 gap-4">
-          {/* Camera Views Section */}
-          <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`}>
-            <LoadingOverlay
-              isLoading={uiState.isLoading || (!isTrackingActive && isTaskProcessing)}
-              message={
-                isTaskProcessing 
-                  ? `Processing... ${Math.round((taskInfo.taskProgress || 0) * 100)}%` 
-                  : "Loading camera feeds..."
-              }
-            >
-              {hasSystemErrors || error ? (
-                <div className="flex items-center justify-center h-full">
-                  <div className="text-center p-6">
-                    <div className="text-red-400 text-4xl mb-4">⚠️</div>
-                    <h3 className="text-lg font-semibold text-red-400 mb-2">System Error</h3>
-                    <p className="text-gray-300 text-sm mb-4">
-                      {uiState.error || error?.message || taskInfo.taskError || 'System unavailable'}
-                    </p>
-                    <button
-                      onClick={handleRetry}
-                      className="px-4 py-2 bg-orange-500 text-white rounded hover:bg-orange-600 transition-colors"
-                    >
-                      Retry Connection
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <>
-                  {/* Multi-camera grid view */}
-                  {activeTab === 'all' && (
-                    <div className={`gap-1 w-full h-full ${
-                      screenSize === 'mobile' ? 'grid grid-cols-1' : 'grid grid-cols-2 grid-rows-2'
-                    }`}>
-                      {FRONTEND_CAMERA_IDS.map(renderCameraView)}
-                    </div>
-                  )}
-                  
-                  {/* Single camera view */}
-                  {FRONTEND_CAMERA_IDS.includes(activeTab) && (
-                    <div className="w-full h-full">
-                      {renderCameraView(activeTab)}
-                    </div>
-                  )}
-                </>
-              )}
-            </LoadingOverlay>
-          </div>
-
-          {/* Right Sidebar with Map and Statistics */}
-          <div className={`flex flex-col gap-4 ${responsiveClasses.sidebarSection}`}>
-            {/* Map Visualization */}
-            {renderMapVisualization()}
-
-            {/* Statistics Panels */}
-            <div className="flex flex-grow gap-4 h-1/2">
-              {/* Detection Statistics */}
-              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
-                <h3 className="text-sm font-semibold mb-3 text-gray-400">Detections per camera</h3>
-                <div className="space-y-2 text-xs flex-grow overflow-y-auto">
-                  {CAMERA_NAMES.map((name, idx) => {
-                    const frontendId = FRONTEND_CAMERA_IDS[idx];
-                    const detectionCount = getTrackingDataForCamera(frontendId).length;
-                    const maxDetections = Math.max(1, ...CAMERA_NAMES.map((_, i) => 
-                      getTrackingDataForCamera(FRONTEND_CAMERA_IDS[i]).length
-                    ));
-                    
-                    return (
-                      <div key={name} className="flex items-center justify-between">
-                        <span>{name}</span>
-                        <div className="flex items-center">
-                          <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
-                            <div
-                              className="h-2 bg-green-500 rounded-full transition-all duration-300"
-                              style={{
-                                width: `${(detectionCount / maxDetections) * 100}%`,
-                              }}
-                            ></div>
-                          </div>
-                          <span className="font-mono">{detectionCount}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Selected Person Info */}
-              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <h3 className="text-sm font-semibold text-gray-400">
-                      {personTracking.selectedPersonId ? 'Selected Person' : 'No Selection'}
-                    </h3>
-                    <span className={`text-xs font-semibold flex items-center ${
-                      personTracking.selectedPersonId ? 'text-orange-400' : 'text-gray-400'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full mr-1 ${
-                        personTracking.selectedPersonId ? 'bg-orange-400' : 'bg-gray-400'
-                      }`}></span>
-                      {personTracking.selectedPersonId ? 'Tracking' : 'Standby'}
-                    </span>
-                  </div>
-                  
-                  {personTracking.selectedPersonId ? (
-                    <>
-                      <p className="text-xs">
-                        Person ID: <span className="font-bold">{personTracking.selectedPersonId}</span>
-                      </p>
-                      <p className="text-xs mt-1">
-                        Confidence: {Math.round((trackingStats.averageConfidence || 0) * 100)}%
-                      </p>
-                      <p className="text-xs mt-1">
-                        Last seen: {trackingStats.lastUpdateTimestamp ? 
-                          new Date(trackingStats.lastUpdateTimestamp).toLocaleTimeString() : 'Unknown'
-                        }
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-xs text-gray-500">
-                      Click on a person in any camera view to select and track them
-                    </p>
-                  )}
-                </div>
-                
-                {personTracking.selectedPersonId && (
-                  <button 
-                    onClick={() => handlePersonSelection(undefined)}
-                    className="w-full py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm font-semibold mt-3 transition-colors"
-                  >
-                    Clear Selection
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="flex space-x-2 flex-shrink-0">
+            <button onClick={handlePlayAll} disabled={isPlaying} className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${ isPlaying ? "bg-gray-600 cursor-not-allowed" : "bg-green-600 hover:bg-green-700" }`}>Play All</button>
+            <button onClick={handleStopAll} disabled={!isPlaying} className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${ !isPlaying ? "bg-gray-600 cursor-not-allowed" : "bg-red-600 hover:bg-red-700" }`}>Stop All</button>
         </div>
       </div>
-    </ErrorBoundary>
+
+      {/* Tab Bar (Keep as before) */}
+      <div className="mb-4 border-b border-gray-700 flex-shrink-0">
+        <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
+          <button onClick={() => setActiveTab("all")} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${ activeTab === "all" ? "border-orange-500 text-orange-500" : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500" }`}>View all</button>
+          {appCameraIds.map((id, index) => (
+            <button key={id} onClick={() => setActiveTab(id)} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${ activeTab === id ? "border-orange-500 text-orange-500" : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500" }`}>
+                {cameraNames[index]}
+            </button>
+          ))}
+        </nav>
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-grow min-h-0 gap-4">
+        {/* Left Side (Image Player Area - Keep as before) */}
+        <div className="w-2/3 bg-gray-800 rounded-md p-1 flex items-center justify-center">
+          {activeTab === "all" && (
+            <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full h-full">
+              {appCameraIds.map((appId) => {
+                const config = cameraFrameConfig[appId];
+                const jsonCameraId = appCameraIdToJsonId[appId];
+                const tracks = jsonCameraId ? currentFrameData?.cameras?.[jsonCameraId]?.tracks : null;
+                return (
+                  <ImageSequencePlayer
+                    key={appId} cameraId={appId} basePath={config?.basePath || ""}
+                    startFrame={config?.startFrame ?? -1} frameCount={config?.frameCount || 0}
+                    currentFrameIndex={frameIndices[appId] ?? 0} imageExtension={config?.extension}
+                    tracks={tracks || null} className="min-h-0"
+                  />
+                );
+              })}
+            </div>
+          )}
+          {appCameraIds.includes(activeTab) && (() => {
+              const config = cameraFrameConfig[activeTab];
+              const jsonCameraId = appCameraIdToJsonId[activeTab];
+              const tracks = jsonCameraId ? currentFrameData?.cameras?.[jsonCameraId]?.tracks : null;
+              return (
+                <ImageSequencePlayer
+                  key={activeTab} cameraId={activeTab} basePath={config?.basePath || ""}
+                  startFrame={config?.startFrame ?? -1} frameCount={config?.frameCount || 0}
+                  currentFrameIndex={frameIndices[activeTab] ?? 0} imageExtension={config?.extension}
+                  tracks={tracks || null} className="w-full h-full"
+                />);
+            })()}
+        </div>
+
+        {/* Right Side Panels */}
+        <div className="w-1/3 flex flex-col gap-4">
+            {/* === MODIFIED: Map Panel - Now a 2x2 Grid === */}
+            <div
+                ref={overallMapContainerRef} // Ref for the main grid container
+                className="bg-gray-700 rounded-md h-1/2 grid grid-cols-2 grid-rows-2 gap-px overflow-hidden" // Grid layout with small gap for borders
+            >
+                {appCameraIds.map((appId, index) => {
+                    const jsonCameraId = appCameraIdToJsonId[appId];
+                    const pointsForThisQuadrant = perCameraMapPoints[jsonCameraId] || [];
+                    const quadrantColor = cameraColorMap[jsonCameraId] || defaultDotColor;
+                    const camName = cameraNames[index];
+
+                    return (
+                        <div
+                            key={jsonCameraId}
+                            className="relative w-full h-full bg-gray-800 p-1" // Quadrant styling, p-1 for slight inner padding
+                            title={`Map - ${camName}`}
+                        >
+                             {/* Optional: Display camera name in quadrant */}
+                            <div className="absolute top-1 left-1 text-xs text-gray-400 opacity-75 pointer-events-none">{camName}</div>
+
+                            {pointsForThisQuadrant.map((point) => (
+                                <div
+                                    key={point.globalId}
+                                    title={`ID: ${point.globalId} (from ${camName})`}
+                                    className={`absolute w-2 h-2 ${quadrantColor} rounded-full shadow-md`}
+                                    style={{
+                                        left: `${point.x}px`,
+                                        top: `${point.y}px`,
+                                        transform: 'translate(-50%, -50%)',
+                                        pointerEvents: 'none',
+                                    }}
+                                />
+                            ))}
+                        </div>
+                    );
+                })}
+                 {/* Show placeholder if no dimensions yet */}
+                {overallMapDimensions.width === 0 && (
+                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 col-span-2 row-span-2">
+                        Map Visualization Area
+                    </div>
+                )}
+            </div>
+             {/* === END MODIFIED === */}
+
+            {/* Lower Panels (Keep as before) */}
+            <div className="flex flex-grow gap-4 h-1/2">
+                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
+                    <h3 className="text-sm font-semibold mb-3 text-gray-400">Detections per camera</h3>
+                    <div className="space-y-2 text-xs flex-grow overflow-y-auto">
+                        {cameraNames.map((name, idx) => (
+                            <div key={name} className="flex items-center justify-between">
+                                <span>{name}</span>
+                                <div className="flex items-center">
+                                    <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
+                                        <div className="h-2 bg-green-500 rounded-full" style={{ width: `${(mockDetections[idx] / Math.max(1, ...mockDetections)) * 100}%` }}></div>
+                                    </div>
+                                    <span className="font-mono">{mockDetections[idx]}</span>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h3 className="text-sm font-semibold text-gray-400">Last caught</h3>
+                            <span className="text-green-400 text-xs font-semibold flex items-center">
+                                <span className="h-1.5 w-1.5 bg-green-400 rounded-full mr-1"></span>Active
+                            </span>
+                        </div>
+                        <p className="text-xs">Camera <span className="font-bold text-lg">3</span></p>
+                        <p className="text-xs mt-3">Person Id: <span className="font-bold">1</span></p>
+                        <p className="text-xs mt-1">Tracking start: 25 min. ago</p>
+                        <p className="text-xs mt-1">Last known: Room1</p>
+                    </div>
+                    <button className="w-full py-1.5 bg-red-600 hover:bg-red-700 text-white rounded text-sm font-semibold mt-3">Cancel Tracking</button>
+                </div>
+            </div>
+        </div>
+      </div>
+    </div>
   );
 };
 
-export default GroupViewPageIntegrated;
+export default GroupViewPage;
