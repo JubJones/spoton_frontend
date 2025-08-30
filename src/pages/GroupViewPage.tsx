@@ -20,6 +20,9 @@ import { useErrorRecovery, useNetworkStatus } from '../hooks/useErrorRecovery';
 // Phase 11 Integration: WebSocket and Store Integration
 import { useWebSocketIntegration } from '../hooks/useWebSocketIntegration';
 
+// Mock Mode Configuration
+import { MOCK_CONFIG } from '../config/mock';
+
 // Phase 11 Integration: Performance Optimization
 import { 
   useAdvancedPerformance, 
@@ -522,27 +525,29 @@ const GroupViewPage: React.FC = () => {
           </nav>
         </div>
 
-        {/* Task Initialization Loading Overlay */}
-        <TaskInitializationLoading
-          isLoading={taskInfo.taskStatus === 'INITIALIZING' || taskInfo.taskStatus === 'QUEUED' || taskInfo.taskStatus === 'CONNECTING'}
-          progress={taskInfo.taskProgress ? Math.round(taskInfo.taskProgress * 100) : 0}
-          currentStep={
-            taskInfo.taskStatus === 'INITIALIZING' ? 'Initializing processing pipeline...' :
-            taskInfo.taskStatus === 'QUEUED' ? 'Task queued for processing...' :
-            taskInfo.taskStatus === 'CONNECTING' ? 'Establishing WebSocket connection...' :
-            undefined
-          }
-          message={`Initializing ${environment || 'system'}...`}
-          environment={environment}
-          onCancel={handleRetry}
-        />
+        {/* Task Initialization Loading Overlay - Skip in Mock Mode */}
+        {!MOCK_CONFIG.enabled && (
+          <TaskInitializationLoading
+            isLoading={taskInfo.taskStatus === 'INITIALIZING' || taskInfo.taskStatus === 'QUEUED' || taskInfo.taskStatus === 'CONNECTING'}
+            progress={taskInfo.taskProgress ? Math.round(taskInfo.taskProgress * 100) : 0}
+            currentStep={
+              taskInfo.taskStatus === 'INITIALIZING' ? 'Initializing processing pipeline...' :
+              taskInfo.taskStatus === 'QUEUED' ? 'Task queued for processing...' :
+              taskInfo.taskStatus === 'CONNECTING' ? 'Establishing WebSocket connection...' :
+              undefined
+            }
+            message={`Initializing ${environment || 'system'}...`}
+            environment={environment}
+            onCancel={handleRetry}
+          />
+        )}
 
         {/* Main Content Area */}
         <div className="flex flex-grow min-h-0 gap-4">
           {/* Camera Views Section */}
           <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`} data-testid="camera-grid">
             <LoadingOverlay
-              isLoading={!isTrackingActive && isTaskProcessing && !['INITIALIZING', 'QUEUED', 'CONNECTING'].includes(taskInfo.taskStatus || '')}
+              isLoading={!MOCK_CONFIG.enabled && !isTrackingActive && isTaskProcessing && !['INITIALIZING', 'QUEUED', 'CONNECTING'].includes(taskInfo.taskStatus || '')}
               message={
                 isTaskProcessing 
                   ? `Processing... ${Math.round((taskInfo.taskProgress || 0) * 100)}%` 

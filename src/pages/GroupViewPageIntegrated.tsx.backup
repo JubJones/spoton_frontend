@@ -5,7 +5,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import ImageSequencePlayer from '../components/ImageSequencePlayer';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import MockModeIndicator from '../components/MockModeIndicator';
 import {
   LoadingOverlay,
   CameraSkeleton,
@@ -140,37 +139,111 @@ const GroupViewPageIntegrated: React.FC = () => {
   // Initialize system and start task when component mounts
   useEffect(() => {
     const initializeSystem = async () => {
+      const initStartTime = Date.now();
+      console.log('🏁 FRONTEND INIT: Starting system initialization', {
+        environment,
+        environmentParam,
+        currentEnvironment,
+        taskId: taskInfo.taskId,
+        isSystemReady,
+        isLoading,
+        timestamp: new Date().toISOString()
+      });
+
       try {
         await executeWithRecovery(async () => {
           // Set environment if not already set
           if (!currentEnvironment && environmentParam) {
+            console.log('🌍 FRONTEND INIT: Setting environment from URL params', {
+              from: currentEnvironment,
+              to: environmentParam,
+              timestamp: new Date().toISOString()
+            });
             await systemActions.setEnvironment(environmentParam);
+            console.log('✅ FRONTEND INIT: Environment set successfully');
           }
           
           // Check system health
+          console.log('🏥 FRONTEND INIT: Checking system health...');
+          const healthStart = Date.now();
           await systemActions.checkSystemHealth();
+          console.log('✅ FRONTEND INIT: System health check completed', {
+            duration: Date.now() - healthStart,
+            timestamp: new Date().toISOString()
+          });
           
           // Start processing task if environment is set
           if (environment && !taskInfo.taskId) {
-            console.log('🚀 Starting processing task for environment:', environment);
+            console.log('🚀 FRONTEND INIT: Starting processing task', {
+              environment,
+              existingTaskId: taskInfo.taskId,
+              timestamp: new Date().toISOString()
+            });
+            
+            const taskStart = Date.now();
             const taskId = await systemActions.startProcessingTask(environment);
             
             if (taskId) {
-              console.log('✅ Task started successfully:', taskId);
+              console.log('✅ FRONTEND INIT: Task started successfully', {
+                taskId,
+                duration: Date.now() - taskStart,
+                timestamp: new Date().toISOString()
+              });
               
               // Connect WebSocket for real-time tracking
+              console.log('🔌 FRONTEND INIT: Initiating WebSocket connection', {
+                taskId,
+                timestamp: new Date().toISOString()
+              });
+              
+              const wsStart = Date.now();
               await trackingActions.connectWebSocket(taskId);
-              console.log('🔌 WebSocket connection initiated');
+              console.log('✅ FRONTEND INIT: WebSocket connection completed', {
+                taskId,
+                duration: Date.now() - wsStart,
+                timestamp: new Date().toISOString()
+              });
+            } else {
+              console.warn('⚠️ FRONTEND INIT: Task creation returned null/undefined taskId');
             }
+          } else {
+            console.log('ℹ️ FRONTEND INIT: Skipping task creation', {
+              environment,
+              existingTaskId: taskInfo.taskId,
+              reason: !environment ? 'No environment' : 'Task already exists',
+              timestamp: new Date().toISOString()
+            });
           }
         });
       } catch (error) {
-        console.error('❌ System initialization failed:', error);
+        console.error('❌ FRONTEND INIT: System initialization failed', {
+          error: error.message,
+          stack: error.stack,
+          duration: Date.now() - initStartTime,
+          timestamp: new Date().toISOString()
+        });
+      } finally {
+        console.log('🏁 FRONTEND INIT: System initialization completed', {
+          totalDuration: Date.now() - initStartTime,
+          timestamp: new Date().toISOString()
+        });
       }
     };
     
     if (!isSystemReady && !isLoading) {
+      console.log('🎯 FRONTEND INIT: Triggering initialization', {
+        isSystemReady,
+        isLoading,
+        timestamp: new Date().toISOString()
+      });
       initializeSystem();
+    } else {
+      console.log('⏸️ FRONTEND INIT: Skipping initialization', {
+        isSystemReady,
+        isLoading,
+        reason: isSystemReady ? 'System already ready' : 'Already loading',
+        timestamp: new Date().toISOString()
+      });
     }
   }, [
     environment,
@@ -187,16 +260,54 @@ const GroupViewPageIntegrated: React.FC = () => {
   // Monitor task progress and handle completion
   useEffect(() => {
     if (taskInfo.taskId && taskInfo.taskStatus !== 'COMPLETED' && isTaskProcessing) {
+      console.log('📊 FRONTEND MONITOR: Starting task progress monitoring', {
+        taskId: taskInfo.taskId,
+        taskStatus: taskInfo.taskStatus,
+        isTaskProcessing,
+        timestamp: new Date().toISOString()
+      });
+
       const monitorTask = async () => {
         try {
+          console.log('🔍 FRONTEND MONITOR: Polling task status', {
+            taskId: taskInfo.taskId,
+            currentStatus: taskInfo.taskStatus,
+            timestamp: new Date().toISOString()
+          });
+          
           await systemActions.updateTaskStatus(taskInfo.taskId!);
+          
+          console.log('✅ FRONTEND MONITOR: Task status updated', {
+            taskId: taskInfo.taskId,
+            newStatus: taskInfo.taskStatus,
+            timestamp: new Date().toISOString()
+          });
         } catch (error) {
-          console.error('Failed to monitor task status:', error);
+          console.error('❌ FRONTEND MONITOR: Failed to monitor task status', {
+            taskId: taskInfo.taskId,
+            error: error.message,
+            timestamp: new Date().toISOString()
+          });
         }
       };
       
       const interval = setInterval(monitorTask, 2000);
-      return () => clearInterval(interval);
+      
+      return () => {
+        console.log('🛑 FRONTEND MONITOR: Stopping task progress monitoring', {
+          taskId: taskInfo.taskId,
+          timestamp: new Date().toISOString()
+        });
+        clearInterval(interval);
+      };
+    } else {
+      console.log('⏸️ FRONTEND MONITOR: Skipping task monitoring', {
+        taskId: taskInfo.taskId,
+        taskStatus: taskInfo.taskStatus,
+        isTaskProcessing,
+        reason: !taskInfo.taskId ? 'No task ID' : taskInfo.taskStatus === 'COMPLETED' ? 'Task completed' : 'Not processing',
+        timestamp: new Date().toISOString()
+      });
     }
   }, [taskInfo.taskId, taskInfo.taskStatus, isTaskProcessing, systemActions]);
   
@@ -230,19 +341,57 @@ const GroupViewPageIntegrated: React.FC = () => {
   }, [trackingActions]);
   
   const handleRetry = useCallback(async () => {
+    console.log('🔄 FRONTEND RETRY: Starting retry process', {
+      environment,
+      existingTaskId: taskInfo.taskId,
+      timestamp: new Date().toISOString()
+    });
+
     reset();
     
-    // Clear any cached data and restart
-    await trackingActions.clearTrackingData();
-    
-    if (taskInfo.taskId) {
-      await trackingActions.connectWebSocket(taskInfo.taskId);
-    } else if (environment) {
-      // Restart the entire process
-      const taskId = await systemActions.startProcessingTask(environment);
-      if (taskId) {
-        await trackingActions.connectWebSocket(taskId);
+    try {
+      // Clear any cached data and restart
+      console.log('🧹 FRONTEND RETRY: Clearing tracking data...');
+      await trackingActions.clearTrackingData();
+      console.log('✅ FRONTEND RETRY: Tracking data cleared');
+      
+      if (taskInfo.taskId) {
+        console.log('🔌 FRONTEND RETRY: Reconnecting WebSocket with existing task', {
+          taskId: taskInfo.taskId,
+          timestamp: new Date().toISOString()
+        });
+        await trackingActions.connectWebSocket(taskInfo.taskId);
+        console.log('✅ FRONTEND RETRY: WebSocket reconnected');
+      } else if (environment) {
+        console.log('🚀 FRONTEND RETRY: Creating new task for retry', {
+          environment,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Restart the entire process
+        const taskId = await systemActions.startProcessingTask(environment);
+        
+        if (taskId) {
+          console.log('✅ FRONTEND RETRY: New task created', {
+            taskId,
+            timestamp: new Date().toISOString()
+          });
+          
+          console.log('🔌 FRONTEND RETRY: Connecting WebSocket to new task...');
+          await trackingActions.connectWebSocket(taskId);
+          console.log('✅ FRONTEND RETRY: WebSocket connected to new task');
+        } else {
+          console.warn('⚠️ FRONTEND RETRY: Task creation failed during retry');
+        }
+      } else {
+        console.warn('⚠️ FRONTEND RETRY: No environment or taskId available for retry');
       }
+    } catch (error) {
+      console.error('❌ FRONTEND RETRY: Retry process failed', {
+        error: error.message,
+        stack: error.stack,
+        timestamp: new Date().toISOString()
+      });
     }
   }, [reset, environment, taskInfo.taskId, systemActions, trackingActions]);
   
@@ -371,7 +520,6 @@ const GroupViewPageIntegrated: React.FC = () => {
   
   return (
     <ErrorBoundary>
-      <MockModeIndicator showDetails={true} />
       <div className={`flex flex-col h-screen bg-gray-900 text-gray-200 ${responsiveClasses.container}`}>
         {/* Header Section */}
         <header className={`mb-4 flex-shrink-0 ${responsiveClasses.headerSection}`}>
@@ -520,7 +668,7 @@ const GroupViewPageIntegrated: React.FC = () => {
         </div>
 
         {/* Main Content Area */}
-        <div className="flex flex-grow min-h-0 gap-4">
+        <div className="flex flex-col flex-grow min-h-0 gap-4">
           {/* Camera Views Section */}
           <div className={`bg-gray-800 rounded-md p-1 flex items-center justify-center ${responsiveClasses.cameraSection}`}>
             <LoadingOverlay

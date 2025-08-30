@@ -12,6 +12,8 @@ import type {
 } from '../types/api';
 import { useBackendHealth } from './useBackendHealth';
 import { APP_CONFIG } from '../config/app';
+import { MOCK_CONFIG } from '../config/mock';
+import { mockAPI } from '../mocks/mockServices';
 
 // Real backend configuration - FIXED to use environment variables
 const API_BASE_URL = APP_CONFIG.API_BASE_URL;
@@ -387,9 +389,24 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
   ];
 };
 
-// Simplified hook for landing/environment pages
+// Simplified hook for landing/environment pages with mock support
 export const useSpotOnBackend = () => {
   const [state, actions] = useSpotOnBackendInternal();
+
+  // In mock mode, always return connected and healthy
+  if (MOCK_CONFIG.enabled) {
+    return {
+      isConnected: true,
+      backendStatus: {
+        status: 'healthy',
+      },
+      healthCheck: async () => {
+        console.log('🎭 Mock health check - always healthy');
+        return await mockAPI.checkSystemHealth();
+      },
+      error: null,
+    };
+  }
 
   return {
     isConnected: state.isConnected,

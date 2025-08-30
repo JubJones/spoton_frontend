@@ -15,6 +15,7 @@ import {
   getAvailableEnvironments,
   validateEnvironmentConfig 
 } from '../config/environments';
+import { MOCK_CONFIG } from '../config/mock';
 
 /**
  * Service for managing environments and their data
@@ -202,7 +203,7 @@ export class EnvironmentService {
   // ========================================================================
 
   /**
-   * Validate environment configuration
+   * Validate environment configuration (mock-aware)
    */
   async validateEnvironment(environmentId: string): Promise<{
     isValid: boolean;
@@ -219,6 +220,19 @@ export class EnvironmentService {
     const localConfigValid = validateEnvironmentConfig(environmentId as EnvironmentId);
     if (!localConfigValid) {
       errors.push(`Local configuration invalid for ${environmentId}`);
+    }
+
+    // In mock mode, always return valid backend connection
+    if (MOCK_CONFIG.enabled) {
+      console.log('🎭 Mock environment validation - always valid');
+      return {
+        isValid: localConfigValid,
+        localConfigValid,
+        backendAccessible: true,
+        hasData: true,
+        errors,
+        warnings: [],
+      };
     }
 
     // Try to access backend

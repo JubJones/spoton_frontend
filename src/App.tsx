@@ -3,6 +3,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AccessibilityProvider, SkipLink } from './components/accessibility/AccessibilityProvider';
 import { FocusManager } from './components/accessibility/FocusManager';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import MockModeIndicator from './components/MockModeIndicator';
 import LandingPage from './pages/LandingPage';
 import EnvironmentSelectionPage from './pages/EnvironmentSelectionPage';
 import SelectZonePage from './pages/SelectZonePage'; // Legacy zone selection (keeping for backward compatibility)
@@ -17,6 +18,9 @@ function App() {
     <AccessibilityProvider>
       <ErrorBoundary>
         <div>
+          {/* Mock mode indicator */}
+          <MockModeIndicator />
+          
           {/* Skip links for keyboard navigation */}
           <SkipLink href="#main-content">Skip to main content</SkipLink>
 

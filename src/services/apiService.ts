@@ -21,6 +21,8 @@ import {
   ExportJobStatusResponse,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
+import { MOCK_CONFIG } from '../config/mock';
+import { mockAPI } from '../mocks/mockServices';
 
 // ============================================================================
 // API Service Configuration
@@ -327,6 +329,12 @@ export class APIService {
   async startProcessingTask(
     request: ProcessingTaskStartRequest
   ): Promise<ProcessingTaskCreateResponse> {
+    // Use mock service if enabled
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock startProcessingTask');
+      return mockAPI.startProcessingTask(request.environment_id);
+    }
+
     try {
       const response = await this.http.post<ProcessingTaskCreateResponse>(
         API_ENDPOINTS.START_TASK,
@@ -349,6 +357,12 @@ export class APIService {
    * Get task status by ID
    */
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    // Use mock service if enabled
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock getTaskStatus');
+      return mockAPI.getTaskStatus(taskId);
+    }
+
     try {
       const response = await this.http.get<TaskStatusResponse>(API_ENDPOINTS.TASK_STATUS(taskId));
 
@@ -371,6 +385,12 @@ export class APIService {
    * Get system health status
    */
   async getSystemHealth(): Promise<SystemHealthResponse> {
+    // Use mock service if enabled
+    if (MOCK_CONFIG.services.systemHealth) {
+      console.log('🎭 Using mock getSystemHealth');
+      return mockAPI.checkSystemHealth();
+    }
+
     try {
       const response = await this.http.get<SystemHealthResponse>(API_ENDPOINTS.HEALTH);
 

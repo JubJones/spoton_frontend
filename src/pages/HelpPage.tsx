@@ -73,7 +73,7 @@ const HelpPage: React.FC = () => {
               <ul className="text-gray-300 space-y-1 text-sm">
                 <li>• Modern web browser (Chrome, Firefox, Safari, Edge)</li>
                 <li>• Stable internet connection</li>
-                <li>• Backend server running on port 3847</li>
+                <li>• Backend server running on port 3847 (not required in mock mode)</li>
                 <li>• JavaScript enabled</li>
               </ul>
             </div>
@@ -253,7 +253,7 @@ const HelpPage: React.FC = () => {
                   If you see "Backend connection lost" message:
                 </p>
                 <ul className="text-gray-400 text-sm space-y-1 ml-4">
-                  <li>• Check that the backend server is running on port 3847</li>
+                  <li>• Check that the backend server is running on port 3847 (or enable mock mode)</li>
                   <li>• Verify your network connection</li>
                   <li>• Ensure no firewall is blocking the connection</li>
                   <li>• Try refreshing the page</li>
