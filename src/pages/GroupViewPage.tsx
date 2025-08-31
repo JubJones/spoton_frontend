@@ -55,20 +55,35 @@ const activeCameras = 4;
 const appCameraIds = ["camera1", "camera2", "camera3", "camera4"];
 const cameraNames = ["Camera 1", "Camera 2", "Camera 3", "Camera 4"];
 
-// Camera mapping between app IDs and backend camera IDs
-const appCameraIdToJsonId: { [appId: string]: string } = {
+// Environment-specific camera mappings
+const cameraMapping: { [environment: string]: { [appId: string]: string } } = {
+  'campus': {
     'camera1': 'c09',
     'camera2': 'c12',
     'camera3': 'c13', 
     'camera4': 'c16',
+  },
+  'factory': {
+    'camera1': 'c01',
+    'camera2': 'c02',
+    'camera3': 'c03',
+    'camera4': 'c05',
+  }
 };
 
-const jsonIdToAppCameraId: { [jsonId: string]: string } = Object.entries(
-  appCameraIdToJsonId
-).reduce((acc, [appId, jsonId]) => {
-  acc[jsonId] = appId;
-  return acc;
-}, {} as { [jsonId: string]: string });
+// Helper function to get camera mapping for current environment
+const getCameraMappingForEnvironment = (environment: string) => {
+  return cameraMapping[environment] || cameraMapping['campus']; // Default to campus
+};
+
+// Helper function to get reverse mapping (JSON ID to app ID)
+const getReverseCameraMapping = (environment: string) => {
+  const appToJsonMapping = getCameraMappingForEnvironment(environment);
+  return Object.entries(appToJsonMapping).reduce((acc, [appId, jsonId]) => {
+    acc[jsonId] = appId;
+    return acc;
+  }, {} as { [jsonId: string]: string });
+};
 
 type TabType = "all" | string;
 const MAP_SOURCE_WIDTH = 1920; // Source width for map_coords (per camera)
@@ -81,13 +96,27 @@ interface SingleCameraMapPoint {
     globalId: number;
 }
 
-// --- NEW: Color mapping for cameras (using JSON IDs) ---
-const cameraColorMap: { [jsonCameraId: string]: string } = {
+// --- Environment-specific color mapping for cameras (using JSON IDs) ---
+const cameraColorMapping: { [environment: string]: { [jsonCameraId: string]: string } } = {
+  'campus': {
     'c09': 'bg-cyan-400',
     'c12': 'bg-red-500',
     'c13': 'bg-yellow-400',
     'c16': 'bg-purple-500',
+  },
+  'factory': {
+    'c01': 'bg-cyan-400',
+    'c02': 'bg-red-500',
+    'c03': 'bg-yellow-400',
+    'c05': 'bg-purple-500',
+  }
 };
+
+// Helper function to get camera color mapping for current environment
+const getCameraColorMapping = (environment: string) => {
+  return cameraColorMapping[environment] || cameraColorMapping['campus']; // Default to campus
+};
+
 const defaultDotColor = 'bg-gray-500';
 
 // --- GroupViewPage Component ---
@@ -174,6 +203,25 @@ const GroupViewPage: React.FC = () => {
       const environment = getEnvironmentFromUrl();
       console.log('Checking for existing streaming task for environment:', environment);
       
+      // First, check if there are existing active streaming tasks for this environment
+      const tasksResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks`);
+      if (tasksResponse.ok) {
+        const tasksData = await tasksResponse.json();
+        const activeTasks = tasksData.data.tasks.filter((task: any) => 
+          task.environment_id === environment && task.status === 'STREAMING'
+        );
+        
+        if (activeTasks.length > 0) {
+          const activeTask = activeTasks[0]; // Use the first active task
+          console.log('Found existing active streaming task:', activeTask.task_id);
+          setTaskId(activeTask.task_id);
+          connectWebSocket(activeTask.task_id);
+          return true;
+        }
+      }
+      
+      console.log('No existing active task found, creating new one...');
+      
       const response = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -185,11 +233,7 @@ const GroupViewPage: React.FC = () => {
         console.log('Response not OK:', response.status, errorText);
         
         if (response.status === 400 && errorText.includes('already has an active')) {
-          console.log('Found existing streaming task - since error message does not contain task ID, we need to handle this differently');
-          
-          // Since we can't extract task ID from error, we need to detect existing streaming
-          // Let's try a different approach - check if there's a known task ID pattern
-          // For now, show user they need to stop existing stream first
+          // This shouldn't happen now since we check above, but keep as fallback
           setError('An active streaming session already exists for this environment. Please refresh the page or wait for it to complete.');
           return false;
         } else {
@@ -278,6 +322,67 @@ const GroupViewPage: React.FC = () => {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
+    // Helper function to process tracking updates
+    const processTrackingUpdate = (message: any) => {
+      setCurrentFrameData(message);
+      
+      // Update camera frames with base64 data
+      const newFrames: { [jsonCameraId: string]: string } = {};
+      const newDebugInfo: { [jsonCameraId: string]: any } = {};
+      
+      Object.entries(message.cameras).forEach(([jsonCameraId, cameraData]: [string, any]) => {
+        if (cameraData.frame_image_base64) {
+          const rawData = cameraData.frame_image_base64;
+          
+          // Check if data already has data URI prefix
+          let processedData: string;
+          let base64Part: string;
+          
+          if (rawData.startsWith('data:image/')) {
+            // Data already has data URI prefix
+            processedData = rawData;
+            base64Part = rawData.split(',')[1] || '';
+            console.log(`🖼️ Data URI already formatted for ${jsonCameraId}`);
+          } else {
+            // Add data URI prefix
+            processedData = `data:image/jpeg;base64,${rawData}`;
+            base64Part = rawData;
+            console.log(`🖼️ Added data URI prefix for ${jsonCameraId}`);
+          }
+          
+          // Validate base64 data
+          const validationResult = testBase64Validity(base64Part, jsonCameraId);
+          
+          newFrames[jsonCameraId] = processedData;
+          
+          // Store debug info
+          newDebugInfo[jsonCameraId] = {
+            hasFrameData: !!rawData,
+            rawDataLength: rawData?.length,
+            processedDataLength: processedData?.length,
+            rawDataPrefix: rawData?.substring(0, 30) + '...',
+            processedDataPrefix: processedData?.substring(0, 50) + '...',
+            hasDataUriPrefix: rawData.startsWith('data:image/'),
+            validationResult,
+            timestamp: new Date().toISOString()
+          };
+          
+          console.log(`🖼️ Frame data for ${jsonCameraId}:`, newDebugInfo[jsonCameraId]);
+          
+          // Set loading state
+          setImageLoadingStates(prev => ({
+            ...prev,
+            [jsonCameraId]: 'loading'
+          }));
+        }
+      });
+      
+      setCameraFrames(newFrames);
+      setImageDebugInfo(prev => ({ ...prev, ...newDebugInfo }));
+      console.log('🖼️ Updated frames for cameras:', Object.keys(newFrames));
+      console.log('🖼️ Frame data summary:', Object.keys(newFrames).map(id => `${id}: ${newFrames[id].length} chars`));
+    };
+
     ws.onopen = () => {
       console.log('✅ WebSocket connected successfully');
       console.log('📤 Sending subscribe message');
@@ -296,64 +401,24 @@ const GroupViewPage: React.FC = () => {
         const message = JSON.parse(event.data);
         console.log('📨 WebSocket message received:', message.type, message.mode);
         
-        if (message.type === 'tracking_update' && message.mode === 'raw_streaming') {
-          setCurrentFrameData(message);
+        // Handle message_batch messages (contains multiple tracking_update messages)
+        if (message.type === 'message_batch') {
+          console.log('📦 Processing message batch with', message.batch_size, 'messages');
           
-          // Update camera frames with base64 data
-          const newFrames: { [jsonCameraId: string]: string } = {};
-          const newDebugInfo: { [jsonCameraId: string]: any } = {};
-          
-          Object.entries(message.cameras).forEach(([jsonCameraId, cameraData]: [string, any]) => {
-            if (cameraData.frame_image_base64) {
-              const rawData = cameraData.frame_image_base64;
-              
-              // Check if data already has data URI prefix
-              let processedData: string;
-              let base64Part: string;
-              
-              if (rawData.startsWith('data:image/')) {
-                // Data already has data URI prefix
-                processedData = rawData;
-                base64Part = rawData.split(',')[1] || '';
-                console.log(`🖼️ Data URI already formatted for ${jsonCameraId}`);
-              } else {
-                // Add data URI prefix
-                processedData = `data:image/jpeg;base64,${rawData}`;
-                base64Part = rawData;
-                console.log(`🖼️ Added data URI prefix for ${jsonCameraId}`);
-              }
-              
-              // Validate base64 data
-              const validationResult = testBase64Validity(base64Part, jsonCameraId);
-              
-              newFrames[jsonCameraId] = processedData;
-              
-              // Store debug info
-              newDebugInfo[jsonCameraId] = {
-                hasFrameData: !!rawData,
-                rawDataLength: rawData?.length,
-                processedDataLength: processedData?.length,
-                rawDataPrefix: rawData?.substring(0, 30) + '...',
-                processedDataPrefix: processedData?.substring(0, 50) + '...',
-                hasDataUriPrefix: rawData.startsWith('data:image/'),
-                validationResult,
-                timestamp: new Date().toISOString()
-              };
-              
-              console.log(`🖼️ Frame data for ${jsonCameraId}:`, newDebugInfo[jsonCameraId]);
-              
-              // Set loading state
-              setImageLoadingStates(prev => ({
-                ...prev,
-                [jsonCameraId]: 'loading'
-              }));
+          // Process each message in the batch
+          if (message.messages && Array.isArray(message.messages)) {
+            // Process the last message in the batch (most recent frame)
+            const latestMessage = message.messages[message.messages.length - 1];
+            if (latestMessage && latestMessage.type === 'tracking_update' && latestMessage.mode === 'raw_streaming') {
+              processTrackingUpdate(latestMessage);
             }
-          });
-          
-          setCameraFrames(newFrames);
-          setImageDebugInfo(prev => ({ ...prev, ...newDebugInfo }));
-          console.log('🖼️ Updated frames for cameras:', Object.keys(newFrames));
-          console.log('🖼️ Frame data summary:', Object.keys(newFrames).map(id => `${id}: ${newFrames[id].length} chars`));
+          }
+          return;
+        }
+        
+        // Handle individual tracking_update messages
+        if (message.type === 'tracking_update' && message.mode === 'raw_streaming') {
+          processTrackingUpdate(message);
         }
       } catch (error) {
         console.error('❌ Error parsing WebSocket message:', error);
@@ -408,7 +473,7 @@ const GroupViewPage: React.FC = () => {
             connectWebSocket(taskId);
             return;
           } else {
-            console.log('Existing task not streaming, clearing taskId and trying new task');
+            console.log('Existing task not streaming, clearing taskId and checking for other active tasks');
             setTaskId(null);
           }
         } catch (error) {
@@ -638,6 +703,8 @@ const GroupViewPage: React.FC = () => {
           {activeTab === "all" && (
             <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full h-full">
               {appCameraIds.map((appId) => {
+                const environment = getEnvironmentFromUrl();
+                const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
                 const jsonCameraId = appCameraIdToJsonId[appId];
                 const frameData = cameraFrames[jsonCameraId];
                 const tracks = currentFrameData?.cameras?.[jsonCameraId]?.tracks || [];
@@ -755,6 +822,8 @@ const GroupViewPage: React.FC = () => {
             </div>
           )}
           {appCameraIds.includes(activeTab) && (() => {
+              const environment = getEnvironmentFromUrl();
+              const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
               const jsonCameraId = appCameraIdToJsonId[activeTab];
               const frameData = cameraFrames[jsonCameraId];
               const tracks = currentFrameData?.cameras?.[jsonCameraId]?.tracks || [];
@@ -857,6 +926,9 @@ const GroupViewPage: React.FC = () => {
                 className="bg-gray-700 rounded-md h-1/2 grid grid-cols-2 grid-rows-2 gap-px overflow-hidden" // Grid layout with small gap for borders
             >
                 {appCameraIds.map((appId, index) => {
+                    const environment = getEnvironmentFromUrl();
+                    const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
+                    const cameraColorMap = getCameraColorMapping(environment);
                     const jsonCameraId = appCameraIdToJsonId[appId];
                     const pointsForThisQuadrant = perCameraMapPoints[jsonCameraId] || [];
                     const quadrantColor = cameraColorMap[jsonCameraId] || defaultDotColor;
@@ -902,6 +974,8 @@ const GroupViewPage: React.FC = () => {
                 <h3 className="text-sm font-semibold mb-2 text-gray-400">Debug Info</h3>
                 <div className="grid grid-cols-2 gap-2 text-xs">
                   {appCameraIds.map(appId => {
+                    const environment = getEnvironmentFromUrl();
+                    const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
                     const jsonCameraId = appCameraIdToJsonId[appId];
                     const frameData = cameraFrames[jsonCameraId];
                     const loadingState = imageLoadingStates[jsonCameraId];
@@ -941,6 +1015,8 @@ const GroupViewPage: React.FC = () => {
                     <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
                     <div className="space-y-2 text-xs flex-grow overflow-y-auto">
                         {cameraNames.map((name, idx) => {
+                            const environment = getEnvironmentFromUrl();
+                            const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
                             const appId = appCameraIds[idx];
                             const jsonCameraId = appCameraIdToJsonId[appId];
                             const trackCount = currentFrameData?.cameras?.[jsonCameraId]?.tracks?.length || 0;
