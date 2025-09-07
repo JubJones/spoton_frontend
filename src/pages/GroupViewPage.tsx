@@ -1074,11 +1074,11 @@ const GroupViewPage: React.FC = () => {
                             const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
                             const appId = appCameraIds[idx];
                             const jsonCameraId = appCameraIdToJsonId[appId];
-                            const trackCount = currentFrameData?.cameras?.[jsonCameraId]?.tracks?.length || 0;
-                            const maxTracks = Math.max(1, ...cameraNames.map((_, i) => {
+                            const detectionCount = detectionData[jsonCameraId]?.detections?.length || 0;
+                            const maxDetections = Math.max(1, ...cameraNames.map((_, i) => {
                                 const aId = appCameraIds[i];
                                 const jId = appCameraIdToJsonId[aId];
-                                return currentFrameData?.cameras?.[jId]?.tracks?.length || 0;
+                                return detectionData[jId]?.detections?.length || 0;
                             }));
                             
                             return (
@@ -1088,10 +1088,10 @@ const GroupViewPage: React.FC = () => {
                                         <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
                                             <div 
                                                 className="h-2 bg-green-500 rounded-full" 
-                                                style={{ width: `${(trackCount / maxTracks) * 100}%` }}
+                                                style={{ width: `${(detectionCount / maxDetections) * 100}%` }}
                                             ></div>
                                         </div>
-                                        <span className="font-mono">{trackCount}</span>
+                                        <span className="font-mono">{detectionCount}</span>
                                     </div>
                                 </div>
                             );
