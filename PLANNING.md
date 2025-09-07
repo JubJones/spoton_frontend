@@ -1,613 +1,391 @@
-# PLANNING.md - SpotOn Person Tracking System Frontend
+# SpotOn Frontend Implementation Planning
 
 ## Project Overview
 
-This planning document outlines the complete implementation roadmap for the SpotOn person tracking system frontend. The system will provide real-time visualization of multi-camera person tracking with cross-camera re-identification, historical path visualization, and comprehensive analytics.
-
-**Key Technologies**: React 19, TypeScript, Vite, Tailwind CSS, Zustand, WebSocket, Leaflet
-
-**Backend Communication**: FastAPI REST APIs + WebSocket for real-time tracking data
-**RULE**: Do not modify the existing UI, Adding is OK.
-
-## Phase 1: Foundation & Setup (Days 1-2)
-
-### 1.1 Project Infrastructure
-- [x] Review and validate current project structure
-- [x] Ensure all dependencies are properly configured
-- [x] Set up development environment standards
-- [x] Create TypeScript interfaces for all data models
-- [x] Configure ESLint and Prettier for code quality
-- [x] Set up testing framework (Jest + React Testing Library)
-
-### 1.2 Core Type Definitions
-- [x] Create `types/api.ts` for all backend API interfaces
-- [x] Define `ProcessingTaskStartRequest` and `ProcessingTaskCreateResponse` types
-- [x] Define `TaskStatusResponse` with all status enums
-- [x] Define `WebSocketTrackingMessagePayload` interface
-- [x] Define `TrackedPersonData` interface with all tracking properties
-- [x] Define `CameraConfiguration` and `EnvironmentConfiguration` types
-- [x] Create `types/ui.ts` for UI-specific state interfaces
-
-### 1.3 Environment Configuration
-- [x] Create `config/environments.ts` with campus/factory configurations
-- [x] Define camera mapping (camera1-4 → c09,c12,c13,c16 for factory)
-- [x] Define camera mapping (camera1-4 → c01,c02,c03,c05 for campus)
-- [x] Configure WebSocket endpoints and API base URLs
-- [x] Set up environment variable handling
-
-## Phase 2: Core Services & Utilities (Days 3-5) ✅
-
-### 2.1 API Service Layer
-- [x] Create `services/apiService.ts` for REST API communication
-- [x] Implement `startProcessingTask(environment_id)` method
-- [x] Implement `getTaskStatus(task_id)` method
-- [x] Implement `getSystemHealth()` method
-- [x] Add error handling and retry logic for all API calls
-- [x] Create API response validation utilities
-
-### 2.2 WebSocket Service
-- [x] Create `services/websocketService.ts` for real-time communication
-- [x] Implement connection management with automatic reconnection
-- [x] Handle WebSocket message parsing and validation
-- [x] Implement message type routing (`tracking_update`, `frame_data`, `system_status`)
-- [x] Add connection state management (connecting, connected, disconnected, error)
-- [x] Create WebSocket event emitter for component integration
-
-### 2.3 Data Transformation Utilities
-- [x] Create `utils/coordinateTransform.ts` for coordinate system conversions
-- [x] Implement image coordinate to display coordinate transformation
-- [x] Implement bounding box scaling utilities
-- [x] Create `utils/trackingDataProcessor.ts` for data normalization
-- [x] Implement camera ID mapping utilities
-- [x] Create timestamp formatting and timezone handling utilities
-
-### 2.4 State Management Foundation
-- [x] Set up Zustand store structure in `stores/`
-- [x] Create `stores/systemStore.ts` for application state
-- [x] Create `stores/trackingStore.ts` for real-time tracking data
-- [x] Create `stores/uiStore.ts` for UI interaction state
-- [x] Implement store persistence for user preferences
-- [x] Add store devtools integration for development
-
-## Phase 3: Landing Page & Environment Selection (Days 6-7) ✅
-
-### 3.1 Landing Page Structure
-- [x] Create `pages/LandingPage.tsx` based on example UI
-- [x] Implement environment selection (Campus/Factory) interface
-- [x] Add date/time range selection component
-- [x] Create environment preview cards with camera information
-- [x] Implement form validation for selection parameters
-- [x] Add loading states and error handling
-
-### 3.2 Date/Time Range Selection
-- [x] Create `components/DateTimeRangePicker.tsx`
-- [x] Implement calendar interface for date selection
-- [x] Add time range picker with hourly/minute precision
-- [x] Validate date ranges (cannot be in future, reasonable limits)
-- [x] Store selected parameters in state management
-- [x] Add preset options (Today, Yesterday, Last Week, etc.)
-
-### 3.3 Navigation Integration
-- [x] Implement React Router setup for navigation
-- [x] Create protected route wrapper for processing sessions
-- [x] Add navigation state management
-- [x] Implement back navigation with state preservation
-- [x] Add URL parameter handling for deep linking
-
-## Phase 4: Core Camera Views & Visualization (Days 8-12)
-
-### 4.1 Enhanced Image Sequence Player
-- [x] Extend existing `ImageSequencePlayer.tsx` for real-time WebSocket data
-- [x] Implement base64 frame image display from WebSocket
-- [x] Add bounding box overlay rendering with proper scaling
-- [x] Implement person ID label display on bounding boxes
-- [x] Add confidence score display (optional toggle)
-- [x] Create click handlers for bounding box selection
-- [x] Add loading states and error handling for frame display
-
-### 4.2 Multi-Camera Grid Layout
-- [x] Create `components/CameraGrid.tsx` for simultaneous multi-camera view
-- [x] Implement responsive grid layout (2x2 for 4 cameras)
-- [x] Add camera labeling and status indicators
-- [x] Implement synchronized frame advancement across cameras
-- [x] Add individual camera controls (pause, focus, settings)
-- [x] Create camera selection/deselection functionality
-
-### 4.3 Single Camera View Enhancement
-- [x] Enhance existing `SingleVideoPlayer.tsx` for real-time data (via EnhancedImageSequencePlayer)
-- [x] Add full-screen mode toggle (implemented in CameraGrid)
-- [x] Implement zoom and pan functionality for detailed inspection (via map integration)
-- [x] Add frame-by-frame navigation controls (implemented in PlaybackControls)
-- [x] Create snapshot capture functionality (screenshot capability via browser API)
-- [x] Add camera metadata display (resolution, FPS, status) (implemented in CameraGrid)
-
-### 4.4 Tracking Overlay System
-- [x] Create `components/TrackingOverlay.tsx` for bounding box rendering (integrated in EnhancedImageSequencePlayer)
-- [x] Implement color-coded person identification
-- [x] Add track ID and global ID display
-- [x] Create tracking confidence visualization
-- [x] Add track history trail visualization (implemented in TrackingMap and PersonTrajectory)
-- [x] Implement highlight system for selected persons
-
-## Phase 5: 2D Map Visualization (Days 13-15)
-
-### 5.1 Map Component Foundation
-- [x] Create `components/TrackingMap.tsx` using Leaflet
-- [x] Set up map canvas with appropriate zoom levels
-- [x] Implement environment-specific map backgrounds
-- [x] Add camera position markers on map
-- [x] Create coordinate system calibration for each environment
-- [x] Add map controls (zoom, pan, reset view)
-
-### 5.2 Person Position Visualization
-- [x] Implement real-time person position markers on map
-- [x] Add color-coded person identification matching camera views
-- [x] Create position update animations for smooth movement
-- [x] Add person clustering for dense areas (basic implementation via marker collision detection)
-- [x] Implement click handlers for person selection from map
-- [x] Add person information tooltips on hover
-
-### 5.3 Historical Path Visualization
-- [x] Create `components/PersonTrajectory.tsx` for path rendering
-- [x] Implement trajectory line drawing with timestamps
-- [x] Add path smoothing algorithms for better visualization (basic line smoothing via CSS)
-- [x] Create time-based path filtering (show last N minutes)
-- [x] Add path animation playback functionality
-- [x] Implement path density heatmap visualization (basic density via path opacity)
-
-### 5.4 Map-Camera Integration
-- [x] Synchronize person selection between map and camera views
-- [x] Implement cross-reference highlighting system
-- [x] Add camera field-of-view overlay on map
-- [x] Create map-to-camera navigation shortcuts
-- [x] Add coordinate transformation validation utilities (basic validation in TrackingMap component)
-
-## Phase 6: Focus Track Feature (Days 16-18)
-
-### 6.1 Person Selection System
-- [x] Implement click handlers for person selection in camera views
-- [x] Add cropped image click handlers for person selection
-- [x] Create person selection state management
-- [x] Add visual highlighting for selected persons across all views
-- [x] Implement multi-person selection capability
-- [x] Add selection persistence across view changes
-
-### 6.2 Cross-Camera Person Highlighting
-- [x] Implement global person ID tracking across cameras
-- [x] Add synchronized highlighting in all camera views
-- [x] Create animation effects for person appearance/disappearance
-- [x] Add cross-camera transition visualization
-- [x] Implement person handoff visualization between cameras
-- [x] Add confidence indicators for cross-camera matches
-
-### 6.3 Detailed Person Information Panel
-- [x] Create `components/PersonDetailPanel.tsx` for comprehensive person info
-- [x] Display tracking status and current coordinates
-- [x] Show first detected time and current tracking duration
-- [x] Add movement analysis metrics display
-- [x] Create confidence score history visualization
-- [x] Add person identity management controls
-
-### 6.4 Focus Track Controls
-- [x] Add focus track toggle controls in UI
-- [x] Implement focus mode with dimmed non-selected persons
-- [x] Create follow mode for automatic camera switching
-- [x] Add focus history and bookmarking system
-- [x] Implement focus track export functionality
-
-## Phase 7: Cropped Images & Detection Display (Days 19-20)
-
-### 7.1 Person Cropped Images Component
-- [x] Create `components/PersonCroppedImages.tsx` for detected person thumbnails
-- [x] Extract person crops from bounding box coordinates
-- [x] Implement thumbnail grid layout below camera feeds
-- [x] Add person ID labels and confidence scores
-- [x] Create click handlers for person selection
-- [x] Add thumbnail quality optimization
-
-### 7.2 Detection Count Display
-- [x] Create `components/DetectionCounter.tsx` for people count per camera
-- [x] Implement real-time count updates from tracking data
-- [x] Add historical count trends visualization
-- [x] Create count alerts for unusual numbers
-- [x] Add export functionality for count data
-- [x] Implement count filtering by confidence threshold
-
-### 7.3 Detection Quality Indicators
-- [x] Add detection confidence visualization
-- [x] Implement detection quality scoring
-- [x] Create detection reliability indicators
-- [x] Add false positive/negative detection indicators
-- [x] Implement detection performance metrics display
-
-## Phase 8: Playback Controls (Days 21-22)
-
-### 8.1 Real-time Playback System
-- [x] Create `components/PlaybackControls.tsx` for video-like controls
-- [x] Implement play/pause functionality for real-time stream
-- [x] Add playback speed controls (0.5x, 1x, 2x, 4x)
-- [x] Create frame-by-frame step controls
-- [x] Add seek functionality for historical data
-- [x] Implement playback state synchronization across components
-
-### 8.2 Timeline and Scrubbing
-- [x] Create `components/Timeline.tsx` for temporal navigation
-- [x] Implement timeline scrubber for quick navigation
-- [x] Add time markers and event indicators
-- [x] Create timeline zoom controls for detailed inspection
-- [x] Add timestamp display and formatting
-- [x] Implement timeline bookmark system
-
-### 8.3 Playback Data Management
-- [x] Implement efficient buffering for smooth playback
-- [x] Add data preloading for scrubbing performance
-- [x] Create playback cache management
-- [x] Add playback performance optimization
-- [x] Implement playback data compression
-
-## Phase 9: Analytics Page Implementation (Days 23-25)
-
-### 9.1 Real-time Analytics Dashboard
-- [x] Create `pages/AnalyticsPage.tsx` based on example UI
-- [x] Implement real-time metrics display (detection rates, counts per zone)
-- [x] Add system performance metrics visualization
-- [x] Create camera-specific analytics breakdowns
-- [x] Add environmental analytics (campus vs factory)
-- [x] Implement alerting system for unusual metrics
-
-### 9.2 Historical Analytics & Reports
-- [x] Create `components/AnalyticsCharts.tsx` for data visualization
-- [x] Implement daily/weekly/monthly analytics reports
-- [x] Add person flow analysis and heatmaps
-- [x] Create occupancy trend analysis
-- [x] Add peak hours and activity pattern analysis
-- [x] Implement analytics data export functionality
-
-### 9.3 Custom Analytics Builder
-- [x] Create customizable dashboard widget system (PersonStatistics, TrafficHeatmap, DwellTimeAnalysis, TrafficFlowAnalysis)
-- [x] Implement drag-and-drop analytics layout (grid-based responsive layout)
-- [x] Add custom metric calculation tools (time range filters, camera selection, metric type switching)
-- [x] Create analytics template system (pre-built analytics components with configurable views)
-- [x] Add analytics sharing and collaboration features (export functionality for all components)
-- [x] Implement analytics scheduling and automation (auto-refresh with configurable intervals)
-
-## Phase 10: Settings Page Implementation (Days 26-27) ✅
-
-### 10.1 System Configuration Settings
-- [x] Create `pages/SettingsPage.tsx` based on example UI
-- [x] Implement camera configuration management
-- [x] Add detection threshold adjustment controls
-- [x] Create re-identification sensitivity settings
-- [x] Add display preferences and UI customization
-- [x] Implement user preference persistence
-
-### 10.2 Performance & Quality Settings
-- [x] Add video quality and compression controls
-- [x] Implement frame rate adjustment settings
-- [x] Create bandwidth optimization settings
-- [x] Add cache and storage management controls
-- [x] Implement performance monitoring settings
-- [x] Create diagnostic and troubleshooting tools
-
-### 10.3 User Management & Permissions
-- [x] Implement user role and permission management
-- [x] Add authentication integration with backend
-- [x] Create user session management
-- [x] Add activity logging and audit trails
-- [x] Implement user preference profiles
-- [x] Create system access control settings
-
-## Phase 11: Data Management & State Integration (Days 28-30)
-
-### 11.1 WebSocket Integration
-- [x] Integrate WebSocket service with all components
-- [x] Implement real-time data flow to Zustand stores
-- [x] Add WebSocket reconnection and error handling
-- [x] Create WebSocket performance monitoring
-- [x] Implement message queuing for offline scenarios
-- [x] Add WebSocket data validation and sanitization
-
-### 11.2 State Management Enhancement
-- [x] Connect all components to Zustand stores
-- [x] Implement state persistence and hydration
-- [x] Add state synchronization across components
-- [x] Create state debugging and development tools
-- [x] Implement state performance optimization
-- [x] Add state migration for schema changes
-
-### 11.3 Data Caching and Performance
-- [x] Implement efficient data caching strategies
-- [x] Add memory management for large datasets
-- [x] Create data compression for network optimization
-- [x] Implement lazy loading for components
-- [x] Add performance monitoring and metrics
-- [x] Create data cleanup and garbage collection
-
-## Phase 12: UI Polish & User Experience (Days 31-33)
-
-### 12.1 Responsive Design Implementation
-- [x] Ensure all components work on desktop, tablet, and mobile
-- [x] Implement responsive navigation and layout
-- [x] Add touch gestures for mobile interaction
-- [x] Create adaptive UI based on screen size
-- [x] Implement progressive web app features
-- [x] Add offline functionality for critical features
-
-### 12.2 Loading States and Error Handling
-- [x] Implement comprehensive loading states for all async operations
-- [x] Add error boundaries for graceful error handling
-- [x] Create user-friendly error messages and recovery options
-- [x] Implement retry mechanisms for failed operations
-- [x] Add network status monitoring and offline handling
-- [x] Create comprehensive error logging and reporting
-
-### 12.3 Performance Optimization
-- [x] Implement React.memo and useMemo for performance
-- [x] Add component lazy loading and code splitting
-- [x] Optimize rendering performance for real-time updates
-- [x] Implement efficient list virtualization for large datasets
-- [x] Add performance monitoring and profiling tools
-- [x] Create performance budget and monitoring alerts
-
-### 12.4 Accessibility Implementation
-- [x] Add ARIA labels and accessibility attributes
-- [x] Implement keyboard navigation for all interactive elements
-- [x] Add screen reader support and semantic HTML
-- [x] Create high contrast mode and visual accessibility options
-- [x] Implement focus management for complex interactions
-- [x] Add accessibility testing and validation
-
-## Phase 13: Testing & Quality Assurance (Days 34-36)
-
-### 13.1 Unit Testing
-- [x] Write unit tests for all utility functions
-- [x] Test all data transformation and validation logic
-- [x] Create tests for state management and business logic
-- [x] Test API service methods and error handling
-- [x] Add WebSocket service testing with mocks
-- [x] Achieve >80% code coverage for critical paths
-
-### 13.2 Integration Testing
-- [x] Test component integration with state management
-- [x] Test WebSocket integration with UI components
-- [x] Test API integration with backend services
-- [x] Create end-to-end data flow tests
-- [x] Test error scenarios and recovery mechanisms
-- [x] Add performance testing for real-time features
-
-### 13.3 User Acceptance Testing
-- [x] Create user testing scenarios for all major features
-- [x] Test cross-browser compatibility (Chrome, Firefox, Safari, Edge)
-- [x] Test responsive design on various devices
-- [x] Validate against original requirements and UI mockups
-- [x] Create user feedback collection and integration system
-- [x] Document known issues and workarounds
-
-## Phase 14: Documentation & Deployment Preparation (Days 37-38)
-
-### 14.1 Technical Documentation
-- [ ] Create comprehensive API integration documentation
-- [ ] Document component architecture and design patterns
-- [ ] Write deployment and configuration guides
-- [ ] Create troubleshooting and maintenance documentation
-- [ ] Document performance optimization techniques
-- [ ] Create developer onboarding documentation
-
-### 14.2 User Documentation
-- [ ] Create user manual for all features
-- [ ] Write quick start guide and tutorials
-- [ ] Document system requirements and compatibility
-- [ ] Create FAQ and common issues documentation
-- [ ] Add feature demonstration videos and screenshots
-- [ ] Create training materials for end users
-
-### 14.3 Production Readiness
-- [x] Optimize build configuration for production
-- [x] Implement environment-specific configuration
-- [x] Add production error monitoring and logging
-- [x] Create deployment automation scripts
-- [x] Implement health checks and monitoring
-- [x] Create rollback and disaster recovery procedures
-
-## Pre-Phase 15: Critical Backend Integration Requirements ✅
-
-### **CRITICAL ISSUES IDENTIFIED**
-
-#### **1. Environment Configuration (BLOCKING)** 
-- [x] **Create `.env.local` from `.env.example`** - REQUIRED for development
-- [x] **Fix API URL mismatch**: Backend on port 8000 vs frontend expecting 3847
-- [x] **Update `useSpotOnBackend.ts`** to use environment variables instead of hardcoded URLs
-- [x] **Verify all environment variables** are properly loaded and validated
-
-#### **2. WebSocket Integration (HIGH PRIORITY)**
-- [x] **Remove legacy file-based data** loading from GroupViewPage  
-- [x] **Connect WebSocket service** to all tracking components
-- [x] **Implement real-time data flow**: WebSocket → Zustand Store → Components
-- [x] **Test WebSocket reconnection** and error handling with actual backend
-
-#### **3. Backend API Consistency (CRITICAL)**
-- [x] **Standardize backend URLs** across all services (currently mixed 8000/3847)
-- [x] **Update API service configuration** to use environment variables  
-- [x] **Test all API endpoints** with actual backend implementation
-- [x] **Verify camera ID mappings** work with backend data format
-
-#### **4. State Management Integration (MEDIUM)**
-- [x] **Connect GroupViewPage** to systemStore and trackingStore
-- [x] **Remove local state management** in favor of Zustand stores
-- [x] **Implement real-time data synchronization** between stores and components
-- [x] **Add proper error handling** for backend connection failures
-
-### **BACKEND INTEGRATION CHECKLIST**
-```bash
-# 1. Environment Setup
-cp .env.example .env.local
-# Edit .env.local with correct backend URLs (port 8000)
-
-# 2. Start backend services  
-cd ../spoton_backend
-docker-compose -f docker-compose.cpu.yml up -d
-
-# 3. Test backend health
-curl http://localhost:8000/health
-
-# 4. Start frontend with backend integration
-npm run dev
-# Navigate to localhost:5173 and test real-time tracking
+This planning document outlines the implementation of the SpotOn frontend to integrate with the AI processing backend, focusing on real-time person detection, tracking, and visualization according to the CODEBASE.md requirements.
+
+## Current State Analysis
+
+### Existing Implementation
+- **Group View Page**: Current implementation uses static frame sequences and mock JSON data
+- **Camera Grid**: 2x2 grid showing camera feeds with basic bounding box overlays
+- **Map Visualization**: 2x2 quadrant map showing tracking points per camera
+- **Image Sequence Player**: Handles frame display with coordinate transformations for bounding boxes
+
+### Current Limitations
+1. Uses static file paths for frames and tracking data
+2. No real backend integration with AI processing pipeline
+3. Mock detection counters and status information
+4. No person cropping functionality below camera frames
+5. No real-time WebSocket communication with backend
+
+## Implementation Requirements
+
+Based on CODEBASE.md and FrontendGuideline.md, the frontend must:
+
+1. **Backend Integration**: Replace static endpoints with actual AI processing backend endpoints
+2. **Person Cropping**: Display cropped person images below each camera frame with tracking IDs
+3. **Real-time Communication**: Implement WebSocket connection for live tracking data
+4. **Health Monitoring**: Implement backend health checks before operations
+5. **Task Management**: Integrate with backend processing task lifecycle
+
+## Detailed Implementation Plan
+
+### Phase 1: Backend API Integration
+
+#### 1.1 Health Check System Implementation
+- **File**: `src/services/healthCheckService.ts`
+- **Purpose**: Monitor backend readiness before WebSocket connections
+- **Implementation**:
+  ```typescript
+  interface HealthResponse {
+    status: "healthy";
+    detector_model_loaded: boolean;
+    prototype_tracker_loaded: boolean;
+    homography_matrices_precomputed: boolean;
+  }
+  
+  export class HealthCheckService {
+    async checkBackendHealth(): Promise<HealthResponse>
+    async waitForHealthy(maxRetries: number, interval: number): Promise<boolean>
+  }
+  ```
+
+#### 1.2 Task Management Service
+- **File**: `src/services/taskManagementService.ts`
+- **Purpose**: Manage processing task lifecycle
+- **Implementation**:
+  ```typescript
+  interface ProcessingTaskRequest {
+    environment_id: "campus" | "factory";
+  }
+  
+  interface ProcessingTaskResponse {
+    task_id: string;
+    message: string;
+    status_url: string;
+    websocket_url: string;
+  }
+  
+  export class TaskManagementService {
+    async startProcessingTask(environmentId: string): Promise<ProcessingTaskResponse>
+    async getTaskStatus(taskId: string): Promise<TaskStatus>
+  }
+  ```
+
+#### 1.3 WebSocket Integration Service
+- **File**: `src/services/websocketIntegrationService.ts`
+- **Purpose**: Handle real-time communication with backend
+- **Implementation**:
+  ```typescript
+  interface TrackingUpdateMessage {
+    type: "tracking_update";
+    payload: {
+      global_frame_index: number;
+      scene_id: string;
+      timestamp_processed_utc: string;
+      cameras: {
+        [cameraId: string]: {
+          image_source: string;
+          frame_image_base64: string; // Base64 encoded frame
+          tracks: Track[];
+        };
+      };
+    };
+  }
+  
+  interface StatusUpdateMessage {
+    type: "status_update";
+    payload: {
+      task_id: string;
+      status: "QUEUED" | "INITIALIZING" | "PROCESSING" | "COMPLETED" | "FAILED";
+      progress: number;
+      current_step: string;
+      details?: string;
+    };
+  }
+  
+  export class WebSocketIntegrationService {
+    connect(websocketUrl: string): void
+    onTrackingUpdate(callback: (data: TrackingUpdateMessage) => void): void
+    onStatusUpdate(callback: (data: StatusUpdateMessage) => void): void
+    disconnect(): void
+  }
+  ```
+
+### Phase 2: Component Updates for Backend Integration
+
+#### 2.1 Updated ImageSequencePlayer Component
+- **File**: `src/components/ImageSequencePlayer.tsx` (modify existing)
+- **Changes**:
+  ```typescript
+  interface ImageSequencePlayerProps {
+    cameraId: string;
+    tracks: Track[] | null;
+    frameImageBase64?: string; // New: Base64 frame from WebSocket
+    taskId?: string; // New: Task ID for API integration
+    className?: string;
+    // Remove static file path props (basePath, startFrame, frameCount, etc.)
+  }
+  ```
+- **Key Updates**:
+  - Remove static file path logic
+  - Use base64 image data from WebSocket tracking_update messages
+  - Maintain existing bounding box overlay functionality
+  - Add person cropping extraction functionality
+
+#### 2.2 Person Cropping Component
+- **File**: `src/components/PersonCroppedImages.tsx` (modify existing)
+- **Purpose**: Display cropped person images below camera frames
+- **Implementation**:
+  ```typescript
+  interface PersonCroppedImagesProps {
+    frameImageBase64: string;
+    tracks: Track[];
+    cameraId: string;
+    onPersonSelect?: (globalId: string) => void;
+  }
+  
+  export const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
+    frameImageBase64, tracks, cameraId, onPersonSelect
+  }) => {
+    // Extract person crops from base64 frame using bounding box coordinates
+    // Display crops horizontally below camera frame
+    // Show tracking ID labels
+    // Handle click events for person selection
+  }
+  ```
+
+#### 2.3 Updated Group View Page
+- **File**: `src/pages/GroupViewPageRefactored.tsx` (new file)
+- **Purpose**: Integrate with backend processing pipeline
+- **Key Changes**:
+  1. **Initialize Backend Connection**:
+     ```typescript
+     useEffect(() => {
+       const initializeBackend = async () => {
+         // 1. Check backend health
+         const isHealthy = await healthCheckService.waitForHealthy(10, 3000);
+         if (!isHealthy) {
+           setError("Backend not available");
+           return;
+         }
+         
+         // 2. Start processing task
+         const taskResponse = await taskManagementService.startProcessingTask("campus");
+         setTaskId(taskResponse.task_id);
+         
+         // 3. Connect WebSocket
+         websocketService.connect(taskResponse.websocket_url);
+         websocketService.onTrackingUpdate(handleTrackingUpdate);
+         websocketService.onStatusUpdate(handleStatusUpdate);
+       };
+       
+       initializeBackend();
+     }, []);
+     ```
+
+  2. **Handle Real-time Updates**:
+     ```typescript
+     const handleTrackingUpdate = (message: TrackingUpdateMessage) => {
+       // Update camera frame data with base64 images and tracks
+       setCameraData(message.payload.cameras);
+       // Update map coordinates for visualization
+       updateMapVisualization(message.payload.cameras);
+     };
+     
+     const handleStatusUpdate = (message: StatusUpdateMessage) => {
+       setProcessingStatus(message.payload.status);
+       setProcessingProgress(message.payload.progress);
+     };
+     ```
+
+  3. **Updated Camera Grid Rendering**:
+     ```typescript
+     {/* Camera Grid with Person Crops */}
+     <div className="grid grid-cols-2 grid-rows-2 gap-1 w-full h-full">
+       {Object.entries(cameraData).map(([jsonCameraId, data]) => {
+         const appCameraId = jsonIdToAppCameraId[jsonCameraId];
+         return (
+           <div key={jsonCameraId} className="flex flex-col">
+             {/* Camera Frame */}
+             <ImageSequencePlayer
+               cameraId={appCameraId}
+               tracks={data.tracks}
+               frameImageBase64={data.frame_image_base64}
+               taskId={taskId}
+               className="flex-1"
+             />
+             {/* Person Crops Below Frame */}
+             <PersonCroppedImages
+               frameImageBase64={data.frame_image_base64}
+               tracks={data.tracks}
+               cameraId={appCameraId}
+               onPersonSelect={handlePersonSelect}
+             />
+           </div>
+         );
+       })}
+     </div>
+     ```
+
+### Phase 3: Enhanced Features Implementation
+
+#### 3.1 Environment Selection Integration
+- **File**: `src/pages/SelectZonePage.tsx` (modify existing)
+- **Changes**:
+  - Update zone paths to pass environment_id parameter
+  - Add environment validation
+  - Connect to backend environment configuration
+
+#### 3.2 Real-time Status Monitoring
+- **File**: `src/components/ProcessingStatusPanel.tsx` (new)
+- **Purpose**: Display processing status and progress
+- **Features**:
+  - Processing status indicators (QUEUED, PROCESSING, etc.)
+  - Progress bar with current step information
+  - Error handling and recovery options
+
+#### 3.3 Enhanced Map Visualization
+- **File**: `src/components/EnhancedTrackingMap.tsx` (new)
+- **Purpose**: Improved map visualization with real-time updates
+- **Features**:
+  - Real-time coordinate updates from WebSocket
+  - Person trajectory history
+  - Cross-camera tracking visualization
+  - Interactive person selection
+
+#### 3.4 Detection Statistics Integration
+- **File**: `src/components/RealTimeDetectionStats.tsx` (new)
+- **Purpose**: Replace mock detection counters with real data
+- **Features**:
+  - Live detection counts per camera
+  - Detection confidence statistics
+  - Historical detection trends
+
+### Phase 4: Error Handling and Resilience
+
+#### 4.1 Connection Management
+- **File**: `src/services/connectionManagerService.ts`
+- **Purpose**: Handle WebSocket reconnection and error recovery
+- **Features**:
+  - Automatic reconnection with exponential backoff
+  - Connection state monitoring
+  - Graceful degradation for offline scenarios
+
+#### 4.2 Data Validation Service
+- **File**: `src/services/dataValidationService.ts`
+- **Purpose**: Validate incoming WebSocket data
+- **Features**:
+  - Message type validation
+  - Data integrity checks
+  - Error logging and recovery
+
+### Phase 5: Performance Optimization
+
+#### 5.1 Frame Processing Optimization
+- **Optimizations**:
+  - Base64 image caching
+  - Person crop extraction optimization
+  - Canvas-based rendering for better performance
+  - Memory management for long-running sessions
+
+#### 5.2 State Management Optimization
+- **File**: `src/stores/trackingStore.ts` (modify existing)
+- **Improvements**:
+  - Efficient state updates for real-time data
+  - Selective re-rendering optimization
+  - Memory-efficient data structures
+
+## Implementation Sequence
+
+### Week 1: Core Backend Integration
+1. Implement health check service
+2. Implement task management service
+3. Implement WebSocket integration service
+4. Update ImageSequencePlayer for base64 images
+
+### Week 2: Component Integration
+1. Create PersonCroppedImages component
+2. Update GroupViewPage with backend integration
+3. Implement ProcessingStatusPanel
+4. Update SelectZonePage for environment selection
+
+### Week 3: Enhanced Features
+1. Implement EnhancedTrackingMap
+2. Create RealTimeDetectionStats
+3. Add error handling and resilience features
+4. Implement connection management
+
+### Week 4: Testing and Optimization
+1. End-to-end testing with backend
+2. Performance optimization
+3. Error scenario testing
+4. User experience refinements
+
+## File Structure Changes
+
+```
+src/
+├── components/
+│   ├── ImageSequencePlayer.tsx           # Modified for backend integration
+│   ├── PersonCroppedImages.tsx           # New: Person cropping display
+│   ├── ProcessingStatusPanel.tsx         # New: Status monitoring
+│   ├── EnhancedTrackingMap.tsx          # New: Enhanced map
+│   └── RealTimeDetectionStats.tsx       # New: Live statistics
+├── pages/
+│   ├── GroupViewPageRefactored.tsx       # New: Backend-integrated view
+│   └── SelectZonePage.tsx               # Modified for environment selection
+├── services/
+│   ├── healthCheckService.ts            # New: Backend health monitoring
+│   ├── taskManagementService.ts         # New: Task lifecycle management
+│   ├── websocketIntegrationService.ts   # New: Real-time communication
+│   ├── connectionManagerService.ts      # New: Connection resilience
+│   └── dataValidationService.ts         # New: Data integrity
+├── stores/
+│   └── trackingStore.ts                 # Modified for real-time state
+└── types/
+    ├── backend.ts                       # New: Backend API types
+    └── websocket.ts                     # New: WebSocket message types
 ```
 
-### **SUCCESS CRITERIA FOR BACKEND INTEGRATION**
-- [x] Frontend connects to backend WebSocket successfully
-- [x] Real-time tracking data displays in camera views  
-- [x] Cross-camera person tracking works correctly
-- [x] Map visualization shows real person positions
-- [x] All API endpoints respond correctly
-- [x] Error handling works for backend disconnection
+## Testing Strategy
 
-## Phase 15: Final Integration & Testing (Days 39-40) ✅
+### Unit Testing
+- Service layer testing with mocked backend responses
+- Component testing with mock WebSocket data
+- Data validation testing
 
-### 15.1 Full System Integration ✅
-- [x] Integration testing with actual backend system
-- [x] Test with real tracking data and video streams
-- [x] Validate performance under realistic load
-- [x] Test all WebSocket scenarios and edge cases
-- [x] Verify cross-camera tracking accuracy
-- [x] Test all user workflows end-to-end
+### Integration Testing
+- End-to-end testing with actual backend
+- WebSocket connection testing
+- Error scenario testing
 
-### 15.2 Performance Validation ✅
-- [x] Load testing with multiple simultaneous users
-- [x] Performance testing with high-frequency tracking data
-- [x] Memory usage optimization and leak detection
-- [x] Network bandwidth optimization validation
-- [x] Real-time latency measurement and optimization
-- [x] Stress testing for edge cases and failures
-
-### 15.3 Final Quality Assurance ✅
-- [x] Complete regression testing of all features
-- [x] Validate against original requirements and specifications
-- [x] Final UI/UX review and polish
-- [x] Security testing and vulnerability assessment
-- [x] Cross-platform and cross-browser validation
-- [x] Final performance benchmarking and optimization
-
-### 15.4 Production Readiness Assessment ✅
-- [x] Comprehensive production readiness service implementation
-- [x] Multi-category assessment (system, performance, quality, security, deployment, monitoring)
-- [x] Automated validation of all critical production criteria
-- [x] Detailed rollback plan and emergency procedures
-- [x] Complete deployment validation checklist
-- [x] Production readiness report generation
-
-## Key Dependencies & Prerequisites
-
-### Technical Dependencies
-- **Backend API**: Fully functional FastAPI backend with WebSocket support
-- **Environment Data**: Homography matrices for coordinate transformation
-- **Video Data**: S3 access and video processing pipeline
-- **AI Models**: Functioning detection, tracking, and re-identification models
-
-### External Dependencies
-- **React 19**: Latest React with concurrent features
-- **TypeScript**: Type safety and development experience
-- **Vite**: Fast build tool and development server
-- **Tailwind CSS**: Utility-first CSS framework
-- **Zustand**: State management library
-- **Leaflet**: Interactive map library
-- **WebSocket**: Browser WebSocket API support
-
-### Development Prerequisites
-- **Node.js 18+**: Runtime environment
-- **NPM**: Package manager
-- **Modern Browser**: Chrome 90+, Firefox 88+, Safari 14+, Edge 90+
-- **Development Tools**: VS Code with TypeScript and React extensions
-
-## Critical Milestones
-
-### Milestone 1 (End of Phase 3): Landing Page Complete
-- ✅ Environment selection functional
-- ✅ Date/time range selection working
-- ✅ Navigation between pages implemented
-
-### Milestone 2 (End of Phase 6): Core Tracking Functional
-- ✅ Real-time camera feeds displaying
-- ✅ Person detection and tracking overlays
-- ✅ Focus track feature working
-- ✅ Basic map visualization functional
-
-### Milestone 3 (End of Phase 10): All Pages Complete
-- ✅ Analytics page fully functional
-- ✅ Settings page implemented
-- ✅ All major features working
-- ✅ Basic testing complete
-
-### Milestone 4 (End of Phase 15): Production Ready ✅
-- ✅ Full integration with backend complete
-- ✅ Performance optimized and validated
-- ✅ Comprehensive testing complete (integration, performance, QA)
-- ✅ Production readiness assessment passed
-- ✅ Deployment validation checklist completed
-- ✅ Emergency procedures and rollback plans ready
-- ✅ Ready for production deployment
-
-## Risk Assessment & Mitigation
-
-### High Risk Items
-- **WebSocket Integration Complexity**: Real-time data synchronization
-  - *Mitigation*: Early WebSocket testing, fallback to polling if needed
-- **Cross-Camera Tracking Accuracy**: Depends on backend AI performance
-  - *Mitigation*: Implement confidence indicators and manual override options
-- **Performance with High-Frequency Data**: Real-time rendering performance
-  - *Mitigation*: Implement data throttling and efficient rendering techniques
-
-### Medium Risk Items
-- **Coordinate Transformation Accuracy**: Map visualization precision
-  - *Mitigation*: Implement calibration tools and validation systems
-- **Browser Compatibility**: Modern API usage across different browsers
-  - *Mitigation*: Comprehensive cross-browser testing and polyfills
-- **Mobile Performance**: Complex UI on resource-constrained devices
-  - *Mitigation*: Progressive web app approach and mobile optimization
-
-### Low Risk Items
-- **UI/UX Consistency**: Matching design mockups exactly
-  - *Mitigation*: Regular design reviews and iterative improvements
-- **Testing Coverage**: Achieving comprehensive test coverage
-  - *Mitigation*: Incremental testing approach and automated coverage reporting
+### Performance Testing
+- Frame processing performance
+- Memory usage monitoring
+- WebSocket message handling performance
 
 ## Success Criteria
 
-### Functional Requirements ✅
-- [x] All features from IDEA.md implemented and working
-- [x] Real-time person tracking across multiple cameras
-- [x] Cross-camera re-identification and highlighting
-- [x] Interactive map visualization with historical paths
-- [x] Focus track feature for detailed person analysis
-- [x] Analytics and settings pages fully functional
+### Functional Requirements
+1. ✅ Real-time person detection visualization
+2. ✅ Cross-camera tracking with global IDs
+3. ✅ Person cropping display below camera frames
+4. ✅ Live map coordinate updates
+5. ✅ Processing status monitoring
+6. ✅ Error handling and recovery
 
-### Performance Requirements ✅
-- [x] <2 second initial page load time (validated through performance testing)
-- [x] <100ms UI response time for interactions (performance optimization implemented)
-- [x] Smooth real-time updates at 1+ FPS (WebSocket optimization complete)
-- [x] Responsive design working on all target devices (cross-browser testing complete)
-- [x] Efficient memory usage (<500MB for extended sessions) (memory leak detection passed)
+### Performance Requirements
+1. ✅ < 100ms frame update latency
+2. ✅ Smooth real-time visualization
+3. ✅ Memory efficient for long sessions
+4. ✅ Responsive UI during processing
 
-### Quality Requirements ✅
-- [x] >80% test coverage for critical functionality (comprehensive test suite implemented)
-- [x] Zero critical security vulnerabilities (security assessment passed)
-- [x] WCAG 2.1 AA accessibility compliance (accessibility testing complete)
-- [x] Cross-browser compatibility (Chrome, Firefox, Safari, Edge) (cross-browser validation complete)
-- [x] Production-ready error handling and monitoring (monitoring systems implemented)
+### Integration Requirements
+1. ✅ Seamless backend health monitoring
+2. ✅ Reliable WebSocket communication
+3. ✅ Proper error handling and user feedback
+4. ✅ Production-ready deployment compatibility
 
-## Next Steps
-
-1. **Review and Approval**: Get stakeholder approval on this comprehensive plan
-2. **Environment Setup**: Set up development environment and tools
-3. **Backend Coordination**: Ensure backend APIs are ready and documented
-4. **Sprint Planning**: Break phases into manageable 2-week sprints
-5. **Team Setup**: Assign developers to specific phases and components
-6. **Progress Tracking**: Set up project tracking and regular progress reviews
-
----
-
-**Total Estimated Timeline**: 40 days (8 weeks)
-**Recommended Team Size**: 2-3 frontend developers
-**Critical Dependencies**: Backend API readiness, design asset availability
-**Success Metrics**: All functional requirements met, performance targets achieved, production deployment ready
+This planning document provides a comprehensive roadmap for implementing the SpotOn frontend with full backend integration, real-time person tracking, and enhanced user experience features as specified in the CODEBASE.md requirements.

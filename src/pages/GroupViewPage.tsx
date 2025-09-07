@@ -1,34 +1,56 @@
 // src/pages/GroupViewPage.tsx
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
-import ImageSequencePlayer from "../components/ImageSequencePlayer";
+import DetectionPersonList from "../components/DetectionPersonList";
+// import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
 
 // --- Type Definitions ---
 interface Track {
   track_id: number;
-  global_id: number;
+  global_id?: string; // Optional for detection mode (no tracking yet)
   bbox_xyxy: [number, number, number, number];
   confidence: number;
   class_id: number;
-  map_coords?: [number, number];
+  map_coords?: [number, number]; // Optional for detection mode
+  detection_class?: string; // Detection-specific field
+  detection_score?: number; // Detection-specific field
 }
 
 interface CameraData {
-  frame_image_base64?: string;  // Updated to match backend API
-  tracks: Track[];
+  frame_image_base64?: string;  // Contains annotated frame with bounding boxes
+  original_frame_base64?: string; // Original frame without annotations
+  tracks: Track[]; // Will be empty for detection mode
   frame_width?: number;
   frame_height?: number;
   timestamp?: string;
 }
 
-interface RawFrameData {
+// Updated interface for unified message format (per-camera messages)
+interface DetectionFrameData {
   type: string;
   task_id: string;
+  camera_id: string; // NEW: Per-camera messages
   global_frame_index: number;
   timestamp_processed_utc: string;
-  mode: string;
-  cameras: {
-    [jsonCameraId: string]: CameraData;
+  mode: string; // Should be 'detection_streaming'
+  camera_data: CameraData; // NEW: Single camera data per message
+  detection_data?: {
+    detections: Array<{
+      detection_id: string;
+      class_name: string;
+      class_id: number;
+      confidence: number;
+      bbox: {
+        x1: number; y1: number; x2: number; y2: number;
+        width: number; height: number;
+        center_x: number; center_y: number;
+      };
+      track_id: null;
+      global_id: null;
+      map_coords: { map_x: number; map_y: number };
+    }>;
+    detection_count: number;
+    processing_time_ms: number;
   };
 }
 
@@ -39,9 +61,9 @@ interface SystemHealth {
   processing_tasks_active?: number;
 }
 
-interface RawTask {
+interface DetectionTask {
   task_id: string;
-  status: string;
+  status: string; // QUEUED, INITIALIZING, PROCESSING, COMPLETED, FAILED
   environment_id: string;
   created_at: string;
 }
@@ -144,6 +166,9 @@ const GroupViewPage: React.FC = () => {
   // State to store points per camera
   const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
 
+  // State to store detection data for PersonList component
+  const [detectionData, setDetectionData] = useState<{ [camera_id: string]: any }>({});
+
   // Get environment from URL parameters
   const getEnvironmentFromUrl = useCallback(() => {
     const urlParams = new URLSearchParams(window.location.search);
@@ -197,23 +222,23 @@ const GroupViewPage: React.FC = () => {
     }
   }, []);
 
-  // Check for existing streaming tasks or create new one
-  const checkExistingStreamingTask = useCallback(async () => {
+  // Check for existing detection tasks or create new one
+  const checkExistingDetectionTask = useCallback(async () => {
     try {
       const environment = getEnvironmentFromUrl();
-      console.log('Checking for existing streaming task for environment:', environment);
+      console.log('Checking for existing detection task for environment:', environment);
       
-      // First, check if there are existing active streaming tasks for this environment
-      const tasksResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks`);
+      // First, check if there are existing active detection tasks for this environment
+      const tasksResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks`);
       if (tasksResponse.ok) {
         const tasksData = await tasksResponse.json();
         const activeTasks = tasksData.data.tasks.filter((task: any) => 
-          task.environment_id === environment && task.status === 'STREAMING'
+          task.environment_id === environment && task.status === 'PROCESSING'
         );
         
         if (activeTasks.length > 0) {
           const activeTask = activeTasks[0]; // Use the first active task
-          console.log('Found existing active streaming task:', activeTask.task_id);
+          console.log('Found existing active detection task:', activeTask.task_id);
           setTaskId(activeTask.task_id);
           connectWebSocket(activeTask.task_id);
           return true;
@@ -222,7 +247,7 @@ const GroupViewPage: React.FC = () => {
       
       console.log('No existing active task found, creating new one...');
       
-      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks/start`, {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ environment_id: environment })
@@ -234,27 +259,27 @@ const GroupViewPage: React.FC = () => {
         
         if (response.status === 400 && errorText.includes('already has an active')) {
           // This shouldn't happen now since we check above, but keep as fallback
-          setError('An active streaming session already exists for this environment. Please refresh the page or wait for it to complete.');
+          setError('An active detection session already exists for this environment. Please refresh the page or wait for it to complete.');
           return false;
         } else {
-          throw new Error(`Failed to start streaming: ${response.status} - ${errorText}`);
+          throw new Error(`Failed to start detection: ${response.status} - ${errorText}`);
         }
       } else {
         // New task created successfully
-        const task: RawTask = await response.json();
+        const task: DetectionTask = await response.json();
         console.log('New task created:', task.task_id);
         setTaskId(task.task_id);
         
-        // Monitor until STREAMING
+        // Monitor until PROCESSING
         let attempts = 0;
         const maxAttempts = 30; // 60 seconds max
         while (attempts < maxAttempts) {
-          const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks/${task.task_id}/status`);
+          const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/${task.task_id}/status`);
           const status = await statusResponse.json();
           console.log('Task status:', status.status, 'attempts:', attempts);
           
-          if (status.status === 'STREAMING') {
-            console.log('Task is streaming, connecting WebSocket');
+          if (status.status === 'PROCESSING') {
+            console.log('Task is processing, connecting WebSocket');
             connectWebSocket(task.task_id);
             return true;
           }
@@ -267,29 +292,29 @@ const GroupViewPage: React.FC = () => {
         }
         
         if (attempts >= maxAttempts) {
-          throw new Error('Timeout waiting for streaming to start');
+          throw new Error('Timeout waiting for detection processing to start');
         }
         return true;
       }
     } catch (error) {
       console.error('Error checking/starting streaming task:', error);
-      setError(`Failed to start streaming: ${(error as Error).message}`);
+      setError(`Failed to start detection: ${(error as Error).message}`);
       return false;
     }
   }, [getEnvironmentFromUrl]);
 
-  // Start raw video streaming task
-  const startRawStreaming = useCallback(async () => {
+  // Start detection processing task
+  const startDetectionProcessing = useCallback(async () => {
     try {
       setError(null);
       
-      // If already streaming, don't start a new task
+      // If already processing, don't start a new task
       if (isStreaming) {
-        console.log('Already streaming, skipping new task creation');
+        console.log('Already processing, skipping new task creation');
         return;
       }
       
-      // If taskId exists but not streaming, try to connect to existing task
+      // If taskId exists but not processing, try to connect to existing task
       if (taskId) {
         console.log('Task ID exists, trying to connect to existing task:', taskId);
         connectWebSocket(taskId);
@@ -297,15 +322,15 @@ const GroupViewPage: React.FC = () => {
       }
       
       // Otherwise, check for existing tasks or create new one
-      await checkExistingStreamingTask();
+      await checkExistingDetectionTask();
       
     } catch (error) {
-      console.error('Error starting raw streaming:', error);
-      setError(`Failed to start streaming: ${(error as Error).message}`);
+      console.error('Error starting detection processing:', error);
+      setError(`Failed to start detection: ${(error as Error).message}`);
     }
-  }, [isStreaming, taskId, checkExistingStreamingTask]);
+  }, [isStreaming, taskId, checkExistingDetectionTask]);
 
-  // Connect to WebSocket for raw video frames
+  // Connect to WebSocket for detection tracking frames
   const connectWebSocket = useCallback((taskId: string) => {
     console.log('🔌 Attempting to connect WebSocket for task:', taskId);
     
@@ -314,7 +339,7 @@ const GroupViewPage: React.FC = () => {
       wsRef.current.close();
     }
 
-    const wsUrl = `${BACKEND_WS_URL}/ws/raw-tracking/${taskId}`;
+    const wsUrl = `${BACKEND_WS_URL}/ws/detection-tracking/${taskId}`;
     console.log('🔌 Connecting to WebSocket URL:', wsUrl);
     console.log('🔌 Using task ID:', taskId);
     console.log('🔌 Backend WS URL:', BACKEND_WS_URL);
@@ -322,71 +347,115 @@ const GroupViewPage: React.FC = () => {
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
 
-    // Helper function to process tracking updates
-    const processTrackingUpdate = (message: any) => {
-      setCurrentFrameData(message);
+    // Helper function to process per-camera detection tracking updates
+    const processDetectionMessage = (message: any) => {
+      // Update current frame data structure for per-camera messages
+      setCurrentFrameData(prevData => {
+        const updatedData = prevData ? { ...prevData } : {
+          global_frame_index: message.global_frame_index,
+          timestamp_processed_utc: message.timestamp_processed_utc,
+          cameras: {}
+        };
+        
+        // Update specific camera data
+        updatedData.cameras[message.camera_id] = message.camera_data;
+        return updatedData;
+      });
       
-      // Update camera frames with base64 data
+      // Process single camera data from per-camera message
+      const { camera_id, camera_data, detection_data } = message;
       const newFrames: { [jsonCameraId: string]: string } = {};
       const newDebugInfo: { [jsonCameraId: string]: any } = {};
       
-      Object.entries(message.cameras).forEach(([jsonCameraId, cameraData]: [string, any]) => {
-        if (cameraData.frame_image_base64) {
-          const rawData = cameraData.frame_image_base64;
-          
-          // Check if data already has data URI prefix
-          let processedData: string;
-          let base64Part: string;
-          
-          if (rawData.startsWith('data:image/')) {
-            // Data already has data URI prefix
-            processedData = rawData;
-            base64Part = rawData.split(',')[1] || '';
-            console.log(`🖼️ Data URI already formatted for ${jsonCameraId}`);
-          } else {
-            // Add data URI prefix
-            processedData = `data:image/jpeg;base64,${rawData}`;
-            base64Part = rawData;
-            console.log(`🖼️ Added data URI prefix for ${jsonCameraId}`);
-          }
-          
-          // Validate base64 data
-          const validationResult = testBase64Validity(base64Part, jsonCameraId);
-          
-          newFrames[jsonCameraId] = processedData;
-          
-          // Store debug info
-          newDebugInfo[jsonCameraId] = {
-            hasFrameData: !!rawData,
-            rawDataLength: rawData?.length,
-            processedDataLength: processedData?.length,
-            rawDataPrefix: rawData?.substring(0, 30) + '...',
-            processedDataPrefix: processedData?.substring(0, 50) + '...',
-            hasDataUriPrefix: rawData.startsWith('data:image/'),
-            validationResult,
-            timestamp: new Date().toISOString()
-          };
-          
-          console.log(`🖼️ Frame data for ${jsonCameraId}:`, newDebugInfo[jsonCameraId]);
-          
-          // Set loading state
-          setImageLoadingStates(prev => ({
-            ...prev,
-            [jsonCameraId]: 'loading'
-          }));
+      if (camera_data && camera_data.frame_image_base64) {
+        const rawData = camera_data.frame_image_base64;
+        
+        // Check if data already has data URI prefix
+        let processedData: string;
+        let base64Part: string;
+        
+        if (rawData.startsWith('data:image/')) {
+          // Data already has data URI prefix
+          processedData = rawData;
+          base64Part = rawData.split(',')[1] || '';
+          console.log(`🖼️ Data URI already formatted for ${camera_id}`);
+        } else {
+          // Add data URI prefix
+          processedData = `data:image/jpeg;base64,${rawData}`;
+          base64Part = rawData;
+          console.log(`🖼️ Added data URI prefix for ${camera_id}`);
         }
-      });
+        
+        // Validate base64 data
+        const validationResult = testBase64Validity(base64Part, camera_id);
+        
+        newFrames[camera_id] = processedData;
+        
+        // Store debug info including detection data
+        newDebugInfo[camera_id] = {
+          hasFrameData: !!rawData,
+          rawDataLength: rawData?.length,
+          processedDataLength: processedData?.length,
+          rawDataPrefix: rawData?.substring(0, 30) + '...',
+          processedDataPrefix: processedData?.substring(0, 50) + '...',
+          hasDataUriPrefix: rawData.startsWith('data:image/'),
+          validationResult,
+          timestamp: new Date().toISOString(),
+          // Detection-specific info
+          detectionCount: detection_data?.detection_count || 0,
+          hasDetections: !!(detection_data && detection_data.detection_count > 0),
+          processingTime: detection_data?.processing_time_ms || 0,
+          detectionDetails: detection_data?.detections?.map((detection: any) => ({
+            detectionId: detection.detection_id,
+            confidence: detection.confidence,
+            bbox: detection.bbox,
+            mapCoords: detection.map_coords
+          })) || []
+        };
+        
+        console.log(`🖼️ Detection frame data for ${camera_id}:`, newDebugInfo[camera_id]);
+        
+        // Log detection information
+        if (detection_data && detection_data.detection_count > 0) {
+          console.log(`🎯 Detected ${detection_data.detection_count} person(s) in ${camera_id}, processing time: ${detection_data.processing_time_ms}ms`);
+          
+          detection_data.detections?.forEach((detection: any, index: number) => {
+            console.log(`Detection ${index + 1}: conf=${detection.confidence?.toFixed(2)}, bbox=[${detection.bbox.x1},${detection.bbox.y1},${detection.bbox.x2},${detection.bbox.y2}]`);
+          });
+        }
+        
+        // Set loading state
+        setImageLoadingStates(prev => ({
+          ...prev,
+          [camera_id]: 'loading'
+        }));
+      }
       
-      setCameraFrames(newFrames);
+      // Update state with new frames and debug info
+      setCameraFrames(prev => ({ ...prev, ...newFrames }));
       setImageDebugInfo(prev => ({ ...prev, ...newDebugInfo }));
-      console.log('🖼️ Updated frames for cameras:', Object.keys(newFrames));
-      console.log('🖼️ Frame data summary:', Object.keys(newFrames).map(id => `${id}: ${newFrames[id].length} chars`));
+      
+      // Update detection data for PersonList component
+      if (detection_data && camera_data.frame_image_base64) {
+        setDetectionData(prev => ({
+          ...prev,
+          [camera_id]: {
+            camera_id,
+            frame_image_base64: camera_data.frame_image_base64,
+            detections: detection_data.detections || [],
+            processing_time_ms: detection_data.processing_time_ms || 0
+          }
+        }));
+      }
+      
+      console.log('🖼️ Updated detection frame for camera:', camera_id);
+      console.log('🖼️ Detection frame data summary:', `${camera_id}: ${newFrames[camera_id]?.length || 0} chars`);
     };
 
     ws.onopen = () => {
-      console.log('✅ WebSocket connected successfully');
+      console.log('✅ Detection WebSocket connected successfully');
       console.log('📤 Sending subscribe message');
-      ws.send(JSON.stringify({ type: 'subscribe_raw_frames' }));
+      ws.send(JSON.stringify({ type: 'subscribe_detection' }));
       setIsStreaming(true);
       setError(null);
       
@@ -401,24 +470,9 @@ const GroupViewPage: React.FC = () => {
         const message = JSON.parse(event.data);
         console.log('📨 WebSocket message received:', message.type, message.mode);
         
-        // Handle message_batch messages (contains multiple tracking_update messages)
-        if (message.type === 'message_batch') {
-          console.log('📦 Processing message batch with', message.batch_size, 'messages');
-          
-          // Process each message in the batch
-          if (message.messages && Array.isArray(message.messages)) {
-            // Process the last message in the batch (most recent frame)
-            const latestMessage = message.messages[message.messages.length - 1];
-            if (latestMessage && latestMessage.type === 'tracking_update' && latestMessage.mode === 'raw_streaming') {
-              processTrackingUpdate(latestMessage);
-            }
-          }
-          return;
-        }
-        
-        // Handle individual tracking_update messages
-        if (message.type === 'tracking_update' && message.mode === 'raw_streaming') {
-          processTrackingUpdate(message);
+        // Handle individual per-camera detection messages
+        if (message.type === 'tracking_update' && message.mode === 'detection_streaming') {
+          processDetectionMessage(message);
         }
       } catch (error) {
         console.error('❌ Error parsing WebSocket message:', error);
@@ -448,10 +502,10 @@ const GroupViewPage: React.FC = () => {
     };
   }, []);
 
-  // Initialize streaming on component mount
+  // Initialize detection processing on component mount
   useEffect(() => {
-    const initializeStreaming = async () => {
-      console.log('Initializing streaming, current taskId:', taskId, 'isStreaming:', isStreaming);
+    const initializeDetectionProcessing = async () => {
+      console.log('Initializing detection processing, current taskId:', taskId, 'isStreaming:', isStreaming);
       
       const isHealthy = await checkSystemHealth();
       if (!isHealthy) {
@@ -459,21 +513,21 @@ const GroupViewPage: React.FC = () => {
         return;
       }
       
-      // If we already have a taskId but not streaming, try to connect to existing WebSocket
+      // If we already have a taskId but not processing, try to connect to existing WebSocket
       if (taskId && !isStreaming) {
         console.log('Found existing taskId, trying to connect to WebSocket:', taskId);
         // Check if task is still active
         try {
-          const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks/${taskId}/status`);
+          const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/${taskId}/status`);
           const status = await statusResponse.json();
           console.log('Existing task status:', status);
           
-          if (status.status === 'STREAMING') {
-            console.log('Existing task is streaming, connecting WebSocket');
+          if (status.status === 'PROCESSING') {
+            console.log('Existing task is processing, connecting WebSocket');
             connectWebSocket(taskId);
             return;
           } else {
-            console.log('Existing task not streaming, clearing taskId and checking for other active tasks');
+            console.log('Existing task not processing, clearing taskId and checking for other active tasks');
             setTaskId(null);
           }
         } catch (error) {
@@ -484,12 +538,12 @@ const GroupViewPage: React.FC = () => {
       
       // If no taskId or existing task not active, try to create/find new task
       if (!taskId) {
-        console.log('No taskId, checking for existing streaming task');
-        await checkExistingStreamingTask();
+        console.log('No taskId, checking for existing detection task');
+        await checkExistingDetectionTask();
       }
     };
     
-    initializeStreaming();
+    initializeDetectionProcessing();
 
     // Cleanup on unmount
     return () => {
@@ -497,7 +551,7 @@ const GroupViewPage: React.FC = () => {
         wsRef.current.close();
       }
     };
-  }, [checkSystemHealth, checkExistingStreamingTask]);
+  }, [checkSystemHealth, checkExistingDetectionTask]);
 
 
   // --- Effect to measure Overall Map Container Size ---
@@ -558,10 +612,10 @@ const GroupViewPage: React.FC = () => {
 
   }, [currentFrameData, overallMapDimensions]);
 
-  // Control handlers for streaming
+  // Control handlers for detection processing
   const handleStartStreaming = () => {
     if (!isStreaming && systemHealth?.status === 'healthy') {
-      startRawStreaming();
+      startDetectionProcessing();
     }
   };
 
@@ -579,12 +633,13 @@ const GroupViewPage: React.FC = () => {
       setCurrentFrameData(null);
       setImageLoadingStates({});
       setImageDebugInfo({});
+      setDetectionData({});
       
-      // Call backend to cleanup all tasks for this environment
+      // Call backend to cleanup all detection tasks for this environment
       const environment = getEnvironmentFromUrl();
-      console.log('🧹 Cleaning up all tasks for environment:', environment);
+      console.log('🧹 Cleaning up all detection tasks for environment:', environment);
       
-      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/raw-processing-tasks/environment/${environment}/cleanup`, {
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/environment/${environment}/cleanup`, {
         method: 'DELETE'
       });
       
@@ -1011,7 +1066,7 @@ const GroupViewPage: React.FC = () => {
 
             {/* Lower Panels */}
             <div className="flex flex-grow gap-4 h-1/2">
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
+                <div className="bg-gray-800 rounded-md p-4 w-1/3 flex flex-col">
                     <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
                     <div className="space-y-2 text-xs flex-grow overflow-y-auto">
                         {cameraNames.map((name, idx) => {
@@ -1043,7 +1098,7 @@ const GroupViewPage: React.FC = () => {
                         })}
                     </div>
                 </div>
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
+                <div className="bg-gray-800 rounded-md p-4 w-1/3 flex flex-col justify-between">
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
@@ -1084,6 +1139,18 @@ const GroupViewPage: React.FC = () => {
                     >
                         {isStreaming ? 'Stop Stream' : error ? 'Clean Up' : 'Start Stream'}
                     </button>
+                </div>
+                
+                {/* Third Panel - Detection Person List */}
+                <div className="w-1/3">
+                    <DetectionPersonList 
+                        cameraDetections={detectionData}
+                        className="h-full"
+                        onPersonClick={(detection, camera_id) => {
+                            console.log('Person clicked:', { detection, camera_id });
+                            // TODO: Add person click functionality
+                        }}
+                    />
                 </div>
             </div>
         </div>
