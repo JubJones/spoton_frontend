@@ -1064,9 +1064,9 @@ const GroupViewPage: React.FC = () => {
               </div>
             )}
 
-            {/* Lower Panels */}
-            <div className="flex flex-grow gap-4 h-1/2">
-                <div className="bg-gray-800 rounded-md p-4 w-1/3 flex flex-col">
+            {/* Upper Lower Panels - Tracks and Stream Info */}
+            <div className="flex gap-4 h-1/3">
+                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
                     <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
                     <div className="space-y-2 text-xs flex-grow overflow-y-auto">
                         {cameraNames.map((name, idx) => {
@@ -1098,7 +1098,7 @@ const GroupViewPage: React.FC = () => {
                         })}
                     </div>
                 </div>
-                <div className="bg-gray-800 rounded-md p-4 w-1/3 flex flex-col justify-between">
+                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
                     <div>
                         <div className="flex justify-between items-center mb-2">
                             <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
@@ -1140,18 +1140,18 @@ const GroupViewPage: React.FC = () => {
                         {isStreaming ? 'Stop Stream' : error ? 'Clean Up' : 'Start Stream'}
                     </button>
                 </div>
-                
-                {/* Third Panel - Detection Person List */}
-                <div className="w-1/3">
-                    <DetectionPersonList 
-                        cameraDetections={detectionData}
-                        className="h-full"
-                        onPersonClick={(detection, camera_id) => {
-                            console.log('Person clicked:', { detection, camera_id });
-                            // TODO: Add person click functionality
-                        }}
-                    />
-                </div>
+            </div>
+            
+            {/* Full Width Detection Person List Panel */}
+            <div className="h-1/3">
+                <DetectionPersonList 
+                    cameraDetections={detectionData}
+                    className="h-full"
+                    onPersonClick={(detection, camera_id) => {
+                        console.log('Person clicked:', { detection, camera_id });
+                        // TODO: Add person click functionality
+                    }}
+                />
             </div>
         </div>
       </div>

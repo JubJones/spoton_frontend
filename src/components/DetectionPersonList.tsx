@@ -162,115 +162,141 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       />
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-gray-400">Detected People</h3>
-        <span className="text-xs text-gray-500">
-          {sortedDetections.length} detection{sortedDetections.length !== 1 ? 's' : ''}
-        </span>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-lg font-semibold text-gray-300">Detected People</h3>
+        <div className="flex items-center space-x-4">
+          <span className="text-sm text-gray-500">
+            {sortedDetections.length} detection{sortedDetections.length !== 1 ? 's' : ''}
+          </span>
+          {sortedDetections.length > 0 && (
+            <span className="text-sm text-blue-400">
+              Avg: {Math.round(
+                sortedDetections.reduce((sum, d) => sum + d.confidence, 0) / sortedDetections.length * 100
+              )}% confidence
+            </span>
+          )}
+        </div>
       </div>
 
-      {/* Person List */}
-      <div className="space-y-2 max-h-64 overflow-y-auto">
+      {/* Person Grid */}
+      <div className="flex-1 overflow-y-auto">
         {sortedDetections.length === 0 ? (
-          <div className="text-center py-6 text-gray-500">
-            <div className="text-2xl mb-2">👤</div>
-            <div className="text-sm">No people detected</div>
+          <div className="flex items-center justify-center h-full text-gray-500">
+            <div className="text-center">
+              <div className="text-6xl mb-4">👥</div>
+              <div className="text-lg font-medium">No people detected</div>
+              <div className="text-sm mt-2">Detections will appear here when streaming</div>
+            </div>
           </div>
         ) : (
-          sortedDetections.map((detection) => {
-            const cropKey = `${detection.camera_id}-${detection.detection_id}`;
-            const isSelected = selectedPerson === cropKey;
-            const croppedImage = croppedImages[cropKey];
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+            {sortedDetections.map((detection) => {
+              const cropKey = `${detection.camera_id}-${detection.detection_id}`;
+              const isSelected = selectedPerson === cropKey;
+              const croppedImage = croppedImages[cropKey];
 
-            return (
-              <div
-                key={cropKey}
-                onClick={() => handlePersonClick(detection, detection.camera_id)}
-                className={`flex items-center space-x-3 p-2 rounded cursor-pointer transition-colors ${
-                  isSelected 
-                    ? 'bg-blue-600 hover:bg-blue-700' 
-                    : 'bg-gray-700 hover:bg-gray-600'
-                }`}
-              >
-                {/* Cropped Person Image */}
-                <div className="flex-shrink-0">
-                  {croppedImage ? (
-                    <div className="relative">
+              return (
+                <div
+                  key={cropKey}
+                  onClick={() => handlePersonClick(detection, detection.camera_id)}
+                  className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${
+                    isSelected 
+                      ? 'ring-2 ring-blue-500 bg-blue-600' 
+                      : 'hover:bg-gray-600 hover:shadow-lg'
+                  }`}
+                >
+                  {/* Cropped Person Image */}
+                  <div className="aspect-[3/4] relative">
+                    {croppedImage ? (
                       <img
                         src={croppedImage}
                         alt={`Person ${detection.detection_id}`}
-                        className="w-12 h-16 object-cover rounded border-2 border-gray-600"
+                        className="w-full h-full object-cover"
                       />
-                      {/* Confidence Badge */}
-                      <div className={`absolute -top-1 -right-1 text-xs font-bold px-1 rounded ${
-                        detection.confidence >= 0.8 
-                          ? 'bg-green-500 text-white' 
-                          : detection.confidence >= 0.6 
-                            ? 'bg-yellow-500 text-black'
-                            : 'bg-red-500 text-white'
-                      }`}>
-                        {Math.round(detection.confidence * 100)}%
+                    ) : (
+                      <div className="w-full h-full bg-gray-600 flex items-center justify-center">
+                        <div className="text-gray-400 text-sm">Loading...</div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="w-12 h-16 bg-gray-600 rounded flex items-center justify-center">
-                      <div className="text-gray-400 text-xs">...</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Person Details */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-medium text-white truncate">
-                      Person {detection.detection_id.slice(-4)}
-                    </p>
-                    <span className={`text-xs font-semibold ${getConfidenceColor(detection.confidence)}`}>
+                    )}
+                    
+                    {/* Confidence Badge */}
+                    <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${
+                      detection.confidence >= 0.8 
+                        ? 'bg-green-500 text-white' 
+                        : detection.confidence >= 0.6 
+                          ? 'bg-yellow-500 text-black'
+                          : 'bg-red-500 text-white'
+                    }`}>
                       {Math.round(detection.confidence * 100)}%
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-gray-400">
-                      {getCameraName(detection.camera_id)}
-                    </p>
-                    <p className="text-xs text-gray-500">
-                      {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}px
-                    </p>
+                    </div>
+
+                    {/* Selection Indicator */}
+                    {isSelected && (
+                      <div className="absolute top-2 left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                        <div className="text-white text-xs font-bold">✓</div>
+                      </div>
+                    )}
                   </div>
 
-                  {/* Map Coordinates (if available) */}
-                  {detection.map_coords && (
-                    <p className="text-xs text-blue-400 mt-1">
-                      Map: ({detection.map_coords.map_x.toFixed(1)}, {detection.map_coords.map_y.toFixed(1)})
-                    </p>
-                  )}
-                </div>
+                  {/* Person Details */}
+                  <div className="p-3">
+                    <div className="flex items-center justify-between mb-1">
+                      <p className="text-sm font-medium text-white truncate">
+                        Person {detection.detection_id.slice(-4)}
+                      </p>
+                    </div>
+                    
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs text-gray-400">
+                        {getCameraName(detection.camera_id)}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                      </p>
+                    </div>
 
-                {/* Click Indicator */}
-                <div className="flex-shrink-0">
-                  <div className={`w-2 h-2 rounded-full ${
-                    isSelected ? 'bg-white' : 'bg-gray-500'
-                  }`} />
+                    {/* Map Coordinates (if available) */}
+                    {detection.map_coords && (
+                      <p className="text-xs text-blue-400 truncate">
+                        Map: ({detection.map_coords.map_x.toFixed(1)}, {detection.map_coords.map_y.toFixed(1)})
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
-            );
-          })
+              );
+            })}
+          </div>
         )}
       </div>
 
-      {/* Summary */}
+      {/* Enhanced Summary Footer */}
       {sortedDetections.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-gray-700">
-          <div className="flex justify-between text-xs text-gray-500">
-            <span>
-              Avg Confidence: {Math.round(
-                sortedDetections.reduce((sum, d) => sum + d.confidence, 0) / sortedDetections.length * 100
-              )}%
-            </span>
-            <span>
-              {Object.keys(cameraDetections).length} camera{Object.keys(cameraDetections).length !== 1 ? 's' : ''}
-            </span>
+        <div className="mt-4 pt-3 border-t border-gray-700">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-lg font-semibold text-white">{sortedDetections.length}</div>
+              <div className="text-xs text-gray-400">Total Detections</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-green-400">
+                {sortedDetections.filter(d => d.confidence >= 0.8).length}
+              </div>
+              <div className="text-xs text-gray-400">High Confidence (≥80%)</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-blue-400">
+                {Object.keys(cameraDetections).length}
+              </div>
+              <div className="text-xs text-gray-400">Active Cameras</div>
+            </div>
+            <div>
+              <div className="text-lg font-semibold text-yellow-400">
+                {Math.round(
+                  sortedDetections.reduce((sum, d) => sum + d.confidence, 0) / sortedDetections.length * 100
+                )}%
+              </div>
+              <div className="text-xs text-gray-400">Average Confidence</div>
+            </div>
           </div>
         </div>
       )}
