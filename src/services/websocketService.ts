@@ -328,6 +328,16 @@ export class WebSocketService {
 
       case 'tracking_update':
         this.emit('tracking-update', message.payload as WebSocketTrackingMessagePayload);
+        
+        // Also emit mapping data if present (for 2D mapping feature)
+        const trackingPayload = message.payload as any;
+        if (trackingPayload.future_pipeline_data?.mapping_coordinates) {
+          // Emit custom event for mapping data
+          const mappingEvent = new CustomEvent('websocket-mapping-message', {
+            detail: trackingPayload
+          });
+          window.dispatchEvent(mappingEvent);
+        }
         break;
 
       case 'status_update':

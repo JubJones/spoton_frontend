@@ -3,6 +3,9 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import { Link } from "react-router-dom";
 import DetectionPersonList from "../components/DetectionPersonList";
 // import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
+import { CameraMapPair } from "../components/mapping";
+import { useMappingData } from "../hooks/useMappingData";
+import type { BackendCameraId } from "../types/api";
 
 // --- Type Definitions ---
 interface Track {
@@ -23,6 +26,13 @@ interface CameraData {
   frame_width?: number;
   frame_height?: number;
   timestamp?: string;
+}
+
+// Aggregate frame data built incrementally from per-camera messages
+interface CurrentFrameAggregate {
+  global_frame_index: number;
+  timestamp_processed_utc: string;
+  cameras: Record<string, CameraData>;
 }
 
 // Updated interface for unified message format (per-camera messages)
@@ -145,7 +155,7 @@ const defaultDotColor = 'bg-gray-500';
 const GroupViewPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("all");
   const [isStreaming, setIsStreaming] = useState(false);
-  const [currentFrameData, setCurrentFrameData] = useState<RawFrameData | null>(null);
+  const [currentFrameData, setCurrentFrameData] = useState<CurrentFrameAggregate | null>(null);
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -168,6 +178,9 @@ const GroupViewPage: React.FC = () => {
 
   // State to store detection data for PersonList component
   const [detectionData, setDetectionData] = useState<{ [camera_id: string]: any }>({});
+
+  // Mapping data hook - listens for 'websocket-mapping-message' events
+  const { mappingData, getMappingForCamera } = useMappingData({ enabled: true, maxTrailLength: 3 });
 
   // Get environment from URL parameters
   const getEnvironmentFromUrl = useCallback(() => {
@@ -350,15 +363,15 @@ const GroupViewPage: React.FC = () => {
     // Helper function to process per-camera detection tracking updates
     const processDetectionMessage = (message: any) => {
       // Update current frame data structure for per-camera messages
-      setCurrentFrameData(prevData => {
-        const updatedData = prevData ? { ...prevData } : {
+      setCurrentFrameData((prevData: CurrentFrameAggregate | null) => {
+        const updatedData: CurrentFrameAggregate = prevData ? { ...prevData } : {
           global_frame_index: message.global_frame_index,
           timestamp_processed_utc: message.timestamp_processed_utc,
           cameras: {}
         };
         
         // Update specific camera data
-        updatedData.cameras[message.camera_id] = message.camera_data;
+        (updatedData.cameras as Record<string, CameraData>)[message.camera_id as string] = message.camera_data as CameraData;
         return updatedData;
       });
       
@@ -450,6 +463,49 @@ const GroupViewPage: React.FC = () => {
       
       console.log('🖼️ Updated detection frame for camera:', camera_id);
       console.log('🖼️ Detection frame data summary:', `${camera_id}: ${newFrames[camera_id]?.length || 0} chars`);
+
+      // Emit mapping event for MiniMap components (per FRONTEND_INTEGRATION_GUIDE.md)
+      // If backend didn't include future_pipeline_data.mapping_coordinates yet,
+      // fall back to building minimal coordinates from track.map_coords
+      let mappingPayload = message;
+      const hasMapping = Array.isArray(message?.future_pipeline_data?.mapping_coordinates)
+        && message.future_pipeline_data.mapping_coordinates.length > 0;
+
+      if (!hasMapping && camera_data?.tracks && camera_data.tracks.length > 0) {
+        const fallbackCoords = camera_data.tracks
+          .filter((t: any) => Array.isArray(t.map_coords) && t.map_coords.length === 2)
+          .map((t: any, idx: number) => ({
+            detection_id: String(t.global_id ?? t.track_id ?? `det_${idx}`),
+            map_x: t.map_coords[0],
+            map_y: t.map_coords[1],
+            projection_successful: true,
+            coordinate_system: 'bev_map_meters',
+            trail: [],
+          }));
+
+        if (fallbackCoords.length > 0) {
+          mappingPayload = {
+            ...message,
+            future_pipeline_data: {
+              ...(message.future_pipeline_data || {}),
+              mapping_coordinates: fallbackCoords,
+            },
+          };
+        }
+      }
+
+      if (Array.isArray(mappingPayload?.future_pipeline_data?.mapping_coordinates)
+          && mappingPayload.future_pipeline_data.mapping_coordinates.length > 0) {
+        const mappingEvent = new CustomEvent('websocket-mapping-message', {
+          detail: mappingPayload,
+        });
+        window.dispatchEvent(mappingEvent);
+        // Debug log for visibility
+        console.log('🗺️ Emitted websocket-mapping-message:', {
+          camera_id,
+          count: mappingPayload.future_pipeline_data.mapping_coordinates.length,
+        });
+      }
     };
 
     ws.onopen = () => {
@@ -687,14 +743,14 @@ const GroupViewPage: React.FC = () => {
         <div className="flex space-x-2 flex-shrink-0">
             <button 
               onClick={handleStartStreaming} 
-              disabled={isStreaming || systemHealth?.status !== 'healthy' || (taskId && !isStreaming)} 
+              disabled={isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)} 
               className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${
-                isStreaming || systemHealth?.status !== 'healthy' || (taskId && !isStreaming)
+                isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)
                   ? "bg-gray-600 cursor-not-allowed" 
                   : "bg-green-600 hover:bg-green-700"
               }`}
             >
-              {taskId && !isStreaming ? 'Connecting...' : 'Start Stream'}
+              {!!taskId && !isStreaming ? 'Connecting...' : 'Start Stream'}
             </button>
             <button 
               onClick={handleStopStreaming} 
@@ -702,7 +758,7 @@ const GroupViewPage: React.FC = () => {
               className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${
                 !isStreaming && !error
                   ? "bg-gray-600 cursor-not-allowed" 
-                  : error && !isStreaming
+                  : (error && !isStreaming)
                     ? "bg-orange-600 hover:bg-orange-700"
                     : "bg-red-600 hover:bg-red-700"
               }`}
@@ -768,6 +824,10 @@ const GroupViewPage: React.FC = () => {
                   <div key={appId} className="relative bg-black rounded overflow-hidden min-h-0 flex items-center justify-center">
                     {frameData ? (
                       <div className="relative w-full h-full">
+                        {/* Camera ID label */}
+                        <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                          {jsonCameraId}
+                        </div>
                         <img 
                           key={`${jsonCameraId}-${frameData.length}`} // Force re-render on data change
                           src={frameData} 
@@ -887,6 +947,10 @@ const GroupViewPage: React.FC = () => {
                 <div key={activeTab} className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center">
                   {frameData ? (
                     <div className="relative w-full h-full">
+                      {/* Camera ID label */}
+                      <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                        {jsonCameraId}
+                      </div>
                       <img 
                         key={`${jsonCameraId}-single-${frameData.length}`} // Force re-render on data change
                         src={frameData} 
@@ -975,53 +1039,44 @@ const GroupViewPage: React.FC = () => {
 
         {/* Right Side Panels */}
         <div className="w-1/3 flex flex-col gap-4">
-            {/* === MODIFIED: Map Panel - Now a 2x2 Grid === */}
+            {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
             <div
-                ref={overallMapContainerRef} // Ref for the main grid container
-                className="bg-gray-700 rounded-md h-1/2 grid grid-cols-2 grid-rows-2 gap-px overflow-hidden" // Grid layout with small gap for borders
+              ref={overallMapContainerRef}
+              className="bg-gray-700 rounded-md p-2 overflow-visible"
             >
-                {appCameraIds.map((appId, index) => {
-                    const environment = getEnvironmentFromUrl();
-                    const appCameraIdToJsonId = getCameraMappingForEnvironment(environment);
-                    const cameraColorMap = getCameraColorMapping(environment);
-                    const jsonCameraId = appCameraIdToJsonId[appId];
-                    const pointsForThisQuadrant = perCameraMapPoints[jsonCameraId] || [];
-                    const quadrantColor = cameraColorMap[jsonCameraId] || defaultDotColor;
-                    const camName = cameraNames[index];
+              {(() => {
+                const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
-                    return (
-                        <div
-                            key={jsonCameraId}
-                            className="relative w-full h-full bg-gray-800 p-1" // Quadrant styling, p-1 for slight inner padding
-                            title={`Map - ${camName}`}
-                        >
-                             {/* Optional: Display camera name in quadrant */}
-                            <div className="absolute top-1 left-1 text-xs text-gray-400 opacity-75 pointer-events-none">{camName}</div>
-
-                            {pointsForThisQuadrant.map((point) => (
-                                <div
-                                    key={point.globalId}
-                                    title={`ID: ${point.globalId} (from ${camName})`}
-                                    className={`absolute w-2 h-2 ${quadrantColor} rounded-full shadow-md`}
-                                    style={{
-                                        left: `${point.x}px`,
-                                        top: `${point.y}px`,
-                                        transform: 'translate(-50%, -50%)',
-                                        pointerEvents: 'none',
-                                    }}
-                                />
-                            ))}
-                        </div>
-                    );
-                })}
-                 {/* Show placeholder if no dimensions yet */}
-                {overallMapDimensions.width === 0 && (
-                    <div className="absolute inset-0 flex items-center justify-center text-gray-400 col-span-2 row-span-2">
-                        Map Visualization Area
+                if (availableMappingCameras.length === 0) {
+                  return (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">
+                      🗺️ 2D mapping will display when person positions are detected
                     </div>
-                )}
+                  );
+                }
+
+                return (
+                  <div className="grid gap-3 grid-cols-1">
+                    {availableMappingCameras.map((backendCameraId) => {
+                      const coords = getMappingForCamera(backendCameraId);
+                      if (!coords || coords.length === 0) return null;
+                      return (
+                        <div key={`map-${backendCameraId}`} className="bg-gray-800 rounded p-2">
+                          <CameraMapPair
+                            cameraId={backendCameraId}
+                            mappingCoordinates={coords}
+                            mapVisible={true}
+                            className="w-full"
+                            mapWidth={Math.max(320, Math.floor((overallMapDimensions.width || 0) - 32))}
+                            mapHeight={Math.max(220, Math.floor(((overallMapDimensions.width || 0) - 32) * 0.66))}
+                          />
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })()}
             </div>
-             {/* === END MODIFIED === */}
 
             {/* Debug Panel - Show when frames are present */}
             {(Object.keys(cameraFrames).length > 0 || isStreaming) && (
@@ -1065,7 +1120,7 @@ const GroupViewPage: React.FC = () => {
             )}
 
             {/* Upper Lower Panels - Tracks and Stream Info */}
-            <div className="flex gap-4 h-1/3">
+            <div className="flex gap-4">
                 <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
                     <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
                     <div className="space-y-2 text-xs flex-grow overflow-y-auto">
@@ -1143,7 +1198,7 @@ const GroupViewPage: React.FC = () => {
             </div>
             
             {/* Full Width Detection Person List Panel */}
-            <div className="h-1/3">
+            <div>
                 <DetectionPersonList 
                     cameraDetections={detectionData}
                     className="h-full"
