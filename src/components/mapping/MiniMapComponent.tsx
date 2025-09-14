@@ -113,9 +113,12 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     const scaleY = height / (maxY - minY);
 
     // Helper function to convert map coordinates to canvas coordinates
+    // Map coordinates directly to canvas without vertical flip so that
+    // increasing Y in map corresponds to moving down on canvas. This fixes
+    // the visual reversal seen previously.
     const mapToCanvas = (mapX: number, mapY: number) => ({
       x: (mapX - minX) * scaleX,
-      y: height - (mapY - minY) * scaleY  // Flip Y axis
+      y: (mapY - minY) * scaleY
     });
 
     // Draw coordinate system background
