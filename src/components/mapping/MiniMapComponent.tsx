@@ -105,8 +105,10 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     canvas.width = width;
     canvas.height = height;
 
-    // Clear canvas
+    // Clear canvas and paint a uniform light background (consistent look across cams)
     ctx.clearRect(0, 0, width, height);
+    ctx.fillStyle = '#f5f5f5';
+    ctx.fillRect(0, 0, width, height);
 
     const { minX, maxX, minY, maxY } = mapBounds;
     const scaleX = width / (maxX - minX);
@@ -121,46 +123,26 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
       y: (mapY - minY) * scaleY
     });
 
-    // Draw coordinate system background
-    ctx.strokeStyle = '#e0e0e0';
-    ctx.lineWidth = 1;
-
-    // Grid lines every 2 meters
-    const gridSize = 2;
-    for (let x = Math.ceil(minX / gridSize) * gridSize; x <= maxX; x += gridSize) {
-      const canvasX = mapToCanvas(x, 0).x;
-      ctx.beginPath();
-      ctx.moveTo(canvasX, 0);
-      ctx.lineTo(canvasX, height);
-      ctx.stroke();
-    }
-    
-    for (let y = Math.ceil(minY / gridSize) * gridSize; y <= maxY; y += gridSize) {
-      const canvasY = mapToCanvas(0, y).y;
-      ctx.beginPath();
-      ctx.moveTo(0, canvasY);
-      ctx.lineTo(width, canvasY);
-      ctx.stroke();
-    }
-
-    // Draw axes (origin lines if visible)
-    ctx.strokeStyle = '#666';
-    ctx.lineWidth = 2;
-    
-    if (minX <= 0 && maxX >= 0) {
-      const originX = mapToCanvas(0, 0).x;
-      ctx.beginPath();
-      ctx.moveTo(originX, 0);
-      ctx.lineTo(originX, height);
-      ctx.stroke();
-    }
-    
-    if (minY <= 0 && maxY >= 0) {
-      const originY = mapToCanvas(0, 0).y;
-      ctx.beginPath();
-      ctx.moveTo(0, originY);
-      ctx.lineTo(width, originY);
-      ctx.stroke();
+    // Optional grid (disabled for clean, consistent look like c02)
+    const showGrid = false;
+    if (showGrid) {
+      ctx.strokeStyle = '#eaeaea';
+      ctx.lineWidth = 1;
+      const gridSize = 2;
+      for (let x = Math.ceil(minX / gridSize) * gridSize; x <= maxX; x += gridSize) {
+        const canvasX = mapToCanvas(x, 0).x;
+        ctx.beginPath();
+        ctx.moveTo(canvasX, 0);
+        ctx.lineTo(canvasX, height);
+        ctx.stroke();
+      }
+      for (let y = Math.ceil(minY / gridSize) * gridSize; y <= maxY; y += gridSize) {
+        const canvasY = mapToCanvas(0, y).y;
+        ctx.beginPath();
+        ctx.moveTo(0, canvasY);
+        ctx.lineTo(width, canvasY);
+        ctx.stroke();
+      }
     }
 
     // Draw person dots and trails
@@ -215,24 +197,10 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
       );
     });
 
-    // Draw camera label
+    // Draw camera label (keep minimal)
     ctx.fillStyle = '#333';
     ctx.font = 'bold 12px Arial';
     ctx.fillText(`Camera ${cameraId}`, 10, 20);
-
-    // Draw coordinate info
-    ctx.fillStyle = '#666';
-    ctx.font = '9px Arial';
-    ctx.fillText(
-      `${minX.toFixed(1)}m - ${maxX.toFixed(1)}m`, 
-      10, 
-      height - 25
-    );
-    ctx.fillText(
-      `${minY.toFixed(1)}m - ${maxY.toFixed(1)}m`, 
-      10, 
-      height - 10
-    );
 
   }, [mappingCoordinates, mapBounds, width, height, cameraId]);
 
