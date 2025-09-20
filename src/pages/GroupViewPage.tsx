@@ -352,7 +352,7 @@ const GroupViewPage: React.FC = () => {
       wsRef.current.close();
     }
 
-    const wsUrl = `${BACKEND_WS_URL}/ws/detection-tracking/${taskId}`;
+    const wsUrl = `${BACKEND_WS_URL}/ws/tracking/${taskId}`;
     console.log('🔌 Connecting to WebSocket URL:', wsUrl);
     console.log('🔌 Using task ID:', taskId);
     console.log('🔌 Backend WS URL:', BACKEND_WS_URL);
@@ -511,7 +511,7 @@ const GroupViewPage: React.FC = () => {
     ws.onopen = () => {
       console.log('✅ Detection WebSocket connected successfully');
       console.log('📤 Sending subscribe message');
-      ws.send(JSON.stringify({ type: 'subscribe_detection' }));
+      ws.send(JSON.stringify({ type: 'subscribe_tracking' }));
       setIsStreaming(true);
       setError(null);
       
@@ -543,7 +543,7 @@ const GroupViewPage: React.FC = () => {
         readyState: ws.readyState,
         error
       });
-      setError(`WebSocket connection error for task ${taskId}: ${error}`);
+      setError(`WebSocket connection error for task ${taskId} (readyState=${ws.readyState})`);
     };
 
     ws.onclose = (event) => {
