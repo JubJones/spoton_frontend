@@ -29,6 +29,7 @@ interface UIStoreState extends UIState {
     // Camera display configuration
     updateCameraConfig: (cameraId: BackendCameraId, config: Partial<CameraDisplayConfig>) => void;
     resetCameraConfig: (cameraId?: BackendCameraId) => void;
+    ensureCameraConfigs: (cameraIds: BackendCameraId[]) => void;
 
     // Map configuration
     updateMapConfig: (config: Partial<MapDisplayConfig>) => void;
@@ -334,6 +335,37 @@ export const useUIStore = create<UIStoreState>()(
                 'resetCameraConfig:all'
               );
             }
+          },
+
+          ensureCameraConfigs: (cameraIds: BackendCameraId[]) => {
+            set(
+              (state) => {
+                if (!cameraIds.length) {
+                  return {};
+                }
+
+                const additions: Partial<Record<BackendCameraId, CameraDisplayConfig>> = {};
+
+                cameraIds.forEach((cameraId) => {
+                  if (!state.cameras[cameraId]) {
+                    additions[cameraId] = createDefaultCameraConfig();
+                  }
+                });
+
+                if (Object.keys(additions).length === 0) {
+                  return {};
+                }
+
+                return {
+                  cameras: {
+                    ...state.cameras,
+                    ...additions,
+                  },
+                };
+              },
+              false,
+              'ensureCameraConfigs'
+            );
           },
 
           // ================================================================

@@ -86,6 +86,9 @@ interface TrackingStoreState extends TrackingState {
 
     // Reset
     reset: () => void;
+
+    // Camera registration
+    ensureCameraSlots: (cameraIds: BackendCameraId[]) => void;
   };
 }
 
@@ -737,6 +740,57 @@ export const useTrackingStore = create<TrackingStoreState>()(
             },
             false,
             'toggleCameraVisibility'
+          );
+        },
+
+        ensureCameraSlots: (cameraIds: BackendCameraId[]) => {
+          set(
+            (state) => {
+              if (!cameraIds.length) {
+                return {};
+              }
+
+              let hasChanges = false;
+
+              const updatedCameras = { ...state.cameras } as Record<
+                BackendCameraId,
+                CameraTrackingDisplayData
+              >;
+              const updatedDisplaySizes = { ...state.displaySizes };
+
+              cameraIds.forEach((cameraId) => {
+                if (!updatedCameras[cameraId]) {
+                  hasChanges = true;
+                  updatedCameras[cameraId] = {
+                    cameraId,
+                    frameImageUrl: undefined,
+                    frameImage: undefined,
+                    tracks: [],
+                    isActive: true,
+                    lastUpdated: new Date(0).toISOString(),
+                    resolution: [1920, 1080],
+                    displaySize: [640, 480],
+                    scaleFactor: [1, 1],
+                  };
+                }
+
+                if (!updatedDisplaySizes[cameraId]) {
+                  hasChanges = true;
+                  updatedDisplaySizes[cameraId] = { width: 640, height: 480 };
+                }
+              });
+
+              if (!hasChanges) {
+                return {};
+              }
+
+              return {
+                cameras: updatedCameras,
+                displaySizes: updatedDisplaySizes,
+              };
+            },
+            false,
+            'ensureCameraSlots'
           );
         },
 

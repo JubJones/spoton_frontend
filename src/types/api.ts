@@ -445,6 +445,28 @@ export interface EnvironmentConfiguration {
 }
 
 // ============================================================================
+// Detection Processing Environment Types
+// ============================================================================
+
+export interface DetectionProcessingEnvironmentCameraMetadata {
+  display_name?: string;
+  overlay_asset?: string;
+  homography_available?: boolean;
+}
+
+export interface DetectionProcessingEnvironment {
+  environment_id: EnvironmentId;
+  display_name?: string;
+  cameras: BackendCameraId[];
+  camera_metadata?: Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>;
+}
+
+export interface DetectionProcessingEnvironmentsResponse {
+  environments: DetectionProcessingEnvironment[];
+  updated_at?: string;
+}
+
+// ============================================================================
 // Error Types
 // ============================================================================
 
@@ -588,6 +610,9 @@ export const API_ENDPOINTS = {
   // Processing tasks
   START_TASK: '/api/v1/processing-tasks/start',
   TASK_STATUS: (taskId: string) => `/api/v1/processing-tasks/${taskId}/status`,
+
+  // Detection processing tasks
+  DETECTION_ENVIRONMENTS: '/api/v1/detection-processing-tasks/environments',
 
   // Environment management
   ENVIRONMENTS: '/api/v1/environments/',

@@ -1,5 +1,7 @@
 // src/components/DetectionPersonList.tsx
 import React, { useState, useCallback, useRef, useEffect } from 'react';
+import { useCameraConfig } from '../context/CameraConfigContext';
+import type { BackendCameraId } from '../types/api';
 
 interface DetectedPerson {
   detection_id: string;
@@ -43,6 +45,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
   const [croppedImages, setCroppedImages] = useState<{ [key: string]: string }>({});
   const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { getDisplayName } = useCameraConfig();
 
   // Function to crop person from image using detection coordinates
   const cropPersonFromImage = useCallback((
@@ -136,13 +139,10 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
 
   // Get camera display name
   const getCameraName = (camera_id: string) => {
-    const cameraMap: { [key: string]: string } = {
-      'c09': 'Camera 1',
-      'c12': 'Camera 2', 
-      'c13': 'Camera 3',
-      'c16': 'Camera 4',
-    };
-    return cameraMap[camera_id] || camera_id;
+    if (camera_id) {
+      return getDisplayName(camera_id as BackendCameraId) || camera_id;
+    }
+    return camera_id;
   };
 
   // Get confidence color

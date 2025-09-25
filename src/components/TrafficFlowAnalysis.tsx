@@ -1,7 +1,7 @@
 // src/components/TrafficFlowAnalysis.tsx
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { BackendCameraId, EnvironmentId } from '../types/api';
-import { getCameraDisplayName } from '../config/environments';
+import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface FlowDirection {
   direction:
@@ -102,13 +102,12 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
   const [selectedPattern, setSelectedPattern] = useState<FlowPattern | null>(null);
   const [animationSpeed, setAnimationSpeed] = useState<number>(1);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { environmentCameras, getDisplayName } = useCameraConfig();
+  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
   // Generate mock traffic flow data
   const trafficFlowData: TrafficFlowData[] = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
     return cameras.map((cameraId, index) => {
       const baseMovements = 450 + index * 120;
@@ -208,14 +207,11 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
         },
       };
     });
-  }, [environment]);
+  }, [cameraIds]);
 
   // Generate overall flow metrics
   const flowMetrics: FlowMetrics = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
     const busyCorridors = [];
     for (let i = 0; i < cameras.length - 1; i++) {
@@ -236,23 +232,23 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
       flowEfficiency: 78.2,
       congestionPoints: [
         {
-          location: `${getCameraDisplayName(cameras[0], environment)} - Main Entrance`,
+          location: `${getDisplayName(cameras[0])} - Main Entrance`,
           severity: 'medium',
           description: 'Moderate bottleneck during peak hours',
         },
         {
-          location: `${getCameraDisplayName(cameras[1], environment)} - Corridor Junction`,
+          location: `${getDisplayName(cameras[1])} - Corridor Junction`,
           severity: 'low',
           description: 'Minor slowdown in afternoon',
         },
         {
-          location: `${getCameraDisplayName(cameras[2], environment)} - Exit Zone`,
+          location: `${getDisplayName(cameras[2])} - Exit Zone`,
           severity: 'high',
           description: 'Significant congestion during shift changes',
         },
       ],
     };
-  }, [environment, trafficFlowData]);
+  }, [cameraIds, trafficFlowData]);
 
   // Filter data based on selected cameras
   const filteredData = useMemo(() => {
@@ -495,11 +491,11 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                   >
                     <div className="flex items-center space-x-3">
                       <span className="text-blue-400 font-semibold">
-                        {getCameraDisplayName(corridor.from, environment)}
+                        {getDisplayName(corridor.from)}
                       </span>
                       <span className="text-gray-400">→</span>
                       <span className="text-green-400 font-semibold">
-                        {getCameraDisplayName(corridor.to, environment)}
+                        {getDisplayName(corridor.to)}
                       </span>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -552,7 +548,7 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
             {filteredData.map((cameraData) => (
               <div key={cameraData.cameraId} className="bg-gray-800/30 rounded-lg p-4">
                 <h4 className="text-white font-semibold mb-3">
-                  {getCameraDisplayName(cameraData.cameraId, environment)} - Flow Directions
+                  {getDisplayName(cameraData.cameraId)} - Flow Directions
                 </h4>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -709,7 +705,7 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                     <th className="text-left p-2 text-gray-400">From / To</th>
                     {Array.from(new Set(filteredData.map((d) => d.cameraId))).map((cameraId) => (
                       <th key={cameraId} className="text-center p-2 text-gray-400">
-                        {getCameraDisplayName(cameraId, environment)}
+                        {getDisplayName(cameraId)}
                       </th>
                     ))}
                   </tr>
@@ -718,7 +714,7 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                   {Array.from(new Set(filteredData.map((d) => d.cameraId))).map((fromCamera) => (
                     <tr key={fromCamera} className="border-b border-gray-700/50">
                       <td className="p-2 text-white font-semibold">
-                        {getCameraDisplayName(fromCamera, environment)}
+                        {getDisplayName(fromCamera)}
                       </td>
                       {Array.from(new Set(filteredData.map((d) => d.cameraId))).map((toCamera) => (
                         <td key={toCamera} className="text-center p-2">
@@ -753,11 +749,11 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                         #{index + 1}
                       </span>
                       <span className="text-blue-400">
-                        {getCameraDisplayName(corridor.from, environment)}
+                        {getDisplayName(corridor.from)}
                       </span>
                       <span className="text-gray-400">→</span>
                       <span className="text-green-400">
-                        {getCameraDisplayName(corridor.to, environment)}
+                        {getDisplayName(corridor.to)}
                       </span>
                     </div>
                     <div className="text-orange-400 font-semibold">

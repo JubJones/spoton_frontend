@@ -16,7 +16,7 @@ import type {
   ExportFormat,
   ExportAnalyticsReportRequest,
 } from '../types/api';
-import { getCameraDisplayName } from '../config/environments';
+import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface AnalyticsMetrics {
   totalDetections: number;
@@ -67,6 +67,9 @@ const AnalyticsPage: React.FC = () => {
     statusText: isConnected ? backendStatus.status : 'Disconnected',
   };
 
+  const { environmentCameras, getDisplayName } = useCameraConfig();
+  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
+
   // Mock analytics data - in real implementation, this would come from the backend
   const analyticsMetrics: AnalyticsMetrics = useMemo(
     () => ({
@@ -81,12 +84,11 @@ const AnalyticsPage: React.FC = () => {
   );
 
   const cameraAnalytics: CameraAnalytics[] = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    if (cameraIds.length === 0) {
+      return [];
+    }
 
-    return cameras.map((cameraId, index) => ({
+    return cameraIds.map((cameraId, index) => ({
       cameraId,
       detectionCount: 280 + index * 45,
       uniquePersons: 15 + index * 8,
@@ -94,7 +96,7 @@ const AnalyticsPage: React.FC = () => {
       uptimePercentage: 97.5 + index * 0.8,
       lastActivity: new Date(Date.now() - index * 300000), // 5 minutes apart
     }));
-  }, [environment]);
+  }, [cameraIds]);
 
   const timeRangeMetrics: TimeRangeMetrics = useMemo(() => {
     const now = Date.now();
@@ -469,7 +471,7 @@ const AnalyticsPage: React.FC = () => {
                   >
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-white font-semibold">
-                        {getCameraDisplayName(camera.cameraId, environment)}
+                        {getDisplayName(camera.cameraId)}
                       </span>
                       <div
                         className={`w-2 h-2 rounded-full ${

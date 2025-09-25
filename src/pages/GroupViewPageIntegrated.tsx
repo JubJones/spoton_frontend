@@ -51,10 +51,10 @@ const cameraFrameConfig: { [key: string]: CameraConfig } = {
 };
 
 const appCameraIdToJsonId: { [appId: string]: string } = {
-    'camera1': 'c09',
-    'camera2': 'c12', // VERIFY
-    'camera3': 'c13', // VERIFY
-    'camera4': 'c16', // VERIFY
+    'camera1': 'c01',
+    'camera2': 'c02',
+    'camera3': 'c03',
+    'camera4': 'c05',
 };
 
 const jsonIdToAppCameraId: { [jsonId: string]: string } = Object.entries(
@@ -87,10 +87,10 @@ interface SingleCameraMapPoint {
 
 // --- NEW: Color mapping for cameras (using JSON IDs) ---
 const cameraColorMap: { [jsonCameraId: string]: string } = {
-    'c09': 'bg-cyan-400',
-    'c12': 'bg-red-500',
-    'c13': 'bg-yellow-400',
-    'c16': 'bg-purple-500',
+    'c01': 'bg-blue-400',
+    'c02': 'bg-green-500',
+    'c03': 'bg-orange-400',
+    'c05': 'bg-pink-500',
 };
 const defaultDotColor = 'bg-gray-500';
 
@@ -106,7 +106,7 @@ const GroupViewPage: React.FC = () => {
   const [overallMapDimensions, setOverallMapDimensions] = useState({ width: 0, height: 0 });
 
   // --- MODIFIED: State to store points per camera ---
-  // Key is jsonCameraId (e.g., 'c09'), value is an array of points for that camera
+  // Key is jsonCameraId (e.g., 'c01'), value is an array of points for that camera
   const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
 
 

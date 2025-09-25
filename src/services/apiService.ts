@@ -16,9 +16,16 @@ import {
   UserInfo,
   API_ENDPOINTS,
   isValidTaskStatus,
+  isValidEnvironmentId,
+  isBackendCameraId,
   ExportAnalyticsReportRequest,
   ExportJobResponse,
   ExportJobStatusResponse,
+  DetectionProcessingEnvironmentsResponse,
+  DetectionProcessingEnvironment,
+  DetectionProcessingEnvironmentCameraMetadata,
+  BackendCameraId,
+  EnvironmentId,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
 import { MOCK_CONFIG } from '../config/mock';
@@ -50,6 +57,31 @@ const LONG_RUNNING_CONFIG: APIServiceConfig = {
   timeout: 180000, // 3 minutes for task initialization
   retryAttempts: 2, // Fewer retries for long operations
   retryDelay: 3000, // 3 second delay between retries
+};
+
+const DEFAULT_DETECTION_ENVIRONMENTS: DetectionProcessingEnvironmentsResponse = {
+  environments: [
+    {
+      environment_id: 'campus',
+      cameras: ['c01', 'c02', 'c03', 'c05'] as BackendCameraId[],
+      camera_metadata: {
+        c01: { display_name: 'Campus Gate Camera' },
+        c02: { display_name: 'Campus Plaza Camera' },
+        c03: { display_name: 'Campus Walkway Camera' },
+        c05: { display_name: 'Campus Commons Camera' },
+      } as Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>,
+    },
+    {
+      environment_id: 'factory',
+      cameras: ['c09', 'c12', 'c13', 'c16'] as BackendCameraId[],
+      camera_metadata: {
+        c09: { display_name: 'Factory Camera 1 (Entrance)' },
+        c12: { display_name: 'Factory Camera 2 (Assembly Line)' },
+        c13: { display_name: 'Factory Camera 3 (Storage Area)' },
+        c16: { display_name: 'Factory Camera 4 (Quality Control)' },
+      } as Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>,
+    },
+  ],
 };
 
 // ============================================================================
@@ -374,6 +406,98 @@ export class APIService {
       return response;
     } catch (error) {
       throw this.handleError(`Failed to get task status for ${taskId}`, error);
+    }
+  }
+
+  /**
+   * Get detection processing environments and their camera lists
+   */
+  async getDetectionProcessingEnvironments(): Promise<DetectionProcessingEnvironmentsResponse> {
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock detection environments');
+      return DEFAULT_DETECTION_ENVIRONMENTS;
+    }
+
+    try {
+      const response = await this.http.get<any>(API_ENDPOINTS.DETECTION_ENVIRONMENTS);
+
+      const payload = response?.data?.environments ? response.data : response;
+
+      if (!payload || !Array.isArray(payload.environments)) {
+        throw new ValidationError('Invalid detection environments response format');
+      }
+
+      const normalized: DetectionProcessingEnvironment[] = payload.environments
+        .map((env: any) => {
+          const envId = env?.environment_id;
+          if (!isValidEnvironmentId(envId)) {
+            console.warn('Ignoring unknown environment from detection endpoint:', envId);
+            return null;
+          }
+
+          const rawCameras: string[] = Array.isArray(env?.cameras) ? env.cameras : [];
+          const cameras = rawCameras.filter((cameraId): cameraId is BackendCameraId =>
+            isBackendCameraId(cameraId)
+          );
+
+          const rawMetadata = env?.camera_metadata ?? {};
+          const cameraMetadata: Partial<
+            Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>
+          > = {};
+
+          cameras.forEach((cameraId) => {
+            const metadataEntry = rawMetadata?.[cameraId] || {};
+            cameraMetadata[cameraId] = {
+              ...metadataEntry,
+            };
+          });
+
+          return {
+            environment_id: envId,
+            display_name: env?.display_name,
+            cameras,
+            camera_metadata: Object.keys(cameraMetadata).length > 0 ? cameraMetadata : undefined,
+          } as DetectionProcessingEnvironment;
+        })
+        .filter((env): env is DetectionProcessingEnvironment => Boolean(env) && env.cameras.length > 0);
+
+      if (normalized.length === 0) {
+        throw new ValidationError('Detection environment response did not include any valid environments');
+      }
+
+      // Merge with defaults to ensure known environments are always available
+      const defaultsMap = new Map<EnvironmentId, DetectionProcessingEnvironment>(
+        DEFAULT_DETECTION_ENVIRONMENTS.environments.map((env) => [env.environment_id, env])
+      );
+
+      normalized.forEach((env) => {
+        const existing = defaultsMap.get(env.environment_id);
+        if (!existing) {
+          defaultsMap.set(env.environment_id, env);
+          return;
+        }
+
+        const mergedCameras = env.cameras.length ? env.cameras : existing.cameras;
+        const mergedMetadata = {
+          ...(existing.camera_metadata || {}),
+          ...(env.camera_metadata || {}),
+        } as Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>;
+
+        defaultsMap.set(env.environment_id, {
+          environment_id: env.environment_id,
+          display_name: env.display_name ?? existing.display_name,
+          cameras: mergedCameras,
+          camera_metadata:
+            Object.keys(mergedMetadata).length > 0 ? mergedMetadata : existing.camera_metadata,
+        });
+      });
+
+      return {
+        environments: Array.from(defaultsMap.values()),
+        updated_at: payload?.updated_at,
+      };
+    } catch (error) {
+      throw this.handleError('Failed to fetch detection processing environments', error);
     }
   }
 

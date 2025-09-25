@@ -1,7 +1,7 @@
 // src/components/PersonStatistics.tsx
 import React, { useState, useMemo, useCallback } from 'react';
 import type { BackendCameraId, EnvironmentId } from '../types/api';
-import { getCameraDisplayName } from '../config/environments';
+import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface PersonMetrics {
   totalDetections: number;
@@ -57,6 +57,8 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'distribution' | 'behavior'>('overview');
   const [sortBy, setSortBy] = useState<'count' | 'confidence' | 'camera'>('count');
+  const { environmentCameras, getDisplayName } = useCameraConfig();
+  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
   // Generate mock data based on environment and time range
   const personMetrics: PersonMetrics = useMemo(() => {
@@ -87,17 +89,17 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
   }, [timeRange]);
 
   const personDistribution: PersonDistribution[] = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
     const baseDistribution = [0.28, 0.35, 0.22, 0.15];
+    const normalizedDistribution = cameras.map((_, index) => baseDistribution[index] ?? 1 / Math.max(1, cameras.length));
+    const sum = normalizedDistribution.reduce((acc, value) => acc + value, 0) || 1;
+    const distribution = normalizedDistribution.map((value) => value / sum);
     const total = personMetrics.totalDetections;
 
     return cameras
       .map((cameraId, index) => {
-        const count = Math.round(total * baseDistribution[index]);
+        const count = Math.round(total * distribution[index]);
         return {
           cameraId,
           personCount: count,
@@ -118,7 +120,7 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
             return 0;
         }
       });
-  }, [environment, personMetrics.totalDetections, sortBy]);
+  }, [cameraIds, personMetrics.totalDetections, sortBy]);
 
   const behaviorData: PersonBehaviorData = useMemo(
     () => ({
@@ -382,7 +384,7 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-3">
                       <span className="text-white font-semibold">
-                        {getCameraDisplayName(dist.cameraId, environment)}
+                        {getDisplayName(dist.cameraId)}
                       </span>
                       <span className="text-xs bg-blue-500 text-white px-2 py-0.5 rounded">
                         Peak: {dist.peakTime}

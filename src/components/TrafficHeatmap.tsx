@@ -1,7 +1,7 @@
 // src/components/TrafficHeatmap.tsx
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import type { BackendCameraId, EnvironmentId } from '../types/api';
-import { getCameraDisplayName } from '../config/environments';
+import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface HeatmapZone {
   id: string;
@@ -60,13 +60,12 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
   const [currentTimeframe, setCurrentTimeframe] = useState<Date>(new Date());
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
+  const { environmentCameras, getDisplayName } = useCameraConfig();
+  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
   // Generate mock heatmap data based on environment
   const heatmapData: HeatmapData = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
     const zones: HeatmapZone[] = cameras.flatMap((cameraId, cameraIndex) => {
       // Create 2-4 zones per camera
@@ -100,7 +99,7 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
 
         return {
           id: zoneId,
-          name: `${getCameraDisplayName(cameraId, environment)} Zone ${zoneIndex + 1}`,
+          name: `${getDisplayName(cameraId)} Zone ${zoneIndex + 1}`,
           coordinates: [
             [50 + cameraIndex * 200 + zoneIndex * 80, 50 + zoneIndex * 60],
             [130 + cameraIndex * 200 + zoneIndex * 80, 50 + zoneIndex * 60],
@@ -139,7 +138,7 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
         peakOccupancyCount: peakData.personCount,
       },
     };
-  }, [environment, timeRange]);
+  }, [cameraIds, environment, timeRange]);
 
   // Filter zones based on selected cameras
   const filteredZones = useMemo(() => {
@@ -557,7 +556,7 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
             <div>
               <span className="text-gray-500">Camera:</span>
               <div className="text-purple-400 font-semibold">
-                {getCameraDisplayName(selectedZone.cameraId, environment)}
+                {getDisplayName(selectedZone.cameraId)}
               </div>
             </div>
           </div>

@@ -1,7 +1,7 @@
 // src/components/DwellTimeAnalysis.tsx
 import React, { useState, useMemo, useCallback } from 'react';
 import type { BackendCameraId, EnvironmentId } from '../types/api';
-import { getCameraDisplayName } from '../config/environments';
+import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface DwellTimeData {
   cameraId: BackendCameraId;
@@ -76,13 +76,12 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
     'overview'
   );
   const [selectedTimeSlot, setSelectedTimeSlot] = useState<number | null>(null);
+  const { environmentCameras, getDisplayName } = useCameraConfig();
+  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
   // Generate mock dwell time data
   const dwellTimeData: DwellTimeData[] = useMemo(() => {
-    const cameras =
-      environment === 'factory'
-        ? (['c09', 'c12', 'c13', 'c16'] as BackendCameraId[])
-        : (['c01', 'c02', 'c03', 'c05'] as BackendCameraId[]);
+    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
     return cameras.map((cameraId, index) => {
       const baseAvgDwell = 3.5 + index * 0.8;
@@ -140,7 +139,7 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
         }),
       };
     });
-  }, [environment]);
+  }, [cameraIds]);
 
   // Generate trend analysis data
   const dwellTimeTrends: DwellTimeTrends = useMemo(() => {
@@ -391,7 +390,7 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
                   <div key={cameraData.cameraId} className="bg-gray-800/30 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-white font-semibold">
-                        {getCameraDisplayName(cameraData.cameraId, environment)}
+                        {getDisplayName(cameraData.cameraId)}
                       </span>
                       <div className="flex items-center space-x-4 text-sm">
                         <div>
@@ -495,7 +494,7 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
                   {filteredData.map((cameraData) => (
                     <div key={cameraData.cameraId} className="bg-gray-800/30 rounded-lg p-3">
                       <div className="font-semibold text-white mb-2">
-                        {getCameraDisplayName(cameraData.cameraId, environment)}
+                        {getDisplayName(cameraData.cameraId)}
                       </div>
                       <div className="space-y-2">
                         {cameraData.dwellTimeDistribution.map((dist, index) => (
