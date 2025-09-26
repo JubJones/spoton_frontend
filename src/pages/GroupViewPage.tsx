@@ -121,9 +121,11 @@ const GroupViewPage: React.FC = () => {
 
   // State to store points per camera
   const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
-
+  
   // State to store detection data for PersonList component
   const [detectionData, setDetectionData] = useState<{ [camera_id: string]: any }>({});
+  const videoAreaRef = useRef<HTMLDivElement | null>(null);
+  const [videoAreaHeight, setVideoAreaHeight] = useState<number>();
 
   // Mapping data hook - listens for 'websocket-mapping-message' events
   const { mappingData, getMappingForCamera } = useMappingData({ enabled: true, maxTrailLength: 3 });
@@ -630,6 +632,28 @@ const GroupViewPage: React.FC = () => {
 
   }, [currentFrameData, overallMapDimensions]);
 
+  useEffect(() => {
+    const element = videoAreaRef.current;
+    if (!element || typeof ResizeObserver === 'undefined') {
+      return;
+    }
+
+    const observer = new ResizeObserver((entries) => {
+      for (const entry of entries) {
+        const newHeight = entry.contentRect.height;
+        if (!Number.isNaN(newHeight)) {
+          setVideoAreaHeight((prev) => (prev !== newHeight ? newHeight : prev));
+        }
+      }
+    });
+
+    observer.observe(element);
+
+    return () => {
+      observer.disconnect();
+    };
+  }, []);
+
   // Control handlers for detection processing
   const handleStartStreaming = () => {
     if (!isStreaming && systemHealth?.status === 'healthy') {
@@ -791,48 +815,171 @@ const GroupViewPage: React.FC = () => {
         </nav>
       </div>
 
-      {/* Main Content Area */}
-      <div className="flex flex-grow min-h-0 gap-4">
-        {/* Left Side (Video Player Area) */}
-        <div className="w-2/3 bg-gray-800 rounded-md p-1 flex items-center justify-center">
-          {cameraConfigLoading && cameraIds.length === 0 ? (
-            <div className="text-gray-400 text-sm">Loading camera configuration...</div>
-          ) : cameraIds.length === 0 ? (
-            <div className="text-gray-400 text-sm">No cameras available for this environment.</div>
-          ) : activeTab === "all" ? (
-            <div
-              className={`w-full h-full grid ${                cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'              } ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`}
-            >
-              {cameraIds.map((cameraId) => {
+            {/* Main Content Area */}
+      <div className="flex flex-col flex-grow gap-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          {/* Left Side (Video Player Area) */}
+          <div
+            className="bg-gray-800 rounded-md p-1 flex items-center justify-center min-h-[320px]"
+            ref={videoAreaRef}
+          >
+            {cameraConfigLoading && cameraIds.length === 0 ? (
+              <div className="text-gray-400 text-sm">Loading camera configuration...</div>
+            ) : cameraIds.length === 0 ? (
+              <div className="text-gray-400 text-sm">No cameras available for this environment.</div>
+            ) : activeTab === "all" ? (
+              <div
+                className={`w-full h-full grid ${                cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'              } ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`}
+              >
+                {cameraIds.map((cameraId) => {
+                  const frameData = cameraFrames[cameraId];
+                  const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
+                  const displayName = getCameraDisplayNameById(cameraId);
+                  const loadingState = imageLoadingStates[cameraId] ?? (frameData ? 'loading' : 'none');
+
+                  return (
+                    <div key={cameraId} className="relative bg-black rounded overflow-hidden min-h-0 flex items-center justify-center">
+                      {frameData ? (
+                        <div className="relative w-full h-full">
+                          <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                            {displayName} ({cameraId})
+                          </div>
+                          <img
+                            key={`${cameraId}-${frameData.length}`}
+                            src={frameData}
+                            alt={`Camera ${displayName}`}
+                            className="w-full h-full object-contain"
+                            onLoad={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              console.log(`✅ Image loaded successfully for ${cameraId}`, {
+                                cameraId,
+                                displayName,
+                                frameDataLength: frameData.length,
+                                frameDataPrefix: frameData.substring(0, 50) + '...',
+                                naturalWidth: img.naturalWidth,
+                                naturalHeight: img.naturalHeight,
+                                displayWidth: img.width,
+                                displayHeight: img.height,
+                                debugInfo: imageDebugInfo[cameraId],
+                              });
+
+                              setImageLoadingStates((prev) => ({
+                                ...prev,
+                                [cameraId]: 'loaded',
+                              }));
+                            }}
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement;
+                              console.error(`❌ Error loading frame for ${cameraId}:`, {
+                                cameraId,
+                                displayName,
+                                frameDataLength: frameData.length,
+                                frameDataPrefix: frameData.substring(0, 50) + '...',
+                                src: img.src.substring(0, 100) + '...',
+                                error: e,
+                                debugInfo: imageDebugInfo[cameraId],
+                              });
+
+                              setImageLoadingStates((prev) => ({
+                                ...prev,
+                                [cameraId]: 'error',
+                              }));
+
+                              try {
+                                if (frameData.startsWith('data:image/jpeg;base64,')) {
+                                  const base64Data = frameData.split(',')[1];
+                                  const binaryString = atob(base64Data);
+                                  console.log(`🔍 Base64 decode test for ${cameraId}:`, {
+                                    base64Length: base64Data.length,
+                                    binaryLength: binaryString.length,
+                                    firstBytes: Array.from(binaryString.slice(0, 10)).map((c) =>
+                                      c.charCodeAt(0).toString(16)
+                                    ).join(' '),
+                                  });
+                                }
+                              } catch (decodeError) {
+                                console.error(`❌ Base64 decode error for ${cameraId}:`, decodeError);
+                              }
+                            }}
+                          />
+
+                          {loadingState === 'loading' && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+                              <div className="text-white text-sm">Loading frame...</div>
+                            </div>
+                          )}
+
+                          {loadingState === 'error' && (
+                            <div className="absolute inset-0 flex items-center justify-center bg-red-900 bg-opacity-50">
+                              <div className="text-red-200 text-sm text-center">
+                                <div>Frame load error</div>
+                                <div className="text-xs mt-1">Check console for details</div>
+                              </div>
+                            </div>
+                          )}
+
+                          {tracks.map((track) => {
+                            const [x1, y1, x2, y2] = track.bbox_xyxy;
+                            const width = x2 - x1;
+                            const height = y2 - y1;
+
+                            return (
+                              <div
+                                key={track.track_id}
+                                className="absolute border-2 border-lime-400 pointer-events-none"
+                                style={{
+                                  left: `${(x1 / MAP_SOURCE_WIDTH) * 100}%`,
+                                  top: `${(y1 / MAP_SOURCE_HEIGHT) * 100}%`,
+                                  width: `${(width / MAP_SOURCE_WIDTH) * 100}%`,
+                                  height: `${(height / MAP_SOURCE_HEIGHT) * 100}%`,
+                                }}
+                              >
+                                <div className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded">
+                                  ID: {track.global_id}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : (
+                        <div className="text-gray-500 text-center p-4">
+                          {isStreaming ? 'Waiting for frames...' : 'No video stream'}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              (() => {
+                const cameraId = activeTab as BackendCameraId;
                 const frameData = cameraFrames[cameraId];
                 const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
                 const displayName = getCameraDisplayNameById(cameraId);
                 const loadingState = imageLoadingStates[cameraId] ?? (frameData ? 'loading' : 'none');
 
                 return (
-                  <div key={cameraId} className="relative bg-black rounded overflow-hidden min-h-0 flex items-center justify-center">
+                  <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center min-h-[320px]">
                     {frameData ? (
                       <div className="relative w-full h-full">
                         <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                           {displayName} ({cameraId})
                         </div>
                         <img
-                          key={`${cameraId}-${frameData.length}`}
+                          key={`${cameraId}-single-${frameData.length}`}
                           src={frameData}
                           alt={`Camera ${displayName}`}
                           className="w-full h-full object-contain"
                           onLoad={(e) => {
                             const img = e.target as HTMLImageElement;
-                            console.log(`✅ Image loaded successfully for ${cameraId}`, {
+                            console.log(`✅ Single view image loaded for ${cameraId}`, {
                               cameraId,
                               displayName,
                               frameDataLength: frameData.length,
-                              frameDataPrefix: frameData.substring(0, 50) + '...',
                               naturalWidth: img.naturalWidth,
                               naturalHeight: img.naturalHeight,
                               displayWidth: img.width,
                               displayHeight: img.height,
-                              debugInfo: imageDebugInfo[cameraId],
                             });
 
                             setImageLoadingStates((prev) => ({
@@ -842,50 +989,32 @@ const GroupViewPage: React.FC = () => {
                           }}
                           onError={(e) => {
                             const img = e.target as HTMLImageElement;
-                            console.error(`❌ Error loading frame for ${cameraId}:`, {
+                            console.error(`❌ Single view error loading frame for ${cameraId}:`, {
                               cameraId,
                               displayName,
                               frameDataLength: frameData.length,
-                              frameDataPrefix: frameData.substring(0, 50) + '...',
                               src: img.src.substring(0, 100) + '...',
                               error: e,
-                              debugInfo: imageDebugInfo[cameraId],
                             });
 
                             setImageLoadingStates((prev) => ({
                               ...prev,
                               [cameraId]: 'error',
                             }));
-
-                            try {
-                              if (frameData.startsWith('data:image/jpeg;base64,')) {
-                                const base64Data = frameData.split(',')[1];
-                                const binaryString = atob(base64Data);
-                                console.log(`🔍 Base64 decode test for ${cameraId}:`, {
-                                  base64Length: base64Data.length,
-                                  binaryLength: binaryString.length,
-                                  firstBytes: Array.from(binaryString.slice(0, 10)).map((c) =>
-                                    c.charCodeAt(0).toString(16)
-                                  ).join(' '),
-                                });
-                              }
-                            } catch (decodeError) {
-                              console.error(`❌ Base64 decode error for ${cameraId}:`, decodeError);
-                            }
                           }}
                         />
 
                         {loadingState === 'loading' && (
                           <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                            <div className="text-white text-sm">Loading frame...</div>
+                            <div className="text-white">Loading frame...</div>
                           </div>
                         )}
 
                         {loadingState === 'error' && (
                           <div className="absolute inset-0 flex items-center justify-center bg-red-900 bg-opacity-50">
-                            <div className="text-red-200 text-sm text-center">
+                            <div className="text-red-200 text-center">
                               <div>Frame load error</div>
-                              <div className="text-xs mt-1">Check console for details</div>
+                              <div className="text-sm mt-1">Check console for details</div>
                             </div>
                           </div>
                         )}
@@ -920,117 +1049,15 @@ const GroupViewPage: React.FC = () => {
                     )}
                   </div>
                 );
-              })}
-            </div>
-          ) : (
-            (() => {
-              if (activeTab === 'all') {
-                return null;
-              }
+              })()
+            )}
+          </div>
 
-              const cameraId = activeTab as BackendCameraId;
-              const frameData = cameraFrames[cameraId];
-              const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
-              const displayName = getCameraDisplayNameById(cameraId);
-              const loadingState = imageLoadingStates[cameraId] ?? (frameData ? 'loading' : 'none');
-
-              return (
-                <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center">
-                  {frameData ? (
-                    <div className="relative w-full h-full">
-                      <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                        {displayName} ({cameraId})
-                      </div>
-                      <img
-                        key={`${cameraId}-single-${frameData.length}`}
-                        src={frameData}
-                        alt={`Camera ${displayName}`}
-                        className="w-full h-full object-contain"
-                        onLoad={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          console.log(`✅ Single view image loaded for ${cameraId}`, {
-                            cameraId,
-                            displayName,
-                            frameDataLength: frameData.length,
-                            naturalWidth: img.naturalWidth,
-                            naturalHeight: img.naturalHeight,
-                            displayWidth: img.width,
-                            displayHeight: img.height,
-                          });
-
-                          setImageLoadingStates((prev) => ({
-                            ...prev,
-                            [cameraId]: 'loaded',
-                          }));
-                        }}
-                        onError={(e) => {
-                          const img = e.target as HTMLImageElement;
-                          console.error(`❌ Single view error loading frame for ${cameraId}:`, {
-                            cameraId,
-                            displayName,
-                            frameDataLength: frameData.length,
-                            src: img.src.substring(0, 100) + '...',
-                            error: e,
-                          });
-
-                          setImageLoadingStates((prev) => ({
-                            ...prev,
-                            [cameraId]: 'error',
-                          }));
-                        }}
-                      />
-
-                      {loadingState === 'loading' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-                          <div className="text-white">Loading frame...</div>
-                        </div>
-                      )}
-
-                      {loadingState === 'error' && (
-                        <div className="absolute inset-0 flex items-center justify-center bg-red-900 bg-opacity-50">
-                          <div className="text-red-200 text-center">
-                            <div>Frame load error</div>
-                            <div className="text-sm mt-1">Check console for details</div>
-                          </div>
-                        </div>
-                      )}
-
-                      {tracks.map((track) => {
-                        const [x1, y1, x2, y2] = track.bbox_xyxy;
-                        const width = x2 - x1;
-                        const height = y2 - y1;
-
-                        return (
-                          <div
-                            key={track.track_id}
-                            className="absolute border-2 border-lime-400 pointer-events-none"
-                            style={{
-                              left: `${(x1 / MAP_SOURCE_WIDTH) * 100}%`,
-                              top: `${(y1 / MAP_SOURCE_HEIGHT) * 100}%`,
-                              width: `${(width / MAP_SOURCE_WIDTH) * 100}%`,
-                              height: `${(height / MAP_SOURCE_HEIGHT) * 100}%`,
-                            }}
-                          >
-                            <div className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded">
-                              ID: {track.global_id}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-gray-500 text-center p-4">
-                      {isStreaming ? 'Waiting for frames...' : 'No video stream'}
-                    </div>
-                  )}
-                </div>
-              );
-            })()
-          )}
-        </div>
-
-        {/* Right Side Panels */}
-        <div className="w-1/3 flex flex-col gap-4">
+          {/* Right Side Panels */}
+          <div
+            className="flex flex-col gap-4 h-full"
+            style={{ maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : undefined, overflowY: videoAreaHeight ? 'auto' : undefined }}
+          >
             {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
             <div
               ref={overallMapContainerRef}
@@ -1148,95 +1175,96 @@ const GroupViewPage: React.FC = () => {
 
             {/* Upper Lower Panels - Tracks and Stream Info */}
             <div className="flex gap-4">
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
-                    <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
-                    <div className="space-y-2 text-xs flex-grow overflow-y-auto">
-                        {(() => {
-                            const maxDetections = Math.max(
-                                1,
-                                ...cameraIds.map((cameraId) => detectionData[cameraId]?.detections?.length || 0)
-                            );
+              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
+                <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
+                <div className="space-y-2 text-xs flex-grow overflow-y-auto">
+                  {(() => {
+                    const maxDetections = Math.max(
+                      1,
+                      ...cameraIds.map((cameraId) => detectionData[cameraId]?.detections?.length || 0)
+                    );
 
-                            return cameraIds.map((cameraId) => {
-                                const displayName = getCameraDisplayNameById(cameraId);
-                                const detectionCount = detectionData[cameraId]?.detections?.length || 0;
+                    return cameraIds.map((cameraId) => {
+                      const displayName = getCameraDisplayNameById(cameraId);
+                      const detectionCount = detectionData[cameraId]?.detections?.length || 0;
 
-                                return (
-                                    <div key={cameraId} className="flex items-center justify-between">
-                                        <span>{displayName}</span>
-                                        <div className="flex items-center">
-                                            <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
-                                                <div
-                                                    className="h-2 bg-green-500 rounded-full"
-                                                    style={{
-                                                        width: `${maxDetections ? (detectionCount / maxDetections) * 100 : 0}%`,
-                                                    }}
-                                                ></div>
-                                            </div>
-                                            <span className="font-mono">{detectionCount}</span>
-                                        </div>
-                                    </div>
-                                );
-                            });
-                        })()}
-                    </div>
-                </div>
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
-                    <div>
-                        <div className="flex justify-between items-center mb-2">
-                            <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
-                            <span className={`text-xs font-semibold flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
-                                <span className={`h-1.5 w-1.5 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
-                                {isStreaming ? 'Live' : 'Offline'}
-                            </span>
+                      return (
+                        <div key={cameraId} className="flex items-center justify-between">
+                          <span>{displayName}</span>
+                          <div className="flex items-center">
+                            <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
+                              <div
+                                className="h-2 bg-green-500 rounded-full"
+                                style={{
+                                  width: `${maxDetections ? (detectionCount / maxDetections) * 100 : 0}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <span className="font-mono">{detectionCount}</span>
+                          </div>
                         </div>
-                        {isStreaming && currentFrameData ? (
-                            <>
-                                <p className="text-xs">Mode: <span className="font-bold">Raw Video</span></p>
-                                <p className="text-xs mt-1">Frame: <span className="font-bold">{currentFrameData.global_frame_index}</span></p>
-                                <p className="text-xs mt-1">Last update: <span className="font-bold">{new Date(currentFrameData.timestamp_processed_utc).toLocaleTimeString()}</span></p>
-                                <p className="text-xs mt-1">Total tracks: <span className="font-bold">
-                                    {Object.values(currentFrameData.cameras).reduce((sum, cam) => sum + (cam.tracks?.length || 0), 0)}
-                                </span></p>
-                            </>
-                        ) : (
-                            <>
-                                <p className="text-xs">Status: <span className="font-bold">No stream</span></p>
-                                <p className="text-xs mt-1">Backend: <span className="font-bold">{systemHealth?.status || 'Unknown'}</span></p>
-                                <p className="text-xs mt-1">Click Start Stream to begin</p>
-                            </>
-                        )}
-                    </div>
-                    <button 
-                        onClick={isStreaming ? handleStopStreaming : error ? handleStopStreaming : handleStartStreaming}
-                        className={`w-full py-1.5 text-white rounded text-sm font-semibold mt-3 ${
-                            isStreaming 
-                                ? "bg-red-600 hover:bg-red-700" 
-                                : error && !isStreaming
-                                    ? "bg-orange-600 hover:bg-orange-700"
-                                    : systemHealth?.status === 'healthy'
-                                        ? "bg-green-600 hover:bg-green-700"
-                                        : "bg-gray-600 cursor-not-allowed"
-                        }`}
-                        disabled={!isStreaming && !error && systemHealth?.status !== 'healthy'}
-                    >
-                        {isStreaming ? 'Stop Stream' : error ? 'Clean Up' : 'Start Stream'}
-                    </button>
+                      );
+                    });
+                  })()}
                 </div>
+              </div>
+              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
+                    <span className={`text-xs font-semibold flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className={`h-1.5 w-1.5 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
+                      {isStreaming ? 'Live' : 'Offline'}
+                    </span>
+                  </div>
+                  {isStreaming && currentFrameData ? (
+                    <>
+                      <p className="text-xs">Mode: <span className="font-bold">Raw Video</span></p>
+                      <p className="text-xs mt-1">Frame: <span className="font-bold">{currentFrameData.global_frame_index}</span></p>
+                      <p className="text-xs mt-1">Last update: <span className="font-bold">{new Date(currentFrameData.timestamp_processed_utc).toLocaleTimeString()}</span></p>
+                      <p className="text-xs mt-1">Total tracks: <span className="font-bold">
+                        {Object.values(currentFrameData.cameras).reduce((sum, cam) => sum + (cam.tracks?.length || 0), 0)}
+                      </span></p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs">Status: <span className="font-bold">No stream</span></p>
+                      <p className="text-xs mt-1">Backend: <span className="font-bold">{systemHealth?.status || 'Unknown'}</span></p>
+                      <p className="text-xs mt-1">Click Start Stream to begin</p>
+                    </>
+                  )}
+                </div>
+                <button
+                  onClick={isStreaming ? handleStopStreaming : error ? handleStopStreaming : handleStartStreaming}
+                  className={`w-full py-1.5 text-white rounded text-sm font-semibold mt-3 ${
+                    isStreaming
+                      ? "bg-red-600 hover:bg-red-700"
+                      : error && !isStreaming
+                        ? "bg-orange-600 hover:bg-orange-700"
+                        : systemHealth?.status === 'healthy'
+                          ? "bg-green-600 hover:bg-green-700"
+                          : "bg-gray-600 cursor-not-allowed"
+                  }`}
+                  disabled={!isStreaming && !error && systemHealth?.status !== 'healthy'}
+                >
+                  {isStreaming ? 'Stop Stream' : error ? 'Clean Up' : 'Start Stream'}
+                </button>
+              </div>
             </div>
-            
-            {/* Full Width Detection Person List Panel */}
-            <div>
-                <DetectionPersonList 
-                    cameraDetections={detectionData}
-                    className="h-full"
-                    onPersonClick={(detection, camera_id) => {
-                        console.log('Person clicked:', { detection, camera_id });
-                        // TODO: Add person click functionality
-                    }}
-                />
-            </div>
+          </div>
         </div>
+      </div>
+
+      {/* Detection Person List - full width beneath video & panels */}
+      <div className="bg-gray-800 rounded-md p-3 mt-4">
+        <DetectionPersonList
+          cameraDetections={detectionData}
+          className="h-full"
+          onPersonClick={(detection, camera_id) => {
+            console.log('Person clicked:', { detection, camera_id });
+            // TODO: Add person click functionality
+          }}
+        />
       </div>
     </div>
   );
