@@ -6,6 +6,7 @@ import DetectionPersonList from "../components/DetectionPersonList";
 import { CameraMapPair } from "../components/mapping";
 import { useMappingData } from "../hooks/useMappingData";
 import type { BackendCameraId, EnvironmentId } from "../types/api";
+import { DEFAULT_CONFIG, WEBSOCKET_ENDPOINTS } from "../types/api";
 import { useCameraConfig } from "../context/CameraConfigContext";
 
 // --- Type Definitions ---
@@ -72,6 +73,34 @@ interface SystemHealth {
   processing_tasks_active?: number;
 }
 
+interface DetectionListItem {
+  detection_id: string;
+  confidence: number;
+  bbox: {
+    x1: number;
+    y1: number;
+    x2: number;
+    y2: number;
+    width: number;
+    height: number;
+    center_x: number;
+    center_y: number;
+  };
+  map_coords?: {
+    map_x: number;
+    map_y: number;
+  };
+  class_name: string;
+  class_id: number;
+}
+
+interface DetectionStoreEntry {
+  camera_id: string;
+  frame_image_base64?: string;
+  detections: DetectionListItem[];
+  processing_time_ms: number;
+}
+
 interface DetectionTask {
   task_id: string;
   status: string; // QUEUED, INITIALIZING, PROCESSING, COMPLETED, FAILED
@@ -97,6 +126,39 @@ interface SingleCameraMapPoint {
 
 const defaultDotColor = 'bg-gray-500';
 
+const BBOX_MATCH_TOLERANCE = 36;
+
+const calculateIoU = (a: [number, number, number, number], b: [number, number, number, number]): number => {
+  const [ax1, ay1, ax2, ay2] = a;
+  const [bx1, by1, bx2, by2] = b;
+  if ([ax1, ay1, ax2, ay2, bx1, by1, bx2, by2].some((value) => typeof value !== 'number' || Number.isNaN(value))) {
+    return 0;
+  }
+  const interX1 = Math.max(ax1, bx1);
+  const interY1 = Math.max(ay1, by1);
+  const interX2 = Math.min(ax2, bx2);
+  const interY2 = Math.min(ay2, by2);
+  const interW = Math.max(0, interX2 - interX1);
+  const interH = Math.max(0, interY2 - interY1);
+  const interArea = interW * interH;
+  const areaA = Math.max(0, ax2 - ax1) * Math.max(0, ay2 - ay1);
+  const areaB = Math.max(0, bx2 - bx1) * Math.max(0, by2 - by1);
+  const denom = areaA + areaB - interArea;
+  if (!Number.isFinite(denom) || denom <= 0) {
+    return 0;
+  }
+  const iou = interArea / denom;
+  return Number.isFinite(iou) ? iou : 0;
+};
+
+interface FocusedPersonState {
+  cameraId: BackendCameraId;
+  trackKey: string | null;
+  detectionKey?: string;
+  bbox: [number, number, number, number];
+  globalId?: string;
+}
+
 // --- GroupViewPage Component ---
 const GroupViewPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("all");
@@ -108,6 +170,7 @@ const GroupViewPage: React.FC = () => {
   
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
+  const focusWsRef = useRef<WebSocket | null>(null);
   
   // Camera frame data stored as base64 strings
   const [cameraFrames, setCameraFrames] = useState<{ [jsonCameraId: string]: string }>({});
@@ -123,9 +186,11 @@ const GroupViewPage: React.FC = () => {
   const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
   
   // State to store detection data for PersonList component
-  const [detectionData, setDetectionData] = useState<{ [camera_id: string]: any }>({});
+  const [detectionData, setDetectionData] = useState<{ [camera_id: string]: DetectionStoreEntry }>({});
   const videoAreaRef = useRef<HTMLDivElement | null>(null);
   const [videoAreaHeight, setVideoAreaHeight] = useState<number>();
+
+  const [focusedPerson, setFocusedPerson] = useState<FocusedPersonState | null>(null);
 
   // Mapping data hook - listens for 'websocket-mapping-message' events
   const { mappingData, getMappingForCamera } = useMappingData({ enabled: true, maxTrailLength: 3 });
@@ -147,17 +212,501 @@ const GroupViewPage: React.FC = () => {
   const environment = getEnvironmentFromUrl();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
+  const getTrackKey = useCallback((cameraId: BackendCameraId, track: Track) => {
+    const globalId = track.global_id;
+    if (globalId !== undefined && globalId !== null) {
+      return `global:${String(globalId)}`;
+    }
+    return `camera:${cameraId}:${track.track_id}`;
+  }, []);
+
+  const areBboxesClose = useCallback((
+    bboxA: [number, number, number, number],
+    bboxB: [number, number, number, number],
+    tolerance: number = BBOX_MATCH_TOLERANCE
+  ) => {
+    return (
+      Math.abs(bboxA[0] - bboxB[0]) <= tolerance &&
+      Math.abs(bboxA[1] - bboxB[1]) <= tolerance &&
+      Math.abs(bboxA[2] - bboxB[2]) <= tolerance &&
+      Math.abs(bboxA[3] - bboxB[3]) <= tolerance
+    );
+  }, []);
+
+  const findTrackMatchingDetection = useCallback((cameraId: BackendCameraId, detectionBbox: [number, number, number, number]) => {
+    const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
+    if (cameraTracks.length === 0) {
+      return undefined;
+    }
+
+    let bestTrack: Track | undefined;
+    let bestIoU = -1;
+    let bestCenterDist = Number.POSITIVE_INFINITY;
+    const [dx1, dy1, dx2, dy2] = detectionBbox;
+    const detectionCenter: [number, number] = [(dx1 + dx2) / 2, (dy1 + dy2) / 2];
+    const trackDiagnostics: Array<{
+      trackKey: string;
+      trackId: number | undefined;
+      globalId: string | number | undefined | null;
+      iou: number;
+      centerDistance: number;
+      bbox: [number, number, number, number];
+    }> = [];
+
+    for (const track of cameraTracks) {
+      const iou = calculateIoU(track.bbox_xyxy, detectionBbox);
+      const [tx1, ty1, tx2, ty2] = track.bbox_xyxy;
+      const trackCenter: [number, number] = [(tx1 + tx2) / 2, (ty1 + ty2) / 2];
+      const dist = Math.hypot(trackCenter[0] - detectionCenter[0], trackCenter[1] - detectionCenter[1]);
+
+      if (cameraId === 'c12') {
+        trackDiagnostics.push({
+          trackKey: getTrackKey(cameraId, track),
+          trackId: track.track_id,
+          globalId: track.global_id,
+          iou: Number.isFinite(iou) ? Number(iou.toFixed(4)) : iou,
+          centerDistance: Number.isFinite(dist) ? Number(dist.toFixed(2)) : dist,
+          bbox: [tx1, ty1, tx2, ty2],
+        });
+      }
+
+      if (iou > bestIoU || (Math.abs(iou - bestIoU) < 1e-6 && dist < bestCenterDist)) {
+        bestIoU = iou;
+        bestCenterDist = dist;
+        bestTrack = track;
+      }
+    }
+
+    if (cameraId === 'c12') {
+      const bestTrackKey = bestTrack ? getTrackKey(cameraId, bestTrack) : null;
+      console.debug('🧪 c12 detection↔track matching', {
+        detectionBbox,
+        detectionCenter,
+        bestTrackKey,
+        bestIoU: Number.isFinite(bestIoU) ? Number(bestIoU.toFixed(4)) : bestIoU,
+        bestCenterDist: Number.isFinite(bestCenterDist) ? Number(bestCenterDist.toFixed(2)) : bestCenterDist,
+        trackDiagnostics,
+      });
+    }
+
+    return bestTrack ?? cameraTracks[0];
+  }, [currentFrameData, getTrackKey]);
+
+  const findDetectionForTrack = useCallback((cameraId: BackendCameraId, track: Track) => {
+    const cameraDetections = detectionData[cameraId];
+    if (!cameraDetections?.detections) {
+      return undefined;
+    }
+
+    const trackBbox = track.bbox_xyxy;
+    let bestDetection: DetectionListItem | undefined;
+    let bestIoU = -1;
+    let bestCenterDist = Number.POSITIVE_INFINITY;
+    const [tx1, ty1, tx2, ty2] = trackBbox;
+    const trackCenter: [number, number] = [(tx1 + tx2) / 2, (ty1 + ty2) / 2];
+
+    cameraDetections.detections.forEach((detection: DetectionListItem) => {
+      const detectionBbox: [number, number, number, number] = [
+        detection.bbox.x1,
+        detection.bbox.y1,
+        detection.bbox.x2,
+        detection.bbox.y2,
+      ];
+      const iou = calculateIoU(trackBbox, detectionBbox);
+      const detectionCenter: [number, number] = [
+        (detectionBbox[0] + detectionBbox[2]) / 2,
+        (detectionBbox[1] + detectionBbox[3]) / 2,
+      ];
+      const dist = Math.hypot(trackCenter[0] - detectionCenter[0], trackCenter[1] - detectionCenter[1]);
+
+      if (iou > bestIoU || (Math.abs(iou - bestIoU) < 1e-6 && dist < bestCenterDist)) {
+        bestIoU = iou;
+        bestCenterDist = dist;
+        bestDetection = detection;
+      }
+    });
+
+    return bestDetection ?? cameraDetections.detections[0];
+  }, [detectionData]);
+
+  const sendFocusMessage = useCallback((message: Record<string, unknown>) => {
+    const socket = focusWsRef.current;
+    if (!socket || socket.readyState !== WebSocket.OPEN) {
+      console.warn('Focus WebSocket not ready; skipping focus message.', message);
+      return;
+    }
+
+    try {
+      socket.send(JSON.stringify(message));
+    } catch (error) {
+      console.error('Failed to send focus message', error);
+    }
+  }, []);
+
+  const handleFocusUpdate = useCallback((payload: any) => {
+    console.log('🎯 Focus update received', payload);
+    if (!payload || !payload.is_active) {
+      setFocusedPerson((prev) => (prev ? null : prev));
+      return;
+    }
+
+    const details = payload.person_details || {};
+    const cameraIdValue = details.camera_id || details.current_camera;
+    if (!cameraIdValue) {
+      return;
+    }
+
+    const bboxDict = details.bbox;
+    const nextBbox = bboxDict
+      ? [bboxDict.x1, bboxDict.y1, bboxDict.x2, bboxDict.y2]
+      : undefined;
+    const trackIdValue = typeof details.track_id === 'number' ? details.track_id : undefined;
+    const detectionIdValue = typeof details.detection_id === 'string' ? details.detection_id : undefined;
+
+    setFocusedPerson(() => ({
+      cameraId: cameraIdValue as BackendCameraId,
+      trackKey: trackIdValue !== undefined ? `camera:${cameraIdValue}:${trackIdValue}` : null,
+      detectionKey: detectionIdValue ? `${cameraIdValue}-${detectionIdValue}` : undefined,
+      bbox: (nextBbox as [number, number, number, number]) || [0, 0, 0, 0],
+      globalId: payload.focused_person_id || undefined,
+    }));
+  }, []);
+
+  const disconnectFocusWebSocket = useCallback(() => {
+    if (focusWsRef.current) {
+      focusWsRef.current.onmessage = null;
+      focusWsRef.current.onopen = null;
+      focusWsRef.current.onclose = null;
+      focusWsRef.current.onerror = null;
+      focusWsRef.current.close();
+      focusWsRef.current = null;
+    }
+  }, []);
+
+  const connectFocusWebSocket = useCallback((taskId: string) => {
+    try {
+      disconnectFocusWebSocket();
+      const url = `${DEFAULT_CONFIG.WS_BASE_URL}${WEBSOCKET_ENDPOINTS.FOCUS(taskId)}`;
+      const socket = new WebSocket(url);
+      focusWsRef.current = socket;
+
+      socket.onopen = () => {
+        console.log('🎯 Focus WebSocket connected:', url);
+      };
+
+      socket.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data);
+          if (message?.type === 'focus_update') {
+            handleFocusUpdate(message.payload);
+          } else if (message?.type === 'pong') {
+            console.debug('🎯 Focus pong received');
+          }
+        } catch (error) {
+          console.error('Failed to parse focus WebSocket message', error);
+        }
+      };
+
+      socket.onclose = () => {
+        console.log('🎯 Focus WebSocket closed');
+        focusWsRef.current = null;
+      };
+
+      socket.onerror = (error) => {
+        console.error('Focus WebSocket error', error);
+      };
+    } catch (error) {
+      console.error('Failed to connect focus WebSocket', error);
+    }
+  }, [disconnectFocusWebSocket, handleFocusUpdate]);
+
+  const clearBackendFocus = useCallback(() => {
+    console.log('🎯 Sending clear_focus');
+    sendFocusMessage({ type: 'clear_focus' });
+  }, [sendFocusMessage]);
+
+  const focusOnBackend = useCallback((params: {
+    personId: string;
+    cameraId: BackendCameraId;
+    trackId?: number;
+    detectionId?: string;
+    bbox: [number, number, number, number];
+    confidence?: number;
+  }) => {
+    const { personId, cameraId, trackId, detectionId, bbox, confidence } = params;
+    console.log('🎯 Sending set_focus', params);
+    sendFocusMessage({
+      type: 'set_focus',
+      person_id: personId,
+      person_details: {
+        camera_id: cameraId,
+        current_camera: cameraId,
+        track_id: trackId,
+        detection_id: detectionId,
+        bbox: {
+          x1: bbox[0],
+          y1: bbox[1],
+          x2: bbox[2],
+          y2: bbox[3],
+        },
+        confidence,
+        first_detected: new Date().toISOString(),
+        position_history: [],
+        movement_metrics: {},
+      },
+    });
+  }, [sendFocusMessage]);
+
   useEffect(() => {
     if (activeTab !== "all" && !cameraIds.includes(activeTab)) {
       setActiveTab("all");
     }
   }, [activeTab, cameraIds]);
 
+  useEffect(() => {
+    return () => {
+      disconnectFocusWebSocket();
+    };
+  }, [disconnectFocusWebSocket]);
+
+  useEffect(() => {
+    if (!focusedPerson) {
+      return;
+    }
+
+    const cameraId = focusedPerson.cameraId;
+    const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
+
+    let matchedTrack: Track | undefined;
+    for (const track of cameraTracks) {
+      const trackKey = getTrackKey(cameraId, track);
+      const globalId = track.global_id !== undefined && track.global_id !== null
+        ? String(track.global_id)
+        : undefined;
+
+      const isMatch =
+        (focusedPerson.trackKey && trackKey === focusedPerson.trackKey) ||
+        (focusedPerson.globalId && globalId === focusedPerson.globalId) ||
+        areBboxesClose(track.bbox_xyxy, focusedPerson.bbox);
+
+      if (isMatch) {
+        matchedTrack = track;
+        break;
+      }
+    }
+
+    if (matchedTrack) {
+      const nextTrackKey = getTrackKey(cameraId, matchedTrack);
+      const nextGlobalId =
+        matchedTrack.global_id !== undefined && matchedTrack.global_id !== null
+          ? String(matchedTrack.global_id)
+          : undefined;
+      const nextBbox = matchedTrack.bbox_xyxy;
+
+      setFocusedPerson((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const trackChanged = prev.trackKey !== nextTrackKey;
+        const globalChanged =
+          nextGlobalId !== undefined && nextGlobalId !== prev.globalId;
+        const bboxChanged = !areBboxesClose(prev.bbox, nextBbox, 2);
+
+        if (!trackChanged && !globalChanged && !bboxChanged) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          trackKey: nextTrackKey,
+          bbox: nextBbox,
+          globalId: nextGlobalId ?? prev.globalId,
+        };
+      });
+      return;
+    }
+
+    const cameraDetections = (detectionData[cameraId]?.detections ?? []) as DetectionListItem[];
+    const matchedDetection = cameraDetections.find((detection) => {
+      const detectionKey = `${cameraId}-${detection.detection_id}`;
+      if (focusedPerson.detectionKey && detectionKey === focusedPerson.detectionKey) {
+        return true;
+      }
+      const detectionBbox: [number, number, number, number] = [
+        detection.bbox.x1,
+        detection.bbox.y1,
+        detection.bbox.x2,
+        detection.bbox.y2,
+      ];
+      return areBboxesClose(detectionBbox, focusedPerson.bbox);
+    });
+
+    if (matchedDetection) {
+      const nextBbox: [number, number, number, number] = [
+        matchedDetection.bbox.x1,
+        matchedDetection.bbox.y1,
+        matchedDetection.bbox.x2,
+        matchedDetection.bbox.y2,
+      ];
+      const nextDetectionKey = `${cameraId}-${matchedDetection.detection_id}`;
+
+      setFocusedPerson((prev) => {
+        if (!prev) {
+          return prev;
+        }
+
+        const bboxChanged = !areBboxesClose(prev.bbox, nextBbox, 2);
+        const detectionKeyChanged = prev.detectionKey !== nextDetectionKey;
+
+        if (!bboxChanged && !detectionKeyChanged) {
+          return prev;
+        }
+
+        return {
+          ...prev,
+          detectionKey: nextDetectionKey,
+          bbox: nextBbox,
+        };
+      });
+      return;
+    }
+
+    setFocusedPerson(null);
+    clearBackendFocus();
+  }, [areBboxesClose, clearBackendFocus, currentFrameData, detectionData, focusedPerson, getTrackKey]);
+
   // Get zone name based on environment
   const getZoneName = useCallback(() => {
     const env = getEnvironmentFromUrl();
     return env === 'factory' ? 'Factory' : 'Campus';
   }, [getEnvironmentFromUrl]);
+
+  const handleDetectionSelection = useCallback(
+    (detection: DetectionListItem, cameraId: BackendCameraId, isSelecting: boolean) => {
+      if (!isSelecting) {
+        setFocusedPerson(null);
+        clearBackendFocus();
+        return;
+      }
+
+      const bboxArray: [number, number, number, number] = [
+        detection.bbox.x1,
+        detection.bbox.y1,
+        detection.bbox.x2,
+        detection.bbox.y2,
+      ];
+
+      const matchedTrack = findTrackMatchingDetection(cameraId, bboxArray);
+      const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
+      if (cameraId === 'c12') {
+        console.debug('🧭 c12 detection focus attempt', {
+          detectionId: detection.detection_id,
+          bbox: bboxArray,
+          matchedTrackSummary: matchedTrack
+            ? {
+                trackId: matchedTrack.track_id,
+                globalId: matchedTrack.global_id,
+                bbox: matchedTrack.bbox_xyxy,
+              }
+            : null,
+          totalTracks: cameraTracks.length,
+        });
+      }
+
+      if (!matchedTrack) {
+        console.warn('⚠️ No matching track found for detection selection', {
+          cameraId,
+          detectionId: detection.detection_id,
+          detectionBbox: bboxArray,
+          availableTrackSummaries: cameraTracks.slice(0, 5).map((track) => ({
+            trackId: track.track_id,
+            globalId: track.global_id,
+            bbox: track.bbox_xyxy,
+          })),
+        });
+      }
+      if (matchedTrack) {
+        setFocusedPerson({
+          cameraId,
+          trackKey: getTrackKey(cameraId, matchedTrack),
+          detectionKey: `${cameraId}-${detection.detection_id}`,
+          bbox: matchedTrack.bbox_xyxy,
+          globalId: matchedTrack.global_id ? String(matchedTrack.global_id) : undefined,
+        });
+        focusOnBackend({
+          personId: matchedTrack.global_id ? String(matchedTrack.global_id) : getTrackKey(cameraId, matchedTrack),
+          cameraId,
+          trackId: matchedTrack.track_id,
+          detectionId: detection.detection_id,
+          bbox: matchedTrack.bbox_xyxy,
+          confidence: detection.confidence,
+        });
+      } else {
+        if (cameraId === 'c12') {
+          console.warn('🟠 c12 falling back to detection-based focus', {
+            detectionId: detection.detection_id,
+            bbox: bboxArray,
+          });
+        }
+        setFocusedPerson({
+          cameraId,
+          trackKey: null,
+          detectionKey: `${cameraId}-${detection.detection_id}`,
+          bbox: bboxArray,
+        });
+        focusOnBackend({
+          personId: `${cameraId}-det-${detection.detection_id}`,
+          cameraId,
+          detectionId: detection.detection_id,
+          bbox: bboxArray,
+          confidence: detection.confidence,
+        });
+      }
+    },
+    [clearBackendFocus, findTrackMatchingDetection, focusOnBackend, getTrackKey]
+  );
+
+  const handleTrackFocus = useCallback(
+    (cameraId: BackendCameraId, track: Track) => {
+      console.log('🖱️ Track clicked', { cameraId, track });
+      const trackKey = getTrackKey(cameraId, track);
+      const alreadyFocused =
+        focusedPerson &&
+        focusedPerson.cameraId === cameraId &&
+        focusedPerson.trackKey === trackKey;
+
+      if (alreadyFocused) {
+        setFocusedPerson(null);
+        clearBackendFocus();
+        return;
+      }
+
+      const matchingDetection = findDetectionForTrack(cameraId, track);
+      console.log('🔍 Matched detection for track', { matchingDetection });
+      setFocusedPerson({
+        cameraId,
+        trackKey,
+        detectionKey: matchingDetection ? `${cameraId}-${matchingDetection.detection_id}` : undefined,
+        bbox: track.bbox_xyxy,
+        globalId: track.global_id ? String(track.global_id) : undefined,
+      });
+      focusOnBackend({
+        personId: track.global_id ? String(track.global_id) : trackKey,
+        cameraId,
+        trackId: track.track_id,
+        detectionId: matchingDetection?.detection_id,
+        bbox: track.bbox_xyxy,
+        confidence: track.confidence,
+      });
+    },
+    [clearBackendFocus, findDetectionForTrack, focusOnBackend, focusedPerson, getTrackKey]
+  );
+
+  const clearFocus = useCallback(() => {
+    setFocusedPerson(null);
+    clearBackendFocus();
+  }, [clearBackendFocus]);
 
   // Test base64 data validity
   const testBase64Validity = useCallback((base64Data: string, jsonCameraId: string) => {
@@ -323,6 +872,7 @@ const GroupViewPage: React.FC = () => {
     
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
+    connectFocusWebSocket(taskId);
 
     // Helper function to process per-camera detection tracking updates
     const processDetectionMessage = (message: any) => {
@@ -343,7 +893,26 @@ const GroupViewPage: React.FC = () => {
       const { camera_id, camera_data, detection_data } = message;
       const newFrames: { [jsonCameraId: string]: string } = {};
       const newDebugInfo: { [jsonCameraId: string]: any } = {};
-      
+
+      if (camera_id === 'c12') {
+        console.debug('🧾 c12 tracking_update payload', {
+          detectionCount: detection_data?.detections?.length ?? 0,
+          trackCount: camera_data?.tracks?.length ?? 0,
+          detectionSample: (detection_data?.detections || []).slice(0, 3).map((det: DetectionListItem) => ({
+            id: det.detection_id,
+            bbox: [det.bbox.x1, det.bbox.y1, det.bbox.x2, det.bbox.y2],
+            confidence: det.confidence,
+          })),
+          trackSample: (camera_data?.tracks || []).slice(0, 3).map((track: Track) => ({
+            trackId: track.track_id,
+            globalId: track.global_id,
+            bbox: track.bbox_xyxy,
+            confidence: track.confidence,
+          })),
+          frameIndex: message.global_frame_index,
+        });
+      }
+
       if (camera_data && camera_data.frame_image_base64) {
         const rawData = camera_data.frame_image_base64;
         
@@ -382,7 +951,7 @@ const GroupViewPage: React.FC = () => {
           detectionCount: detection_data?.detection_count || 0,
           hasDetections: !!(detection_data && detection_data.detection_count > 0),
           processingTime: detection_data?.processing_time_ms || 0,
-          detectionDetails: detection_data?.detections?.map((detection: any) => ({
+          detectionDetails: (detection_data?.detections as DetectionListItem[] | undefined)?.map((detection) => ({
             detectionId: detection.detection_id,
             confidence: detection.confidence,
             bbox: detection.bbox,
@@ -396,7 +965,7 @@ const GroupViewPage: React.FC = () => {
         if (detection_data && detection_data.detection_count > 0) {
           console.log(`🎯 Detected ${detection_data.detection_count} person(s) in ${camera_id}, processing time: ${detection_data.processing_time_ms}ms`);
           
-          detection_data.detections?.forEach((detection: any, index: number) => {
+          (detection_data.detections as DetectionListItem[])?.forEach((detection, index: number) => {
             console.log(`Detection ${index + 1}: conf=${detection.confidence?.toFixed(2)}, bbox=[${detection.bbox.x1},${detection.bbox.y1},${detection.bbox.x2},${detection.bbox.y2}]`);
           });
         }
@@ -419,7 +988,7 @@ const GroupViewPage: React.FC = () => {
           [camera_id]: {
             camera_id,
             frame_image_base64: camera_data.frame_image_base64,
-            detections: detection_data.detections || [],
+            detections: (detection_data.detections || []) as DetectionListItem[],
             processing_time_ms: detection_data.processing_time_ms || 0
           }
         }));
@@ -518,9 +1087,10 @@ const GroupViewPage: React.FC = () => {
         reason: event.reason,
         wasClean: event.wasClean
       });
+      disconnectFocusWebSocket();
       setIsStreaming(false);
     };
-  }, []);
+  }, [connectFocusWebSocket, disconnectFocusWebSocket, testBase64Validity]);
 
   // Initialize detection processing on component mount
   useEffect(() => {
@@ -667,6 +1237,7 @@ const GroupViewPage: React.FC = () => {
       if (wsRef.current) {
         wsRef.current.close();
       }
+      disconnectFocusWebSocket();
       
       // Clear local state immediately for responsive UI
       setIsStreaming(false);
@@ -676,6 +1247,8 @@ const GroupViewPage: React.FC = () => {
       setImageLoadingStates({});
       setImageDebugInfo({});
       setDetectionData({});
+      setFocusedPerson(null);
+      clearBackendFocus();
       
       // Call backend to cleanup all detection tasks for this environment
       const environment = getEnvironmentFromUrl();
@@ -840,7 +1413,7 @@ const GroupViewPage: React.FC = () => {
                   return (
                     <div key={cameraId} className="relative bg-black rounded overflow-hidden min-h-0 flex items-center justify-center">
                       {frameData ? (
-                        <div className="relative w-full h-full">
+                      <div className="relative w-full h-full" onClick={clearFocus} role="presentation">
                           <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                             {displayName} ({cameraId})
                           </div>
@@ -922,20 +1495,54 @@ const GroupViewPage: React.FC = () => {
                             const [x1, y1, x2, y2] = track.bbox_xyxy;
                             const width = x2 - x1;
                             const height = y2 - y1;
+                            const trackKey = getTrackKey(cameraId, track);
+                            const globalId = track.global_id ? String(track.global_id) : undefined;
+
+                            const isFocused = focusedPerson
+                              ? (
+                                  (focusedPerson.trackKey && trackKey === focusedPerson.trackKey) ||
+                                  (focusedPerson.globalId && globalId && focusedPerson.globalId === globalId) ||
+                                  (focusedPerson.cameraId === cameraId && areBboxesClose(track.bbox_xyxy, focusedPerson.bbox))
+                                )
+                              : false;
+
+                            if (focusedPerson && !isFocused) {
+                              return null;
+                            }
+
+                            const borderColor = isFocused ? '#FFD700' : '#32CD32';
+                            const boxShadow = isFocused ? `0 0 12px ${borderColor}` : undefined;
 
                             return (
                               <div
                                 key={track.track_id}
-                                className="absolute border-2 border-lime-400 pointer-events-none"
+                                role="button"
+                                tabIndex={0}
+                                className="absolute border-2 cursor-pointer transition-all duration-150"
                                 style={{
                                   left: `${(x1 / MAP_SOURCE_WIDTH) * 100}%`,
                                   top: `${(y1 / MAP_SOURCE_HEIGHT) * 100}%`,
                                   width: `${(width / MAP_SOURCE_WIDTH) * 100}%`,
                                   height: `${(height / MAP_SOURCE_HEIGHT) * 100}%`,
+                                  borderColor,
+                                  boxShadow,
+                                }}
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  handleTrackFocus(cameraId, track);
+                                }}
+                                onKeyDown={(event) => {
+                                  if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault();
+                                    handleTrackFocus(cameraId, track);
+                                  }
                                 }}
                               >
-                                <div className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded">
-                                  ID: {track.global_id}
+                                <div
+                                  className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded"
+                                  style={{ borderColor }}
+                                >
+                                  ID: {globalId ?? track.track_id}
                                 </div>
                               </div>
                             );
@@ -961,7 +1568,7 @@ const GroupViewPage: React.FC = () => {
                 return (
                   <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center min-h-[320px]">
                     {frameData ? (
-                      <div className="relative w-full h-full">
+                      <div className="relative w-full h-full" onClick={clearFocus} role="presentation">
                         <div className="absolute top-2 left-2 bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                           {displayName} ({cameraId})
                         </div>
@@ -1023,20 +1630,54 @@ const GroupViewPage: React.FC = () => {
                           const [x1, y1, x2, y2] = track.bbox_xyxy;
                           const width = x2 - x1;
                           const height = y2 - y1;
+                          const trackKey = getTrackKey(cameraId, track);
+                          const globalId = track.global_id ? String(track.global_id) : undefined;
+
+                          const isFocused = focusedPerson
+                            ? (
+                                (focusedPerson.trackKey && trackKey === focusedPerson.trackKey) ||
+                                (focusedPerson.globalId && globalId && focusedPerson.globalId === globalId) ||
+                                (focusedPerson.cameraId === cameraId && areBboxesClose(track.bbox_xyxy, focusedPerson.bbox))
+                              )
+                            : false;
+
+                          if (focusedPerson && !isFocused) {
+                            return null;
+                          }
+
+                          const borderColor = isFocused ? '#FFD700' : '#32CD32';
+                          const boxShadow = isFocused ? `0 0 12px ${borderColor}` : undefined;
 
                           return (
                             <div
                               key={track.track_id}
-                              className="absolute border-2 border-lime-400 pointer-events-none"
+                              role="button"
+                              tabIndex={0}
+                              className="absolute border-2 cursor-pointer transition-all duration-150"
                               style={{
                                 left: `${(x1 / MAP_SOURCE_WIDTH) * 100}%`,
                                 top: `${(y1 / MAP_SOURCE_HEIGHT) * 100}%`,
                                 width: `${(width / MAP_SOURCE_WIDTH) * 100}%`,
                                 height: `${(height / MAP_SOURCE_HEIGHT) * 100}%`,
+                                borderColor,
+                                boxShadow,
+                              }}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                handleTrackFocus(cameraId, track);
+                              }}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handleTrackFocus(cameraId, track);
+                                }
                               }}
                             >
-                              <div className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded">
-                                ID: {track.global_id}
+                              <div
+                                className="absolute -top-6 left-0 bg-black bg-opacity-60 text-white text-xs px-1 py-0.5 rounded"
+                                style={{ borderColor }}
+                              >
+                                ID: {globalId ?? track.track_id}
                               </div>
                             </div>
                           );
@@ -1260,9 +1901,13 @@ const GroupViewPage: React.FC = () => {
         <DetectionPersonList
           cameraDetections={detectionData}
           className="h-full"
-          onPersonClick={(detection, camera_id) => {
-            console.log('Person clicked:', { detection, camera_id });
-            // TODO: Add person click functionality
+          selectedPersonKey={focusedPerson?.detectionKey ?? null}
+          onPersonClick={(detection, camera_id, isSelecting) => {
+            handleDetectionSelection(
+              detection as DetectionListItem,
+              camera_id as BackendCameraId,
+              isSelecting
+            );
           }}
         />
       </div>

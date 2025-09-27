@@ -834,7 +834,14 @@ export const useUIStore = create<UIStoreState>()(
               .catch(() => null);
           },
           setItem: async (name: string, value: string): Promise<void> => {
-            const parsedValue = JSON.parse(value);
+            const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
+            let parsedValue: any;
+            try {
+              parsedValue = JSON.parse(serializedValue);
+            } catch (error) {
+              console.warn('⚠️ Failed to parse persisted UI store value, storing raw string', { name, value });
+              parsedValue = serializedValue;
+            }
             return statePersistenceService.saveState(name, parsedValue, {
               version: 2,
               compression: true,

@@ -25,6 +25,8 @@ interface ScaleInfo {
   scale: number;
   offsetX: number;
   offsetY: number;
+  renderedWidth: number;
+  renderedHeight: number;
 }
 
 // Original image dimensions
@@ -70,19 +72,45 @@ const EnhancedImageSequencePlayer: React.FC<EnhancedImageSequencePlayerProps> = 
 
   // Calculate scaling when image or container size changes
   const calculateScale = useCallback(() => {
-    if (imgRef.current && imgRef.current.complete && imgRef.current.naturalWidth > 0) {
-      const imgElement = imgRef.current;
-      const renderedWidth = imgElement.width;
-      const renderedHeight = imgElement.height;
-      const offsetX = imgElement.offsetLeft;
-      const offsetY = imgElement.offsetTop;
-      const scale = renderedWidth / ORIGINAL_WIDTH;
-
-      setScaleInfo({ scale, offsetX, offsetY });
-    } else {
+    const imgElement = imgRef.current;
+    if (!imgElement || !imgElement.complete || imgElement.naturalWidth <= 0) {
       setScaleInfo(null);
+      return;
     }
-  }, []);
+
+    const imgRect = imgElement.getBoundingClientRect();
+    const parentRect = imgElement.parentElement?.getBoundingClientRect();
+    if (!parentRect) {
+      setScaleInfo(null);
+      return;
+    }
+
+    const renderedWidth = imgRect.width;
+    const renderedHeight = imgRect.height;
+    const scale = renderedWidth / ORIGINAL_WIDTH;
+    const offsetX = imgRect.left - parentRect.left;
+    const offsetY = imgRect.top - parentRect.top;
+
+    setScaleInfo({
+      scale,
+      offsetX,
+      offsetY,
+      renderedWidth,
+      renderedHeight,
+    });
+
+    if (cameraId === 'c12') {
+      console.debug('📐 c12 scale recalculated', {
+        renderedWidth,
+        renderedHeight,
+        offsetX,
+        offsetY,
+        scale,
+        containerWidth: parentRect.width,
+        containerHeight: parentRect.height,
+      });
+    }
+  }, [cameraId]);
 
   // Effect to handle scaling calculations
   useEffect(() => {
@@ -186,10 +214,10 @@ const EnhancedImageSequencePlayer: React.FC<EnhancedImageSequencePlayerProps> = 
 
           // Calculate scaled coordinates
           const [x1, y1, x2, y2] = track.bbox_xyxy;
-          const scaledX1 = x1 * scaleInfo.scale + scaleInfo.offsetX;
-          const scaledY1 = y1 * scaleInfo.scale + scaleInfo.offsetY;
-          const scaledWidth = (x2 - x1) * scaleInfo.scale;
-          const scaledHeight = (y2 - y1) * scaleInfo.scale;
+      const scaledX1 = x1 * scaleInfo.scale + scaleInfo.offsetX;
+      const scaledY1 = y1 * scaleInfo.scale + scaleInfo.offsetY;
+      const scaledWidth = (x2 - x1) * scaleInfo.scale;
+      const scaledHeight = (y2 - y1) * scaleInfo.scale;
 
           const personColor = getPersonColor(personId, isHighlighted);
           const borderWidth = isHighlighted ? 3 : isHovered ? 2.5 : 2;

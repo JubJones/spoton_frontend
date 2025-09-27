@@ -34,18 +34,24 @@ interface CameraDetection {
 interface DetectionPersonListProps {
   cameraDetections: { [camera_id: string]: CameraDetection };
   className?: string;
-  onPersonClick?: (detection: DetectedPerson, camera_id: string) => void;
+  onPersonClick?: (detection: DetectedPerson, camera_id: string, isSelecting: boolean) => void;
+  selectedPersonKey?: string | null;
 }
 
 const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
   cameraDetections,
   className = '',
   onPersonClick,
+  selectedPersonKey = null,
 }) => {
   const [croppedImages, setCroppedImages] = useState<{ [key: string]: string }>({});
-  const [selectedPerson, setSelectedPerson] = useState<string | null>(null);
+  const [selectedPerson, setSelectedPerson] = useState<string | null>(selectedPersonKey);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { getDisplayName } = useCameraConfig();
+
+  useEffect(() => {
+    setSelectedPerson(selectedPersonKey);
+  }, [selectedPersonKey]);
 
   // Function to crop person from image using detection coordinates
   const cropPersonFromImage = useCallback((
@@ -121,8 +127,9 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
   // Handle person click
   const handlePersonClick = useCallback((detection: DetectedPerson, camera_id: string) => {
     const personKey = `${camera_id}-${detection.detection_id}`;
-    setSelectedPerson(selectedPerson === personKey ? null : personKey);
-    onPersonClick?.(detection, camera_id);
+    const willSelect = selectedPerson !== personKey;
+    setSelectedPerson(willSelect ? personKey : null);
+    onPersonClick?.(detection, camera_id, willSelect);
   }, [selectedPerson, onPersonClick]);
 
   // Get all detections across all cameras
