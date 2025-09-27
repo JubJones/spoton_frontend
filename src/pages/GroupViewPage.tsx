@@ -92,6 +92,12 @@ interface DetectionListItem {
   };
   class_name: string;
   class_id: number;
+  track_id?: number;
+  global_id?: string | null;
+  tracking_key?: string;
+  track_assignment_iou?: number;
+  track_assignment_center_distance?: number;
+  metadata?: Record<string, unknown>;
 }
 
 interface DetectionStoreEntry {
@@ -118,6 +124,14 @@ const MAP_SOURCE_WIDTH = 1920; // Source width for map_coords (per camera)
 const MAP_SOURCE_HEIGHT = 1080; // Source height for map_coords (per camera)
 
 // --- MODIFIED: Type for storing calculated map points (per camera) ---
+
+const normalizeGlobalId = (value: unknown): string | undefined => {
+  if (value === undefined || value === null) {
+    return undefined;
+  }
+  const stringValue = String(value);
+  return stringValue.length > 0 ? stringValue : undefined;
+};
 interface SingleCameraMapPoint {
     x: number;         // Scaled x-coordinate for display within a quadrant
     y: number;         // Scaled y-coordinate for display within a quadrant
@@ -233,11 +247,32 @@ const GroupViewPage: React.FC = () => {
     );
   }, []);
 
-  const findTrackMatchingDetection = useCallback((cameraId: BackendCameraId, detectionBbox: [number, number, number, number]) => {
+  const findTrackMatchingDetection = useCallback((cameraId: BackendCameraId, detection: DetectionListItem) => {
     const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
     if (cameraTracks.length === 0) {
       return undefined;
     }
+
+    if (typeof detection.track_id === 'number') {
+      const directMatch = cameraTracks.find((track) => track.track_id === detection.track_id);
+      if (directMatch) {
+        return directMatch;
+      }
+    }
+
+    if (detection.tracking_key) {
+      const keyMatch = cameraTracks.find((track) => getTrackKey(cameraId, track) === detection.tracking_key);
+      if (keyMatch) {
+        return keyMatch;
+      }
+    }
+
+    const detectionBbox: [number, number, number, number] = [
+      detection.bbox.x1,
+      detection.bbox.y1,
+      detection.bbox.x2,
+      detection.bbox.y2,
+    ];
 
     let bestTrack: Track | undefined;
     let bestIoU = -1;
@@ -299,6 +334,20 @@ const GroupViewPage: React.FC = () => {
     }
 
     const trackBbox = track.bbox_xyxy;
+    const directMatch = cameraDetections.detections.find(
+      (detection: DetectionListItem) => typeof detection.track_id === 'number' && detection.track_id === track.track_id
+    );
+    if (directMatch) {
+      return directMatch;
+    }
+
+    const trackingKeyMatch = cameraDetections.detections.find(
+      (detection: DetectionListItem) => detection.tracking_key && detection.tracking_key === getTrackKey(cameraId, track)
+    );
+    if (trackingKeyMatch) {
+      return trackingKeyMatch;
+    }
+
     let bestDetection: DetectionListItem | undefined;
     let bestIoU = -1;
     let bestCenterDist = Number.POSITIVE_INFINITY;
@@ -327,7 +376,7 @@ const GroupViewPage: React.FC = () => {
     });
 
     return bestDetection ?? cameraDetections.detections[0];
-  }, [detectionData]);
+  }, [detectionData, getTrackKey]);
 
   const sendFocusMessage = useCallback((message: Record<string, unknown>) => {
     const socket = focusWsRef.current;
@@ -368,7 +417,7 @@ const GroupViewPage: React.FC = () => {
       trackKey: trackIdValue !== undefined ? `camera:${cameraIdValue}:${trackIdValue}` : null,
       detectionKey: detectionIdValue ? `${cameraIdValue}-${detectionIdValue}` : undefined,
       bbox: (nextBbox as [number, number, number, number]) || [0, 0, 0, 0],
-      globalId: payload.focused_person_id || undefined,
+      globalId: normalizeGlobalId(payload.focused_person_id),
     }));
   }, []);
 
@@ -597,11 +646,12 @@ const GroupViewPage: React.FC = () => {
         detection.bbox.y2,
       ];
 
-      const matchedTrack = findTrackMatchingDetection(cameraId, bboxArray);
+      const matchedTrack = findTrackMatchingDetection(cameraId, detection);
       const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
       if (cameraId === 'c12') {
         console.debug('🧭 c12 detection focus attempt', {
           detectionId: detection.detection_id,
+          detectionTrackId: detection.track_id,
           bbox: bboxArray,
           matchedTrackSummary: matchedTrack
             ? {
@@ -618,6 +668,7 @@ const GroupViewPage: React.FC = () => {
         console.warn('⚠️ No matching track found for detection selection', {
           cameraId,
           detectionId: detection.detection_id,
+          detectionTrackId: detection.track_id,
           detectionBbox: bboxArray,
           availableTrackSummaries: cameraTracks.slice(0, 5).map((track) => ({
             trackId: track.track_id,
@@ -627,15 +678,16 @@ const GroupViewPage: React.FC = () => {
         });
       }
       if (matchedTrack) {
+        const normalizedGlobalId = normalizeGlobalId(matchedTrack.global_id);
         setFocusedPerson({
           cameraId,
           trackKey: getTrackKey(cameraId, matchedTrack),
           detectionKey: `${cameraId}-${detection.detection_id}`,
           bbox: matchedTrack.bbox_xyxy,
-          globalId: matchedTrack.global_id ? String(matchedTrack.global_id) : undefined,
+          globalId: normalizedGlobalId,
         });
         focusOnBackend({
-          personId: matchedTrack.global_id ? String(matchedTrack.global_id) : getTrackKey(cameraId, matchedTrack),
+          personId: normalizedGlobalId ?? getTrackKey(cameraId, matchedTrack),
           cameraId,
           trackId: matchedTrack.track_id,
           detectionId: detection.detection_id,
@@ -654,9 +706,17 @@ const GroupViewPage: React.FC = () => {
           trackKey: null,
           detectionKey: `${cameraId}-${detection.detection_id}`,
           bbox: bboxArray,
+          globalId:
+            detection.global_id !== undefined && detection.global_id !== null
+              ? String(detection.global_id)
+              : undefined,
         });
         focusOnBackend({
-          personId: `${cameraId}-det-${detection.detection_id}`,
+          personId:
+            detection.tracking_key ??
+            (typeof detection.track_id === 'number'
+              ? `camera:${cameraId}:${detection.track_id}`
+              : `${cameraId}-det-${detection.detection_id}`),
           cameraId,
           detectionId: detection.detection_id,
           bbox: bboxArray,
@@ -684,15 +744,16 @@ const GroupViewPage: React.FC = () => {
 
       const matchingDetection = findDetectionForTrack(cameraId, track);
       console.log('🔍 Matched detection for track', { matchingDetection });
+      const normalizedGlobalId = normalizeGlobalId(track.global_id);
       setFocusedPerson({
         cameraId,
         trackKey,
         detectionKey: matchingDetection ? `${cameraId}-${matchingDetection.detection_id}` : undefined,
         bbox: track.bbox_xyxy,
-        globalId: track.global_id ? String(track.global_id) : undefined,
+        globalId: normalizedGlobalId,
       });
       focusOnBackend({
-        personId: track.global_id ? String(track.global_id) : trackKey,
+        personId: normalizedGlobalId ?? trackKey,
         cameraId,
         trackId: track.track_id,
         detectionId: matchingDetection?.detection_id,
@@ -893,6 +954,16 @@ const GroupViewPage: React.FC = () => {
       const { camera_id, camera_data, detection_data } = message;
       const newFrames: { [jsonCameraId: string]: string } = {};
       const newDebugInfo: { [jsonCameraId: string]: any } = {};
+
+      if (detection_data?.detections?.length) {
+        const sample = detection_data.detections.slice(0, 3).map((det: any) => ({
+          detection_id: det.detection_id,
+          track_id: det.track_id,
+          global_id: det.global_id,
+          tracking_key: det.tracking_key,
+        }));
+        console.debug('🧩 WebSocket detection sample', camera_id, sample);
+      }
 
       if (camera_id === 'c12') {
         console.debug('🧾 c12 tracking_update payload', {
@@ -1496,7 +1567,7 @@ const GroupViewPage: React.FC = () => {
                             const width = x2 - x1;
                             const height = y2 - y1;
                             const trackKey = getTrackKey(cameraId, track);
-                            const globalId = track.global_id ? String(track.global_id) : undefined;
+                            const globalId = normalizeGlobalId(track.global_id);
 
                             const isFocused = focusedPerson
                               ? (
@@ -1631,7 +1702,7 @@ const GroupViewPage: React.FC = () => {
                           const width = x2 - x1;
                           const height = y2 - y1;
                           const trackKey = getTrackKey(cameraId, track);
-                          const globalId = track.global_id ? String(track.global_id) : undefined;
+                          const globalId = normalizeGlobalId(track.global_id);
 
                           const isFocused = focusedPerson
                             ? (

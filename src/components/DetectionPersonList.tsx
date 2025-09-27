@@ -22,6 +22,12 @@ interface DetectedPerson {
   };
   class_name: string;
   class_id: number;
+  track_id?: number;
+  global_id?: string | null;
+  tracking_key?: string;
+  track_assignment_iou?: number;
+  track_assignment_center_distance?: number;
+  metadata?: Record<string, unknown>;
 }
 
 interface CameraDetection {
@@ -108,21 +114,16 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
     Object.entries(cameraDetections).forEach(([camera_id, cameraData]) => {
       if (cameraData.detections && cameraData.frame_image_base64) {
         cameraData.detections.forEach((detection) => {
-          const cropKey = `${camera_id}-${detection.detection_id}`;
-          
-          // Only crop if we don't already have this crop
-          if (!croppedImages[cropKey]) {
-            cropPersonFromImage(
-              cameraData.frame_image_base64,
-              detection.bbox,
-              detection.detection_id,
-              camera_id
-            );
-          }
+          cropPersonFromImage(
+            cameraData.frame_image_base64,
+            detection.bbox,
+            detection.detection_id,
+            camera_id
+          );
         });
       }
     });
-  }, [cameraDetections, cropPersonFromImage, croppedImages]);
+  }, [cameraDetections, cropPersonFromImage]);
 
   // Handle person click
   const handlePersonClick = useCallback((detection: DetectedPerson, camera_id: string) => {
@@ -201,6 +202,20 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
               const cropKey = `${detection.camera_id}-${detection.detection_id}`;
               const isSelected = selectedPerson === cropKey;
               const croppedImage = croppedImages[cropKey];
+              let trackLabel: string | undefined;
+              if (typeof detection.track_id === 'number') {
+                trackLabel = `Track ${detection.track_id.toString().padStart(3, '0')}`;
+              } else if (typeof detection.tracking_key === 'string') {
+                const lastSegment = detection.tracking_key.split(':').pop();
+                trackLabel = lastSegment ? `Track ${lastSegment.toString().padStart(3, '0')}` : `Track ${detection.tracking_key}`;
+              }
+
+              const fallbackLabel = detection.detection_id?.startsWith('track_')
+                ? `Track ${detection.detection_id.slice(-3)}`
+                : detection.detection_id
+                  ? `Detection ${detection.detection_id.slice(-4)}`
+                  : 'Detection';
+              const primaryLabel = trackLabel ?? fallbackLabel;
 
               return (
                 <div
@@ -217,7 +232,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                     {croppedImage ? (
                       <img
                         src={croppedImage}
-                        alt={`Person ${detection.detection_id}`}
+                        alt={`Person ${primaryLabel}`}
                         className="w-full h-full object-cover"
                       />
                     ) : (
@@ -249,10 +264,10 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                   <div className="p-3">
                     <div className="flex items-center justify-between mb-1">
                       <p className="text-sm font-medium text-white truncate">
-                        Person {detection.detection_id.slice(-4)}
+                        {primaryLabel}
                       </p>
                     </div>
-                    
+
                     <div className="flex items-center justify-between mb-2">
                       <p className="text-xs text-gray-400">
                         {getCameraName(detection.camera_id)}
