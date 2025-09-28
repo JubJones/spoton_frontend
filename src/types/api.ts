@@ -339,13 +339,34 @@ export interface OverlayConfig {
 // Analytics Types (Mock Implementation Ready)
 // ============================================================================
 
+export interface RealTimePerformanceMetrics {
+  cache_hit_rate?: number;
+  memory_usage?: number;
+  processing_latency?: number;
+  error_rate?: number;
+  [key: string]: number | undefined;
+}
+
 export interface RealTimeMetrics {
+  timestamp: string;
   active_persons: number;
-  total_cameras: number;
+  detection_rate: number;
+  average_confidence: number;
+  camera_loads: Record<string, number>;
+  performance_metrics: RealTimePerformanceMetrics;
+}
+
+export interface RealTimeMetricsResponse {
+  status: string;
+  data: RealTimeMetrics;
+  timestamp: string;
 }
 
 export interface ActivePersonsResponse {
   active_persons: ActivePerson[];
+  total_count: number;
+  camera_id: string | null;
+  environment_id: string | null;
 }
 
 export interface ActivePerson {
@@ -504,7 +525,7 @@ export interface ValidationError {
 
 export interface APIResponse<T = any> {
   data: T;
-  status: number;
+  status: number | string;
   message?: string;
   timestamp: string;
 }

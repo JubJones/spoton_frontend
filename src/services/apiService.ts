@@ -10,7 +10,9 @@ import {
   APIError,
   APIResponse,
   RealTimeMetrics,
+  RealTimeMetricsResponse,
   ActivePerson,
+  ActivePersonsResponse,
   SystemStatistics,
   LoginRequest,
   LoginResponse,
@@ -645,8 +647,24 @@ export class APIService {
    */
   async getRealTimeMetrics(): Promise<RealTimeMetrics> {
     try {
-      const response = await this.http.get<RealTimeMetrics>(API_ENDPOINTS.REAL_TIME_METRICS);
-      return response;
+      const response = await this.http.get<RealTimeMetricsResponse>(
+        API_ENDPOINTS.REAL_TIME_METRICS
+      );
+
+      if (!response || typeof response !== 'object' || !('data' in response)) {
+        throw new ValidationError('Invalid real-time metrics response format');
+      }
+
+      if (response.status && response.status !== 'success') {
+        throw new APIServiceError(
+          'Backend returned an error for real-time metrics',
+          500,
+          undefined,
+          response
+        );
+      }
+
+      return response.data;
     } catch (error) {
       throw this.handleError('Failed to get real-time metrics', error);
     }
@@ -657,8 +675,24 @@ export class APIService {
    */
   async getActivePersons(): Promise<ActivePerson[]> {
     try {
-      const response = await this.http.get<ActivePerson[]>(API_ENDPOINTS.ACTIVE_PERSONS);
-      return response;
+      const response = await this.http.get<APIResponse<ActivePersonsResponse>>(
+        API_ENDPOINTS.ACTIVE_PERSONS
+      );
+
+      if (!response || typeof response !== 'object' || !('data' in response)) {
+        throw new ValidationError('Invalid active persons response format');
+      }
+
+      if (response.status && response.status !== 'success') {
+        throw new APIServiceError(
+          'Backend returned an error for active persons',
+          500,
+          undefined,
+          response
+        );
+      }
+
+      return response.data.active_persons;
     } catch (error) {
       throw this.handleError('Failed to get active persons', error);
     }

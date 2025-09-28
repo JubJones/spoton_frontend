@@ -8,7 +8,9 @@ import type {
   WebSocketMessage,
   WebSocketTrackingMessagePayload,
   RealTimeMetrics,
+  RealTimeMetricsResponse,
   ActivePerson,
+  ActivePersonsResponse,
   EnvironmentId,
 } from '../types/api';
 import { API_ENDPOINTS } from '../types/api';
@@ -410,11 +412,16 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
   // Get realtime metrics
   const getRealtimeMetrics = useCallback(async (): Promise<RealTimeMetrics | null> => {
     try {
-      const response = await axios.get<RealTimeMetrics>(
+      const response = await axios.get<RealTimeMetricsResponse>(
         `${API_BASE_URL}/api/v1/analytics/real-time/metrics`,
         { timeout: 5000 }
       );
-      return response.data;
+
+      if (response.data.status !== 'success') {
+        throw new Error('Backend returned error status for real-time metrics');
+      }
+
+      return response.data.data;
     } catch (error) {
       handleError(error as Error, 'Realtime Metrics');
       return null;
@@ -424,11 +431,18 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
   // Get active persons
   const getActivePersons = useCallback(async (): Promise<ActivePerson[] | null> => {
     try {
-      const response = await axios.get<ActivePerson[]>(
-        `${API_BASE_URL}/api/v1/analytics/real-time/active-persons`,
-        { timeout: 5000 }
-      );
-      return response.data;
+      const response = await axios.get<{
+        status: string;
+        data: ActivePersonsResponse;
+      }>(`${API_BASE_URL}/api/v1/analytics/real-time/active-persons`, {
+        timeout: 5000,
+      });
+
+      if (response.data.status !== 'success') {
+        throw new Error('Backend returned error status for active persons');
+      }
+
+      return response.data.data.active_persons;
     } catch (error) {
       handleError(error as Error, 'Active Persons');
       return null;

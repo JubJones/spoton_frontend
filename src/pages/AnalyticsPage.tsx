@@ -1,12 +1,7 @@
 // src/pages/AnalyticsPage.tsx
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '../components/common/Header';
-import PersonStatistics from '../components/PersonStatistics';
-import TrafficHeatmap from '../components/TrafficHeatmap';
-import DwellTimeAnalysis from '../components/DwellTimeAnalysis';
-import TrafficFlowAnalysis from '../components/TrafficFlowAnalysis';
-import AnalyticsCharts from '../components/AnalyticsCharts';
 import AlertSettings from '../components/AlertSettings';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import { apiService } from '../services/apiService';
@@ -15,33 +10,17 @@ import type {
   BackendCameraId,
   ExportFormat,
   ExportAnalyticsReportRequest,
+  RealTimeMetrics,
 } from '../types/api';
 import { useCameraConfig } from '../context/CameraConfigContext';
 
-interface AnalyticsMetrics {
-  totalDetections: number;
-  uniquePersons: number;
-  averageDwellTime: number;
-  peakOccupancy: number;
-  averageConfidence: number;
-  systemUptime: number;
-}
-
-interface CameraAnalytics {
-  cameraId: BackendCameraId;
-  detectionCount: number;
-  uniquePersons: number;
-  averageConfidence: number;
-  uptimePercentage: number;
-  lastActivity: Date;
-}
-
-interface TimeRangeMetrics {
-  timeRange: '1h' | '6h' | '24h' | '7d' | '30d';
-  totalDetections: number;
-  peakHour: { hour: number; count: number };
-  trends: Array<{ timestamp: Date; count: number; confidence: number }>;
-}
+const TIME_RANGE_TO_DURATION_MS: Record<'1h' | '6h' | '24h' | '7d' | '30d', number> = {
+  '1h': 60 * 60 * 1000,
+  '6h': 6 * 60 * 60 * 1000,
+  '24h': 24 * 60 * 60 * 1000,
+  '7d': 7 * 24 * 60 * 60 * 1000,
+  '30d': 30 * 24 * 60 * 60 * 1000,
+};
 
 const AnalyticsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -70,60 +49,203 @@ const AnalyticsPage: React.FC = () => {
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
-  // Mock analytics data - in real implementation, this would come from the backend
-  const analyticsMetrics: AnalyticsMetrics = useMemo(
-    () => ({
-      totalDetections: 1247,
-      uniquePersons: 89,
-      averageDwellTime: 4.2, // minutes
-      peakOccupancy: 12,
-      averageConfidence: 0.87,
-      systemUptime: 99.2, // percentage
-    }),
+  const [metrics, setMetrics] = useState<RealTimeMetrics | null>(null);
+  const [isLoadingMetrics, setIsLoadingMetrics] = useState<boolean>(false);
+  const [isRefreshingMetrics, setIsRefreshingMetrics] = useState<boolean>(false);
+  const [metricsError, setMetricsError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+
+  const fetchMetrics = useCallback(
+    async (options: { showSpinner?: boolean } = {}) => {
+      const { showSpinner = false } = options;
+      try {
+        if (showSpinner) {
+          setIsLoadingMetrics(true);
+        } else {
+          setIsRefreshingMetrics(true);
+        }
+
+        const data = await apiService.getRealTimeMetrics();
+        setMetrics(data);
+        setMetricsError(null);
+        setLastUpdated(data.timestamp);
+      } catch (error) {
+        console.error('Failed to fetch real-time metrics:', error);
+        setMetricsError(error instanceof Error ? error.message : 'Unknown error');
+      } finally {
+        if (showSpinner) {
+          setIsLoadingMetrics(false);
+        } else {
+          setIsRefreshingMetrics(false);
+        }
+      }
+    },
     []
   );
 
-  const cameraAnalytics: CameraAnalytics[] = useMemo(() => {
-    if (cameraIds.length === 0) {
-      return [];
+  useEffect(() => {
+    fetchMetrics({ showSpinner: true });
+  }, [fetchMetrics]);
+
+  useEffect(() => {
+    if (!isAutoRefresh) {
+      return;
     }
 
-    return cameraIds.map((cameraId, index) => ({
-      cameraId,
-      detectionCount: 280 + index * 45,
-      uniquePersons: 15 + index * 8,
-      averageConfidence: 0.82 + index * 0.03,
-      uptimePercentage: 97.5 + index * 0.8,
-      lastActivity: new Date(Date.now() - index * 300000), // 5 minutes apart
-    }));
-  }, [cameraIds]);
+    const intervalId = window.setInterval(() => {
+      fetchMetrics();
+    }, refreshInterval * 1000);
 
-  const timeRangeMetrics: TimeRangeMetrics = useMemo(() => {
-    const now = Date.now();
-    const ranges = {
-      '1h': 60 * 60 * 1000,
-      '6h': 6 * 60 * 60 * 1000,
-      '24h': 24 * 60 * 60 * 1000,
-      '7d': 7 * 24 * 60 * 60 * 1000,
-      '30d': 30 * 24 * 60 * 60 * 1000,
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [fetchMetrics, isAutoRefresh, refreshInterval]);
+
+  const handleManualRefresh = useCallback(() => {
+    fetchMetrics({ showSpinner: true });
+  }, [fetchMetrics]);
+
+  const cameraLoadEntries = useMemo(() => {
+    if (!metrics) {
+      return [] as Array<{ cameraId: string; activePersons: number; isConfigured: boolean }>;
+    }
+
+    const cameraLoads = metrics.camera_loads ?? {};
+    const configuredSet = new Set(cameraIds);
+    const entries: Array<{ cameraId: string; activePersons: number; isConfigured: boolean }> =
+      cameraIds.map((cameraId) => ({
+        cameraId,
+        activePersons: cameraLoads[cameraId] ?? 0,
+        isConfigured: true,
+      }));
+
+    Object.entries(cameraLoads).forEach(([cameraId, activePersons]) => {
+      if (!configuredSet.has(cameraId as BackendCameraId)) {
+        entries.push({ cameraId, activePersons, isConfigured: false });
+      }
+    });
+
+    return entries.sort((a, b) => b.activePersons - a.activePersons);
+  }, [cameraIds, metrics]);
+
+  const totalActiveAcrossCameras = useMemo(() => {
+    return cameraLoadEntries.reduce((sum, entry) => sum + entry.activePersons, 0);
+  }, [cameraLoadEntries]);
+
+  const detectionRatePerSecond = metrics?.detection_rate ?? null;
+  const detectionRatePerMinute = detectionRatePerSecond !== null ? detectionRatePerSecond * 60 : null;
+  const averageConfidencePercent = metrics ? metrics.average_confidence * 100 : null;
+  const cacheHitRatePercent = metrics?.performance_metrics?.cache_hit_rate != null
+    ? metrics.performance_metrics.cache_hit_rate * 100
+    : null;
+  const errorRatePercent = metrics?.performance_metrics?.error_rate != null
+    ? metrics.performance_metrics.error_rate * 100
+    : null;
+  const processingLatency = metrics?.performance_metrics?.processing_latency ?? null;
+  const memoryUsage = metrics?.performance_metrics?.memory_usage ?? null;
+  const reportingCameraCount = cameraLoadEntries.length;
+  const lastUpdatedDisplay = useMemo(() => {
+    if (!lastUpdated) {
+      return null;
+    }
+    try {
+      return new Date(lastUpdated).toLocaleTimeString();
+    } catch (error) {
+      console.warn('Failed to parse last updated timestamp', error);
+      return lastUpdated;
+    }
+  }, [lastUpdated]);
+  const showInitialLoading = isLoadingMetrics && metrics === null;
+
+  const metricCards = useMemo(() => {
+    const formatNumber = (value: number | null | undefined, fractionDigits = 0) => {
+      if (value === null || value === undefined || Number.isNaN(value)) {
+        return '—';
+      }
+      return value.toLocaleString(undefined, {
+        minimumFractionDigits: fractionDigits,
+        maximumFractionDigits: fractionDigits,
+      });
     };
 
-    const range = ranges[selectedTimeRange];
-    const dataPoints = selectedTimeRange === '1h' ? 12 : selectedTimeRange === '6h' ? 36 : 48;
-
-    const trends = Array.from({ length: dataPoints }, (_, i) => ({
-      timestamp: new Date(now - range + (i * range) / dataPoints),
-      count: Math.floor(Math.random() * 20) + 5,
-      confidence: 0.7 + Math.random() * 0.3,
-    }));
-
-    return {
-      timeRange: selectedTimeRange,
-      totalDetections: trends.reduce((sum, point) => sum + point.count, 0),
-      peakHour: { hour: 14, count: 35 },
-      trends,
-    };
-  }, [selectedTimeRange]);
+    return [
+      {
+        id: 'active-persons',
+        label: 'Active Persons',
+        value: formatNumber(metrics?.active_persons),
+        accent: 'text-orange-400',
+        subLabel:
+          totalActiveAcrossCameras > 0
+            ? `${totalActiveAcrossCameras.toLocaleString()} across cameras`
+            : null,
+      },
+      {
+        id: 'detection-rate',
+        label: 'Detection Rate',
+        value:
+          detectionRatePerSecond !== null
+            ? `${formatNumber(detectionRatePerSecond, 2)} / sec`
+            : '—',
+        accent: 'text-blue-400',
+        subLabel:
+          detectionRatePerMinute !== null
+            ? `${formatNumber(detectionRatePerMinute, 1)} / min`
+            : null,
+      },
+      {
+        id: 'avg-confidence',
+        label: 'Average Confidence',
+        value:
+          averageConfidencePercent !== null
+            ? `${formatNumber(averageConfidencePercent, 1)}%`
+            : '—',
+        accent: 'text-purple-400',
+        subLabel: null,
+      },
+      {
+        id: 'camera-coverage',
+        label: 'Cameras Reporting',
+        value: `${formatNumber(reportingCameraCount)} / ${cameraIds.length}`,
+        accent: 'text-green-400',
+        subLabel:
+          totalActiveAcrossCameras > 0
+            ? `${formatNumber(totalActiveAcrossCameras)} active persons tracked`
+            : null,
+      },
+      {
+        id: 'cache-hit-rate',
+        label: 'Cache Hit Rate',
+        value:
+          cacheHitRatePercent !== null
+            ? `${formatNumber(cacheHitRatePercent, 1)}%`
+            : '—',
+        accent: 'text-cyan-400',
+        subLabel: null,
+      },
+      {
+        id: 'error-rate',
+        label: 'System Error Rate',
+        value:
+          errorRatePercent !== null ? `${formatNumber(errorRatePercent, 2)}%` : '—',
+        accent: 'text-yellow-400',
+        subLabel:
+          processingLatency !== null
+            ? `Latency: ${formatNumber(processingLatency, 2)} s`
+            : undefined,
+      },
+    ];
+  }, [
+    averageConfidencePercent,
+    cacheHitRatePercent,
+    cameraIds.length,
+    detectionRatePerMinute,
+    detectionRatePerSecond,
+    errorRatePercent,
+    metrics?.active_persons,
+    processingLatency,
+    reportingCameraCount,
+    totalActiveAcrossCameras,
+  ]);
 
   // Handle camera selection
   const handleCameraToggle = useCallback((cameraId: BackendCameraId) => {
@@ -144,11 +266,14 @@ const AnalyticsPage: React.FC = () => {
       try {
         setIsExporting(true);
 
+        const now = Date.now();
+        const durationMs = TIME_RANGE_TO_DURATION_MS[selectedTimeRange];
+
         // Create export request
         const exportRequest: ExportAnalyticsReportRequest = {
           environment_id: environment,
-          start_time: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(), // Last 24 hours
-          end_time: new Date().toISOString(),
+          start_time: new Date(now - durationMs).toISOString(),
+          end_time: new Date(now).toISOString(),
           format: format as ExportFormat,
           include_zones: true,
           include_heatmaps: selectedMetricType === 'occupancy',
@@ -214,7 +339,7 @@ const AnalyticsPage: React.FC = () => {
         setIsExporting(false);
       }
     },
-    [environment, selectedMetricType, selectedCameras]
+    [environment, selectedMetricType, selectedCameras, selectedTimeRange]
   );
 
   // Handle alert configuration
@@ -281,6 +406,33 @@ const AnalyticsPage: React.FC = () => {
                 <option value={60}>1m</option>
                 <option value={300}>5m</option>
               </select>
+
+              {/* Manual Refresh */}
+              <button
+                onClick={handleManualRefresh}
+                disabled={isLoadingMetrics || isRefreshingMetrics}
+                className="px-3 py-1 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 text-white rounded text-sm flex items-center space-x-2"
+              >
+                {isLoadingMetrics ? (
+                  <>
+                    <div className="w-3 h-3 border border-white border-t-transparent rounded-full animate-spin"></div>
+                    <span>Refreshing...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔄</span>
+                    <span>Refresh</span>
+                  </>
+                )}
+              </button>
+
+              <div className="text-xs text-gray-400 min-w-[120px]">
+                <span>Last updated:</span>{' '}
+                <span className="text-gray-200">{lastUpdatedDisplay ?? '—'}</span>
+                {isRefreshingMetrics && !isLoadingMetrics && (
+                  <span className="ml-2 text-blue-400">(auto)</span>
+                )}
+              </div>
 
               {/* Export Actions */}
               <div className="flex space-x-2">
@@ -354,6 +506,15 @@ const AnalyticsPage: React.FC = () => {
               </div>
             </div>
           )}
+
+          {metricsError && (
+            <div className="bg-red-500/10 border border-red-500 text-red-200 px-4 py-2 rounded-lg mb-4">
+              <div className="flex items-center space-x-2">
+                <span className="w-2 h-2 bg-red-500 rounded-full animate-pulse"></span>
+                <span>{metricsError}</span>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Time Range and Metric Type Controls */}
@@ -405,106 +566,109 @@ const AnalyticsPage: React.FC = () => {
 
         {/* Key Metrics Overview */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-total-detections">
-            <div className="text-2xl font-bold text-orange-400">
-              {analyticsMetrics.totalDetections.toLocaleString()}
+          {metricCards.map((card) => (
+            <div
+              key={card.id}
+              className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4"
+            >
+              <div
+                className={`text-2xl font-bold ${card.accent} ${
+                  showInitialLoading ? 'animate-pulse text-gray-500' : ''
+                }`}
+              >
+                {showInitialLoading ? '—' : card.value}
+              </div>
+              <div className="text-sm text-gray-400">{card.label}</div>
+              {card.subLabel && (
+                <div className="text-xs text-gray-500 mt-1">{card.subLabel}</div>
+              )}
             </div>
-            <div className="text-sm text-gray-400">Total Detections</div>
-            <div className="text-xs text-green-400 mt-1">+12% from yesterday</div>
-          </div>
-
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-active-tracks">
-            <div className="text-2xl font-bold text-blue-400">{analyticsMetrics.uniquePersons}</div>
-            <div className="text-sm text-gray-400">Active Tracks</div>
-            <div className="text-xs text-green-400 mt-1">+8% from yesterday</div>
-          </div>
-
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-average-confidence">
-            <div className="text-2xl font-bold text-purple-400">
-              {Math.round(analyticsMetrics.averageConfidence * 100)}%
-            </div>
-            <div className="text-sm text-gray-400">Average Confidence</div>
-            <div className="text-xs text-red-400 mt-1">-5% from yesterday</div>
-          </div>
-
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4" data-testid="metric-system-uptime">
-            <div className="text-2xl font-bold text-green-400">
-              99.7%
-            </div>
-            <div className="text-sm text-gray-400">System Uptime</div>
-            <div className="text-xs text-gray-400 mt-1">At 2:00 PM</div>
-          </div>
-
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
-            <div className="text-2xl font-bold text-cyan-400">
-              {Math.round(analyticsMetrics.averageConfidence * 100)}%
-            </div>
-            <div className="text-sm text-gray-400">Avg Confidence</div>
-            <div className="text-xs text-green-400 mt-1">+2% from yesterday</div>
-          </div>
-
-          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
-            <div className="text-2xl font-bold text-yellow-400">
-              {analyticsMetrics.systemUptime.toFixed(1)}%
-            </div>
-            <div className="text-sm text-gray-400">System Uptime</div>
-            <div className="text-xs text-green-400 mt-1">Excellent</div>
-          </div>
+          ))}
         </div>
+
+        {!metrics && !isLoadingMetrics && (
+          <div className="text-sm text-gray-400 mb-6">
+            No real-time metrics available yet. Trigger a manual refresh or verify the backend is
+            publishing analytics data.
+          </div>
+        )}
 
         {/* Camera Performance Overview */}
         <div className="mb-6">
           <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
             <h3 className="text-lg font-semibold text-white mb-4">Camera Performance</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {cameraAnalytics.map((camera) => {
-                const isSelected = selectedCameras.has(camera.cameraId);
+              {cameraLoadEntries.map((camera) => {
+                const typedCameraId = camera.cameraId as BackendCameraId;
+                const isSelectable = camera.isConfigured;
+                const isSelected = isSelectable && selectedCameras.has(typedCameraId);
+                const share =
+                  totalActiveAcrossCameras > 0
+                    ? (camera.activePersons / totalActiveAcrossCameras) * 100
+                    : 0;
+                const loadIndicator =
+                  camera.activePersons >= 8
+                    ? 'bg-red-400'
+                    : camera.activePersons >= 4
+                      ? 'bg-yellow-400'
+                      : camera.activePersons > 0
+                        ? 'bg-green-400'
+                        : 'bg-gray-500';
+
+                const cardClasses = [
+                  'p-3 rounded-lg border transition-colors',
+                  isSelectable
+                    ? isSelected
+                      ? 'border-orange-400 bg-orange-500/10'
+                      : 'border-gray-600 bg-gray-800/30 hover:border-gray-500 cursor-pointer'
+                    : 'border-dashed border-gray-600 bg-gray-800/20 cursor-not-allowed opacity-75',
+                ].join(' ');
+
+                const displayName = getDisplayName(typedCameraId) || camera.cameraId;
+
                 return (
                   <div
                     key={camera.cameraId}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'border-orange-400 bg-orange-500/10'
-                        : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                    }`}
-                    onClick={() => handleCameraToggle(camera.cameraId)}
+                    className={cardClasses}
+                    onClick={() => {
+                      if (isSelectable) {
+                        handleCameraToggle(typedCameraId);
+                      }
+                    }}
                   >
                     <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-semibold">
-                        {getDisplayName(camera.cameraId)}
-                      </span>
-                      <div
-                        className={`w-2 h-2 rounded-full ${
-                          camera.uptimePercentage > 95
-                            ? 'bg-green-400'
-                            : camera.uptimePercentage > 90
-                              ? 'bg-yellow-400'
-                              : 'bg-red-400'
-                        }`}
-                      />
+                      <span className="text-white font-semibold">{displayName}</span>
+                      <div className={`w-2 h-2 rounded-full ${loadIndicator}`} />
                     </div>
 
                     <div className="space-y-1 text-sm">
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Detections:</span>
-                        <span className="text-orange-400">{camera.detectionCount}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Unique:</span>
-                        <span className="text-blue-400">{camera.uniquePersons}</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-400">Confidence:</span>
-                        <span className="text-green-400">
-                          {Math.round(camera.averageConfidence * 100)}%
+                        <span className="text-gray-400">Active Persons:</span>
+                        <span className="text-orange-400 font-semibold">
+                          {camera.activePersons}
                         </span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-400">Uptime:</span>
-                        <span className="text-purple-400">
-                          {camera.uptimePercentage.toFixed(1)}%
+                        <span className="text-gray-400">Share:</span>
+                        <span className="text-blue-400">{share.toFixed(1)}%</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-gray-400">Status:</span>
+                        <span className="text-gray-300">
+                          {camera.activePersons === 0
+                            ? 'Idle'
+                            : camera.activePersons >= 8
+                              ? 'High load'
+                              : camera.activePersons >= 4
+                                ? 'Moderate'
+                                : 'Normal'}
                         </span>
                       </div>
+                      {!camera.isConfigured && (
+                        <div className="text-xs text-yellow-400">
+                          Not configured in current environment
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
@@ -513,51 +677,108 @@ const AnalyticsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Main Analytics Content Grid */}
+        {/* System Performance Detail */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          {/* Charts Component */}
-          <AnalyticsCharts
-            timeRangeMetrics={timeRangeMetrics}
-            selectedMetricType={selectedMetricType}
-            selectedCameras={selectedCameras}
-            environment={environment}
-            className="lg:col-span-2"
-          />
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">System Performance</h3>
+            <dl className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-400">Cache Hit Rate</dt>
+                <dd className="text-gray-200">
+                  {cacheHitRatePercent !== null ? `${cacheHitRatePercent.toFixed(1)}%` : '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-400">Processing Latency</dt>
+                <dd className="text-gray-200">
+                  {processingLatency !== null ? `${processingLatency.toFixed(2)} s` : '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-400">Error Rate</dt>
+                <dd className="text-gray-200">
+                  {errorRatePercent !== null ? `${errorRatePercent.toFixed(2)}%` : '—'}
+                </dd>
+              </div>
+              <div className="flex items-center justify-between">
+                <dt className="text-gray-400">Memory Usage</dt>
+                <dd className="text-gray-200">
+                  {memoryUsage !== null ? `${memoryUsage.toFixed(1)} MB` : '—'}
+                </dd>
+              </div>
+            </dl>
+            <p className="text-xs text-gray-500 mt-4">
+              Metrics refresh automatically based on the selected interval. Manual refresh is available at
+              any time for on-demand snapshots.
+            </p>
+          </div>
 
-          {/* Person Statistics */}
-          <PersonStatistics
-            environment={environment}
-            timeRange={selectedTimeRange}
-            selectedCameras={selectedCameras}
-            className=""
-          />
+          <div className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-4">
+            <h3 className="text-lg font-semibold text-white mb-4">Real-time Snapshot</h3>
+            <div className="space-y-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Timestamp</span>
+                <span className="text-gray-200">{lastUpdatedDisplay ?? '—'}</span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Active Persons</span>
+                <span className="text-gray-200">
+                  {metrics?.active_persons != null ? metrics.active_persons.toLocaleString() : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Detection Rate</span>
+                <span className="text-gray-200">
+                  {detectionRatePerSecond !== null
+                    ? `${detectionRatePerSecond.toFixed(2)} / sec`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Average Confidence</span>
+                <span className="text-gray-200">
+                  {averageConfidencePercent !== null
+                    ? `${averageConfidencePercent.toFixed(1)}%`
+                    : '—'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-gray-400">Cameras Reporting</span>
+                <span className="text-gray-200">{reportingCameraCount}</span>
+              </div>
+            </div>
+            <div className="mt-6">
+              <h4 className="text-sm font-semibold text-white mb-2">Camera Load Distribution</h4>
+              <div className="space-y-2">
+                {cameraLoadEntries.map((camera) => {
+                  const share =
+                    totalActiveAcrossCameras > 0
+                      ? (camera.activePersons / totalActiveAcrossCameras) * 100
+                      : 0;
+                  const typedCameraId = camera.cameraId as BackendCameraId;
+                  const displayName = getDisplayName(typedCameraId) || camera.cameraId;
 
-          {/* Traffic Heatmap */}
-          <TrafficHeatmap
-            environment={environment}
-            timeRange={selectedTimeRange}
-            selectedCameras={selectedCameras}
-            className=""
-          />
-        </div>
-
-        {/* Advanced Analytics Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Dwell Time Analysis */}
-          <DwellTimeAnalysis
-            environment={environment}
-            timeRange={selectedTimeRange}
-            selectedCameras={selectedCameras}
-            className=""
-          />
-
-          {/* Traffic Flow Analysis */}
-          <TrafficFlowAnalysis
-            environment={environment}
-            timeRange={selectedTimeRange}
-            selectedCameras={selectedCameras}
-            className=""
-          />
+                  return (
+                    <div key={`${camera.cameraId}-distribution`} className="text-xs">
+                      <div className="flex items-center justify-between text-gray-300">
+                        <span>{displayName}</span>
+                        <span>{camera.activePersons}</span>
+                      </div>
+                      <div className="w-full h-1 bg-gray-700 rounded overflow-hidden mt-1">
+                        <div
+                          className="h-full bg-blue-500"
+                          style={{ width: `${Math.min(100, share)}%` }}
+                        ></div>
+                      </div>
+                    </div>
+                  );
+                })}
+                {cameraLoadEntries.length === 0 && (
+                  <div className="text-xs text-gray-500">No camera load data available.</div>
+                )}
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Export Progress Indicator */}
