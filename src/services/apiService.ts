@@ -5,6 +5,7 @@ import {
   ProcessingTaskStartRequest,
   ProcessingTaskCreateResponse,
   TaskStatusResponse,
+  PlaybackStatusResponse,
   SystemHealthResponse,
   APIError,
   APIResponse,
@@ -406,6 +407,75 @@ export class APIService {
       return response;
     } catch (error) {
       throw this.handleError(`Failed to get task status for ${taskId}`, error);
+    }
+  }
+
+  /**
+   * Pause active processing task playback
+   */
+  async pauseTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock pauseTaskPlayback');
+      return {
+        task_id: taskId,
+        state: 'paused',
+        last_transition_at: new Date().toISOString(),
+        last_frame_index: 0,
+      };
+    }
+
+    try {
+      return await this.http.post<PlaybackStatusResponse>(
+        API_ENDPOINTS.PLAYBACK_PAUSE(taskId)
+      );
+    } catch (error) {
+      throw this.handleError(`Failed to pause playback for ${taskId}`, error);
+    }
+  }
+
+  /**
+   * Resume processing task playback
+   */
+  async resumeTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock resumeTaskPlayback');
+      return {
+        task_id: taskId,
+        state: 'playing',
+        last_transition_at: new Date().toISOString(),
+        last_frame_index: 0,
+      };
+    }
+
+    try {
+      return await this.http.post<PlaybackStatusResponse>(
+        API_ENDPOINTS.PLAYBACK_RESUME(taskId)
+      );
+    } catch (error) {
+      throw this.handleError(`Failed to resume playback for ${taskId}`, error);
+    }
+  }
+
+  /**
+   * Retrieve playback status for task
+   */
+  async getPlaybackStatus(taskId: string): Promise<PlaybackStatusResponse> {
+    if (MOCK_CONFIG.services.api) {
+      console.log('🎭 Using mock getPlaybackStatus');
+      return {
+        task_id: taskId,
+        state: 'playing',
+        last_transition_at: new Date().toISOString(),
+        last_frame_index: 0,
+      };
+    }
+
+    try {
+      return await this.http.get<PlaybackStatusResponse>(
+        API_ENDPOINTS.PLAYBACK_STATUS(taskId)
+      );
+    } catch (error) {
+      throw this.handleError(`Failed to fetch playback status for ${taskId}`, error);
     }
   }
 
@@ -874,6 +944,17 @@ export const mockResponses = {
     updated_at: new Date().toISOString(),
   }),
 
+  playbackStatus: (
+    taskId: string,
+    state: PlaybackStatusResponse['state'] = 'playing'
+  ): PlaybackStatusResponse => ({
+    task_id: taskId,
+    state,
+    last_transition_at: new Date().toISOString(),
+    last_frame_index: 128,
+    last_error: undefined,
+  }),
+
   realTimeMetrics: (): RealTimeMetrics => ({
     active_persons: 0,
     total_cameras: 8,
@@ -898,6 +979,12 @@ export function createMockAPIService(): APIService {
   mockService.startProcessingTask = async (request) =>
     mockResponses.taskStart(request.environment_id);
   mockService.getTaskStatus = async (taskId) => mockResponses.taskStatus(taskId);
+  mockService.pauseTaskPlayback = async (taskId) =>
+    mockResponses.playbackStatus(taskId, 'paused');
+  mockService.resumeTaskPlayback = async (taskId) =>
+    mockResponses.playbackStatus(taskId, 'playing');
+  mockService.getPlaybackStatus = async (taskId) =>
+    mockResponses.playbackStatus(taskId);
   mockService.getRealTimeMetrics = async () => mockResponses.realTimeMetrics();
   mockService.getActivePersons = async () => mockResponses.activePersons();
   mockService.getSystemStatistics = async () => mockResponses.systemStatistics();

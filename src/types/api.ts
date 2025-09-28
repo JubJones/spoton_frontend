@@ -36,6 +36,20 @@ export interface TaskStatusResponse {
 }
 
 // ============================================================================
+// Playback Control Types
+// ============================================================================
+
+export type PlaybackState = 'playing' | 'paused' | 'stopped';
+
+export interface PlaybackStatusResponse {
+  task_id: string;
+  state: PlaybackState;
+  last_transition_at: string;
+  last_frame_index?: number;
+  last_error?: string;
+}
+
+// ============================================================================
 // Tracking Data Types
 // ============================================================================
 
@@ -635,12 +649,9 @@ export const API_ENDPOINTS = {
   PERSON_DETAILS: (globalPersonId: string) => `/api/v1/persons/${globalPersonId}/details`,
 
   // Playback controls
-  PLAY: (taskId: string) => `/api/v1/controls/${taskId}/play`,
-  PAUSE: (taskId: string) => `/api/v1/controls/${taskId}/pause`,
-  STOP: (taskId: string) => `/api/v1/controls/${taskId}/stop`,
-  SEEK: (taskId: string) => `/api/v1/controls/${taskId}/seek`,
+  PLAYBACK_PAUSE: (taskId: string) => `/api/v1/controls/${taskId}/pause`,
+  PLAYBACK_RESUME: (taskId: string) => `/api/v1/controls/${taskId}/resume`,
   PLAYBACK_STATUS: (taskId: string) => `/api/v1/controls/${taskId}/status`,
-  CONFIGURE_PLAYBACK: (taskId: string) => `/api/v1/controls/${taskId}/configure`,
 
   // Media content
   CAMERA_FRAME: (taskId: string, cameraId: string) => `/api/v1/media/frames/${taskId}/${cameraId}`,

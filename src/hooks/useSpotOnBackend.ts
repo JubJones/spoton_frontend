@@ -4,12 +4,14 @@ import type {
   SystemHealthResponse,
   ProcessingTaskCreateResponse,
   TaskStatusResponse,
+  PlaybackStatusResponse,
   WebSocketMessage,
   WebSocketTrackingMessagePayload,
   RealTimeMetrics,
   ActivePerson,
   EnvironmentId,
 } from '../types/api';
+import { API_ENDPOINTS } from '../types/api';
 import { useBackendHealth } from './useBackendHealth';
 import { APP_CONFIG } from '../config/app';
 import { MOCK_CONFIG } from '../config/mock';
@@ -27,6 +29,7 @@ export interface SpotOnBackendState {
   // Task management
   currentTaskId: string | null;
   taskStatus: TaskStatusResponse | null;
+  playbackStatus: PlaybackStatusResponse | null;
 
   // Real-time data
   latestTrackingData: WebSocketTrackingMessagePayload | null;
@@ -50,6 +53,9 @@ export interface SpotOnBackendActions {
     environmentId?: EnvironmentId
   ) => Promise<ProcessingTaskCreateResponse | null>;
   getTaskStatus: (taskId: string) => Promise<TaskStatusResponse | null>;
+  pausePlayback: (taskId: string) => Promise<PlaybackStatusResponse | null>;
+  resumePlayback: (taskId: string) => Promise<PlaybackStatusResponse | null>;
+  fetchPlaybackStatus: (taskId: string) => Promise<PlaybackStatusResponse | null>;
 
   // WebSocket connection
   connectWebSocket: (taskId: string) => void;
@@ -79,6 +85,7 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
     isHealthy: false,
     currentTaskId: null,
     taskStatus: null,
+    playbackStatus: null,
     latestTrackingData: null,
     connectionEstablished: false,
     binaryFramesEnabled: false,
@@ -151,6 +158,7 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
         const taskData = response.data;
         updateState({
           currentTaskId: taskData.task_id,
+          playbackStatus: null,
           error: null,
         });
 
@@ -181,6 +189,92 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
         return statusData;
       } catch (error) {
         handleError(error as Error, 'Task Status');
+        return null;
+      }
+    },
+    [updateState, handleError]
+  );
+
+  const pausePlayback = useCallback(
+    async (taskId: string): Promise<PlaybackStatusResponse | null> => {
+      if (!taskId) {
+        return null;
+      }
+
+      try {
+        if (MOCK_CONFIG.enabled && typeof mockAPI.pausePlayback === 'function') {
+          const mockResponse = await mockAPI.pausePlayback(taskId);
+          updateState({ playbackStatus: mockResponse, error: null });
+          return mockResponse;
+        }
+
+        const response = await axios.post<PlaybackStatusResponse>(
+          `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_PAUSE(taskId)}`,
+          {},
+          { timeout: 5000 }
+        );
+
+        updateState({ playbackStatus: response.data, error: null });
+        return response.data;
+      } catch (error) {
+        handleError(error as Error, 'Pause Playback');
+        return null;
+      }
+    },
+    [updateState, handleError]
+  );
+
+  const resumePlayback = useCallback(
+    async (taskId: string): Promise<PlaybackStatusResponse | null> => {
+      if (!taskId) {
+        return null;
+      }
+
+      try {
+        if (MOCK_CONFIG.enabled && typeof mockAPI.resumePlayback === 'function') {
+          const mockResponse = await mockAPI.resumePlayback(taskId);
+          updateState({ playbackStatus: mockResponse, error: null });
+          return mockResponse;
+        }
+
+        const response = await axios.post<PlaybackStatusResponse>(
+          `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_RESUME(taskId)}`,
+          {},
+          { timeout: 5000 }
+        );
+
+        updateState({ playbackStatus: response.data, error: null });
+        return response.data;
+      } catch (error) {
+        handleError(error as Error, 'Resume Playback');
+        return null;
+      }
+    },
+    [updateState, handleError]
+  );
+
+  const fetchPlaybackStatus = useCallback(
+    async (taskId: string): Promise<PlaybackStatusResponse | null> => {
+      if (!taskId) {
+        return null;
+      }
+
+      try {
+        if (MOCK_CONFIG.enabled && typeof mockAPI.getPlaybackStatus === 'function') {
+          const mockResponse = await mockAPI.getPlaybackStatus(taskId);
+          updateState({ playbackStatus: mockResponse, error: null });
+          return mockResponse;
+        }
+
+        const response = await axios.get<PlaybackStatusResponse>(
+          `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_STATUS(taskId)}`,
+          { timeout: 5000 }
+        );
+
+        updateState({ playbackStatus: response.data, error: null });
+        return response.data;
+      } catch (error) {
+        handleError(error as Error, 'Fetch Playback Status');
         return null;
       }
     },
@@ -380,6 +474,9 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
       checkHealth,
       startProcessingTask,
       getTaskStatus,
+      pausePlayback,
+      resumePlayback,
+      fetchPlaybackStatus,
       connectWebSocket,
       disconnectWebSocket,
       getRealtimeMetrics,

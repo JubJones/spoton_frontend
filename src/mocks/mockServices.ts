@@ -5,12 +5,14 @@
 import {
   ProcessingTaskCreateResponse,
   TaskStatusResponse,
+  PlaybackStatusResponse,
   SystemHealthResponse,
   WebSocketTrackingMessagePayload,
   EnvironmentId,
   WebSocketMessage,
   WebSocketMessageType,
-  TaskStatus
+  TaskStatus,
+  PlaybackState,
 } from '../types/api';
 
 import {
@@ -40,6 +42,8 @@ interface MockTaskState {
   websocketListeners: Array<(message: WebSocketMessage) => void>;
   isProcessing: boolean;
   createdAt: Date;
+  playbackState: PlaybackState;
+  lastPlaybackChange: Date;
 }
 
 class MockBackendService {
@@ -66,7 +70,9 @@ class MockBackendService {
       statusIndex: 0,
       websocketListeners: [],
       isProcessing: true,
-      createdAt: new Date()
+      createdAt: new Date(),
+      playbackState: 'playing',
+      lastPlaybackChange: new Date(),
     };
     
     this.tasks.set(taskId, task);
@@ -94,6 +100,63 @@ class MockBackendService {
     }
     
     return generateMockTaskStatus(taskId, task.statusIndex, task.progress);
+  }
+
+  async pausePlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    await delay(API_DELAY / 2);
+
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    task.playbackState = 'paused';
+    task.lastPlaybackChange = new Date();
+
+    return {
+      task_id: taskId,
+      state: task.playbackState,
+      last_transition_at: task.lastPlaybackChange.toISOString(),
+      last_frame_index: task.frameIndex,
+      last_error: undefined,
+    };
+  }
+
+  async resumePlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    await delay(API_DELAY / 2);
+
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    task.playbackState = 'playing';
+    task.lastPlaybackChange = new Date();
+
+    return {
+      task_id: taskId,
+      state: task.playbackState,
+      last_transition_at: task.lastPlaybackChange.toISOString(),
+      last_frame_index: task.frameIndex,
+      last_error: undefined,
+    };
+  }
+
+  async getPlaybackStatus(taskId: string): Promise<PlaybackStatusResponse> {
+    await delay(API_DELAY / 2);
+
+    const task = this.tasks.get(taskId);
+    if (!task) {
+      throw new Error(`Task ${taskId} not found`);
+    }
+
+    return {
+      task_id: taskId,
+      state: task.playbackState,
+      last_transition_at: task.lastPlaybackChange.toISOString(),
+      last_frame_index: task.frameIndex,
+      last_error: undefined,
+    };
   }
 
   // Check system health
@@ -205,6 +268,11 @@ class MockBackendService {
     const sendTrackingUpdate = () => {
       if (task.status !== 'PROCESSING' || !task.isProcessing) return;
 
+      if (task.playbackState === 'paused') {
+        setTimeout(sendTrackingUpdate, MOCK_CONFIG.FRAME_INTERVAL_MS);
+        return;
+      }
+
       // Generate mock tracking data
       const trackingData = generateMockTrackingData(task.environment, task.frameIndex);
       
@@ -292,6 +360,18 @@ export const mockAPI = {
 
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
     return mockBackendService.getTaskStatus(taskId);
+  },
+
+  async pausePlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    return mockBackendService.pausePlayback(taskId);
+  },
+
+  async resumePlayback(taskId: string): Promise<PlaybackStatusResponse> {
+    return mockBackendService.resumePlayback(taskId);
+  },
+
+  async getPlaybackStatus(taskId: string): Promise<PlaybackStatusResponse> {
+    return mockBackendService.getPlaybackStatus(taskId);
   },
 
   // WebSocket connection

@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
+import React, { useState, useEffect, useCallback } from 'react';
+import { useSpotOnBackendFull } from '../hooks/useSpotOnBackend';
 import {
   TrackingUpdatePayload,
   CameraID,
@@ -7,9 +7,20 @@ import {
   CAMERA_MAPPING,
   ENVIRONMENT_CAMERAS,
 } from '../types/trackingData';
+import type { PlaybackStatusResponse } from '../types/api';
+import TaskPlaybackControls from './TaskPlaybackControls';
 
 const BackendIntegratedView: React.FC = () => {
-  const [backendState, backendActions] = useSpotOnBackend();
+  const [backendState, backendActions] = useSpotOnBackendFull();
+  const {
+    startProcessingTask: startProcessingTaskAction,
+    connectWebSocket: connectWebSocketAction,
+    disconnectWebSocket: disconnectWebSocketAction,
+    clearError: clearErrorAction,
+    pausePlayback,
+    resumePlayback,
+    fetchPlaybackStatus,
+  } = backendActions;
   const [selectedEnvironment, setSelectedEnvironment] = useState<EnvironmentID>('factory');
   const [isStarted, setIsStarted] = useState(false);
 
@@ -24,14 +35,14 @@ const BackendIntegratedView: React.FC = () => {
   useEffect(() => {
     if (backendState.currentTaskId && !backendState.isConnected) {
       console.log('Auto-connecting to WebSocket...');
-      backendActions.connectWebSocket(backendState.currentTaskId);
+      connectWebSocketAction(backendState.currentTaskId);
     }
-  }, [backendState.currentTaskId, backendState.isConnected, backendActions]);
+  }, [backendState.currentTaskId, backendState.isConnected, connectWebSocketAction]);
 
   const handleStartTask = async () => {
     console.log('Starting processing task for environment:', selectedEnvironment);
     setIsStarted(true);
-    const result = await backendActions.startProcessingTask(selectedEnvironment);
+    const result = await startProcessingTaskAction(selectedEnvironment);
     if (result) {
       console.log('Task started:', result);
     }
@@ -40,10 +51,39 @@ const BackendIntegratedView: React.FC = () => {
   const handleEnvironmentChange = (env: EnvironmentID) => {
     setSelectedEnvironment(env);
     if (backendState.isConnected) {
-      backendActions.disconnectWebSocket();
+      disconnectWebSocketAction();
     }
     setIsStarted(false);
   };
+
+  useEffect(() => {
+    if (!backendState.currentTaskId) {
+      return;
+    }
+
+    fetchPlaybackStatus(backendState.currentTaskId);
+  }, [backendState.currentTaskId, fetchPlaybackStatus]);
+
+  const handlePausePlayback = useCallback(() => {
+    if (!backendState.currentTaskId) {
+      return Promise.resolve<PlaybackStatusResponse | null>(null);
+    }
+    return pausePlayback(backendState.currentTaskId);
+  }, [backendState.currentTaskId, pausePlayback]);
+
+  const handleResumePlayback = useCallback(() => {
+    if (!backendState.currentTaskId) {
+      return Promise.resolve<PlaybackStatusResponse | null>(null);
+    }
+    return resumePlayback(backendState.currentTaskId);
+  }, [backendState.currentTaskId, resumePlayback]);
+
+  const handleRefreshPlayback = useCallback(() => {
+    if (!backendState.currentTaskId) {
+      return Promise.resolve<PlaybackStatusResponse | null>(null);
+    }
+    return fetchPlaybackStatus(backendState.currentTaskId);
+  }, [backendState.currentTaskId, fetchPlaybackStatus]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -178,20 +218,30 @@ const BackendIntegratedView: React.FC = () => {
               </div>
             </div>
 
-            <div className="bg-gray-50 p-3 rounded">
-              <div className="text-sm text-gray-600">Progress</div>
-              <div className="font-semibold">
-                {backendState.taskStatus
-                  ? `${Math.round(backendState.taskStatus.progress * 100)}%`
-                  : 'N/A'}
-              </div>
+          <div className="bg-gray-50 p-3 rounded">
+            <div className="text-sm text-gray-600">Progress</div>
+            <div className="font-semibold">
+              {backendState.taskStatus
+                ? `${Math.round(backendState.taskStatus.progress * 100)}%`
+                : 'N/A'}
             </div>
           </div>
+        </div>
 
-          {/* Current Step */}
-          {backendState.taskStatus && (
-            <div className="mt-3 text-sm text-gray-600">
-              Current Step: {backendState.taskStatus.current_step}
+        <div className="mt-6">
+          <TaskPlaybackControls
+            taskId={backendState.currentTaskId}
+            playbackStatus={backendState.playbackStatus}
+            onPause={handlePausePlayback}
+            onResume={handleResumePlayback}
+            onRefresh={handleRefreshPlayback}
+          />
+        </div>
+
+        {/* Current Step */}
+        {backendState.taskStatus && (
+          <div className="mt-3 text-sm text-gray-600">
+            Current Step: {backendState.taskStatus.current_step}
               {backendState.taskStatus.details && (
                 <span className="text-gray-500"> - {backendState.taskStatus.details}</span>
               )}
@@ -207,7 +257,7 @@ const BackendIntegratedView: React.FC = () => {
                   <p className="text-red-700">{backendState.error}</p>
                 </div>
                 <button
-                  onClick={backendActions.clearError}
+                  onClick={clearErrorAction}
                   className="text-red-500 hover:text-red-700"
                 >
                   ✕

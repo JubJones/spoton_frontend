@@ -5,8 +5,9 @@ import DetectionPersonList from "../components/DetectionPersonList";
 // import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
 import { CameraMapPair } from "../components/mapping";
 import { useMappingData } from "../hooks/useMappingData";
-import type { BackendCameraId, EnvironmentId } from "../types/api";
-import { DEFAULT_CONFIG, WEBSOCKET_ENDPOINTS } from "../types/api";
+import TaskPlaybackControls from "../components/TaskPlaybackControls";
+import type { BackendCameraId, EnvironmentId, PlaybackStatusResponse } from "../types/api";
+import { DEFAULT_CONFIG, WEBSOCKET_ENDPOINTS, API_ENDPOINTS } from "../types/api";
 import { useCameraConfig } from "../context/CameraConfigContext";
 
 // --- Type Definitions ---
@@ -181,6 +182,7 @@ const GroupViewPage: React.FC = () => {
   const [systemHealth, setSystemHealth] = useState<SystemHealth | null>(null);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatusResponse | null>(null);
   
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
@@ -517,6 +519,75 @@ const GroupViewPage: React.FC = () => {
       disconnectFocusWebSocket();
     };
   }, [disconnectFocusWebSocket]);
+
+  const fetchPlaybackStatusForTask = useCallback(async (targetTaskId: string): Promise<PlaybackStatusResponse> => {
+    const response = await fetch(
+      `${BACKEND_BASE_URL}${API_ENDPOINTS.PLAYBACK_STATUS(targetTaskId)}`
+    );
+
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Failed to fetch playback status (${response.status})`);
+    }
+
+    const payload = (await response.json()) as PlaybackStatusResponse;
+    setPlaybackStatus(payload);
+    return payload;
+  }, []);
+
+  const sendPlaybackCommand = useCallback(
+    async (targetTaskId: string, action: 'pause' | 'resume'): Promise<PlaybackStatusResponse> => {
+      const endpoint =
+        action === 'pause'
+          ? API_ENDPOINTS.PLAYBACK_PAUSE(targetTaskId)
+          : API_ENDPOINTS.PLAYBACK_RESUME(targetTaskId);
+
+      const response = await fetch(`${BACKEND_BASE_URL}${endpoint}`, { method: 'POST' });
+
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || `Failed to ${action} playback (${response.status})`);
+      }
+
+      const payload = (await response.json()) as PlaybackStatusResponse;
+      setPlaybackStatus(payload);
+      return payload;
+    },
+    []
+  );
+
+  const pausePlaybackCommand = useCallback(async (): Promise<PlaybackStatusResponse | null> => {
+    if (!taskId) {
+      return null;
+    }
+    return sendPlaybackCommand(taskId, 'pause');
+  }, [taskId, sendPlaybackCommand]);
+
+  const resumePlaybackCommand = useCallback(async (): Promise<PlaybackStatusResponse | null> => {
+    if (!taskId) {
+      return null;
+    }
+    return sendPlaybackCommand(taskId, 'resume');
+  }, [taskId, sendPlaybackCommand]);
+
+  const refreshPlaybackStatusCommand = useCallback(async (): Promise<PlaybackStatusResponse | null> => {
+    if (!taskId) {
+      setPlaybackStatus(null);
+      return null;
+    }
+    return fetchPlaybackStatusForTask(taskId);
+  }, [taskId, fetchPlaybackStatusForTask]);
+
+  useEffect(() => {
+    if (!taskId) {
+      setPlaybackStatus(null);
+      return;
+    }
+
+    fetchPlaybackStatusForTask(taskId).catch((err) => {
+      console.error('Failed to fetch playback status', err);
+    });
+  }, [taskId, fetchPlaybackStatusForTask]);
 
   useEffect(() => {
     if (!focusedPerson) {
@@ -1313,6 +1384,7 @@ const GroupViewPage: React.FC = () => {
       // Clear local state immediately for responsive UI
       setIsStreaming(false);
       setTaskId(null);
+      setPlaybackStatus(null);
       setCameraFrames({});
       setCurrentFrameData(null);
       setImageLoadingStates({});
@@ -1369,11 +1441,11 @@ const GroupViewPage: React.FC = () => {
             </div>
             <div>Mode: <span className="font-semibold">Raw Video</span></div>
             {taskId && <div>Task: <span className="font-semibold text-xs">{taskId.slice(0, 8)}...</span></div>}
-        </div>
-        <div className="flex space-x-2 flex-shrink-0">
-            <button 
-              onClick={handleStartStreaming} 
-              disabled={isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)} 
+      </div>
+      <div className="flex space-x-2 flex-shrink-0">
+          <button 
+            onClick={handleStartStreaming} 
+            disabled={isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)} 
               className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${
                 isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)
                   ? "bg-gray-600 cursor-not-allowed" 
@@ -1411,6 +1483,16 @@ const GroupViewPage: React.FC = () => {
               Debug
             </button>
         </div>
+      </div>
+
+      <div className="mb-4 flex-shrink-0">
+        <TaskPlaybackControls
+          taskId={taskId}
+          playbackStatus={playbackStatus}
+          onPause={pausePlaybackCommand}
+          onResume={resumePlaybackCommand}
+          onRefresh={refreshPlaybackStatusCommand}
+        />
       </div>
 
       {/* Error Display */}
