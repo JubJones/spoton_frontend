@@ -16,8 +16,6 @@ import type {
 import { API_ENDPOINTS } from '../types/api';
 import { useBackendHealth } from './useBackendHealth';
 import { APP_CONFIG } from '../config/app';
-import { MOCK_CONFIG } from '../config/mock';
-import { mockAPI } from '../mocks/mockServices';
 
 // Real backend configuration - FIXED to use environment variables
 const API_BASE_URL = APP_CONFIG.API_BASE_URL;
@@ -204,12 +202,6 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
       }
 
       try {
-        if (MOCK_CONFIG.enabled && typeof mockAPI.pausePlayback === 'function') {
-          const mockResponse = await mockAPI.pausePlayback(taskId);
-          updateState({ playbackStatus: mockResponse, error: null });
-          return mockResponse;
-        }
-
         const response = await axios.post<PlaybackStatusResponse>(
           `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_PAUSE(taskId)}`,
           {},
@@ -233,12 +225,6 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
       }
 
       try {
-        if (MOCK_CONFIG.enabled && typeof mockAPI.resumePlayback === 'function') {
-          const mockResponse = await mockAPI.resumePlayback(taskId);
-          updateState({ playbackStatus: mockResponse, error: null });
-          return mockResponse;
-        }
-
         const response = await axios.post<PlaybackStatusResponse>(
           `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_RESUME(taskId)}`,
           {},
@@ -262,12 +248,6 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
       }
 
       try {
-        if (MOCK_CONFIG.enabled && typeof mockAPI.getPlaybackStatus === 'function') {
-          const mockResponse = await mockAPI.getPlaybackStatus(taskId);
-          updateState({ playbackStatus: mockResponse, error: null });
-          return mockResponse;
-        }
-
         const response = await axios.get<PlaybackStatusResponse>(
           `${API_BASE_URL}${API_ENDPOINTS.PLAYBACK_STATUS(taskId)}`,
           { timeout: 5000 }
@@ -500,24 +480,9 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
   ];
 };
 
-// Simplified hook for landing/environment pages with mock support
+// Simplified hook for landing/environment pages
 export const useSpotOnBackend = () => {
   const [state, actions] = useSpotOnBackendInternal();
-
-  // In mock mode, always return connected and healthy
-  if (MOCK_CONFIG.enabled) {
-    return {
-      isConnected: true,
-      backendStatus: {
-        status: 'healthy',
-      },
-      healthCheck: async () => {
-        console.log('🎭 Mock health check - always healthy');
-        return await mockAPI.checkSystemHealth();
-      },
-      error: null,
-    };
-  }
 
   return {
     isConnected: state.isConnected,

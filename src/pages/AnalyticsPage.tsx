@@ -5,13 +5,7 @@ import Header from '../components/common/Header';
 import StatusCard from '../components/common/StatusCard';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import { apiService } from '../services/apiService';
-import type {
-  EnvironmentId,
-  BackendCameraId,
-  ExportFormat,
-  ExportAnalyticsReportRequest,
-  RealTimeMetrics,
-} from '../types/api';
+import type { EnvironmentId, BackendCameraId, ExportFormat, RealTimeMetrics } from '../types/api';
 import { useCameraConfig } from '../context/CameraConfigContext';
 
 type TimeRangeKey = '5m' | '1h' | '6h' | 'today' | '24h' | '3d' | '7d' | '30d' | '1m';
@@ -157,7 +151,6 @@ const AnalyticsPage: React.FC = () => {
   const [refreshInterval, setRefreshInterval] = useState<number>(30);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
   const [isExporting, setIsExporting] = useState(false);
-  const [exportProgress, setExportProgress] = useState<Record<string, number>>({});
 
   const { isConnected, backendStatus } = useSpotOnBackend();
   const connectionStatus = useMemo(() => ({
@@ -790,28 +783,6 @@ const AnalyticsPage: React.FC = () => {
             </div>
           </div>
         </section>
-
-        {Object.keys(exportProgress).length > 0 && (
-          <section className="rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
-            <h3 className="text-lg font-semibold text-white mb-4">Export Progress</h3>
-            <div className="space-y-3">
-              {Object.entries(exportProgress).map(([jobId, progress]) => (
-                <div key={jobId} className="space-y-2">
-                  <div className="flex items-center justify-between text-xs text-gray-400">
-                    <span>Job {jobId.slice(0, 8)}...</span>
-                    <span>{Math.round(progress * 100)}%</span>
-                  </div>
-                  <div className="h-2 rounded-full bg-white/10">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-blue-500"
-                      style={{ width: `${Math.min(100, Math.round(progress * 100))}%` }}
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        )}
       </main>
     </div>
   );

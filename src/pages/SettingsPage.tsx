@@ -8,7 +8,6 @@ import CameraSettings from '../components/CameraSettings';
 import AlertSettings from '../components/AlertSettings';
 import ExportSettings from '../components/ExportSettings';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
-import { MOCK_CONFIG } from '../config/mock';
 import type { EnvironmentId } from '../types/api';
 
 interface SettingsSection {
@@ -165,11 +164,6 @@ const SettingsPage: React.FC = () => {
   // Get section status (mock-aware)
   const getSectionStatus = useCallback(
     (section: SettingsSection) => {
-      // In mock mode, all sections are available
-      if (MOCK_CONFIG.enabled) {
-        return { available: true, reason: null };
-      }
-      
       if (section.requiresBackend && !isConnected) {
         return { available: false, reason: 'Backend connection required' };
       }

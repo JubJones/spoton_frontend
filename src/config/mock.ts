@@ -2,11 +2,8 @@
 // Toggle between mock data and real backend
 // src/config/mock.ts
 
-// Environment variable to control mock mode
-// Set VITE_USE_MOCK_DATA=true in .env.local to enable mock mode
-export const MOCK_MODE_ENABLED = 
-  import.meta.env.VITE_USE_MOCK_DATA === 'true' || 
-  import.meta.env.DEV && import.meta.env.VITE_USE_MOCK_DATA !== 'false';
+// Mock mode disabled: always use live backend.
+export const MOCK_MODE_ENABLED = false;
 
 // Mock configuration options
 export const MOCK_CONFIG = {
@@ -15,44 +12,31 @@ export const MOCK_CONFIG = {
   
   // Mock specific services (can be individually controlled)
   services: {
-    api: MOCK_MODE_ENABLED,
-    websocket: MOCK_MODE_ENABLED,
-    systemHealth: MOCK_MODE_ENABLED,
-    tracking: MOCK_MODE_ENABLED,
+    api: false,
+    websocket: false,
+    systemHealth: false,
+    tracking: false,
   },
   
   // Mock behavior settings
   behavior: {
     // Simulate network delays
-    simulateNetworkDelay: true,
+    simulateNetworkDelay: false,
     
     // Simulate occasional errors
     simulateErrors: false,
     
     // Auto-start processing when environment is selected
-    autoStartProcessing: true,
+    autoStartProcessing: false,
     
     // Show mock indicators in UI
-    showMockIndicators: import.meta.env.DEV,
+    showMockIndicators: false,
   },
   
   // Performance settings for mock data
   performance: {
-    frameUpdateInterval: 1000, // 1 second between frame updates
+    frameUpdateInterval: 1000, // Legacy defaults (unused when disabled)
     maxPersonsPerCamera: 4,
-    enableBase64Images: true, // Include base64 image data
+    enableBase64Images: true,
   }
 } as const;
-
-// Log mock mode status
-if (import.meta.env.DEV) {
-  console.log('🎭 Mock Mode Configuration:', {
-    enabled: MOCK_CONFIG.enabled,
-    services: MOCK_CONFIG.services,
-    env: {
-      VITE_USE_MOCK_DATA: import.meta.env.VITE_USE_MOCK_DATA,
-      NODE_ENV: import.meta.env.NODE_ENV,
-      DEV: import.meta.env.DEV,
-    }
-  });
-}
