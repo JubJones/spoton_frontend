@@ -1,6 +1,7 @@
 // src/pages/LandingPage.tsx
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Target, Map, BarChart2 } from 'lucide-react';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import Header from '../components/common/Header';
 import StatusCard from '../components/common/StatusCard';
@@ -90,7 +91,7 @@ const LandingPage: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-16">
           <div className="text-center p-6">
             <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-500 rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <span className="text-2xl">🎯</span>
+              <Target className="w-8 h-8 text-white" />
             </div>
             <h4 className="text-xl font-semibold mb-3 text-white">Real-time Tracking</h4>
             <p className="text-gray-400">
@@ -101,7 +102,7 @@ const LandingPage: React.FC = () => {
 
           <div className="text-center p-6">
             <div className="w-16 h-16 bg-gradient-to-r from-green-500 to-blue-500 rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <span className="text-2xl">🗺️</span>
+              <Map className="w-8 h-8 text-white" />
             </div>
             <h4 className="text-xl font-semibold mb-3 text-white">Spatial Mapping</h4>
             <p className="text-gray-400">
@@ -112,7 +113,7 @@ const LandingPage: React.FC = () => {
 
           <div className="text-center p-6">
             <div className="w-16 h-16 bg-gradient-to-r from-orange-500 to-red-500 rounded-xl mx-auto mb-4 flex items-center justify-center">
-              <span className="text-2xl">📊</span>
+              <BarChart2 className="w-8 h-8 text-white" />
             </div>
             <h4 className="text-xl font-semibold mb-3 text-white">Analytics Dashboard</h4>
             <p className="text-gray-400">

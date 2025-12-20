@@ -5,7 +5,6 @@ import { getAvailableEnvironments, validateEnvironmentConfig } from '../config/e
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import Header from '../components/common/Header';
 import LoadingSpinner from '../components/common/LoadingSpinner';
-import DateTimeRangePicker, { DateTimeRange } from '../components/DateTimeRangePicker';
 import { APP_CONFIG } from '../config/app';
 import type { EnvironmentConfiguration, EnvironmentId } from '../types/api';
 
@@ -64,11 +63,10 @@ const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
   return (
     <div
       data-testid={`environment-${environment.id}`}
-      className={`relative p-6 rounded-xl border-2 transition-all duration-300 cursor-pointer transform hover:scale-105 ${
-        isSelected
-          ? 'border-orange-400 bg-gradient-to-br from-orange-500/10 to-red-500/10 shadow-lg shadow-orange-500/25'
-          : 'border-gray-600 bg-black/30 hover:border-gray-500'
-      }`}
+      className={`relative p-6 rounded-xl border-2 transition-all duration-300 cursor-pointer transform hover:scale-105 ${isSelected
+        ? 'border-orange-400 bg-gradient-to-br from-orange-500/10 to-red-500/10 shadow-lg shadow-orange-500/25'
+        : 'border-gray-600 bg-black/30 hover:border-gray-500'
+        }`}
       onClick={handleCardClick}
     >
       {/* Environment Icon */}
@@ -100,11 +98,10 @@ const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
             <div key={camera.id} className="flex justify-between items-center text-xs">
               <span className="text-gray-400">{camera.name}</span>
               <span
-                className={`px-2 py-1 rounded ${
-                  camera.homography_available
-                    ? 'bg-green-500/20 text-green-400'
-                    : 'bg-yellow-500/20 text-yellow-400'
-                }`}
+                className={`px-2 py-1 rounded ${camera.homography_available
+                  ? 'bg-green-500/20 text-green-400'
+                  : 'bg-yellow-500/20 text-yellow-400'
+                  }`}
               >
                 {camera.homography_available ? 'Mapped' : 'Basic'}
               </span>
@@ -116,11 +113,10 @@ const EnvironmentCard: React.FC<EnvironmentCardProps> = ({
       {/* Action Button */}
       <button
         onClick={handleProceed}
-        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 ${
-          isValidated
-            ? 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white'
-            : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
-        }`}
+        className={`w-full py-3 px-4 rounded-lg font-semibold transition-all duration-300 ${isValidated
+          ? 'bg-gradient-to-r from-green-500 to-blue-500 hover:from-green-600 hover:to-blue-600 text-white'
+          : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white'
+          }`}
       >
         {isValidated ? 'Launch Environment' : 'Validate & Launch'}
       </button>
@@ -143,18 +139,7 @@ const EnvironmentSelectionPage: React.FC = () => {
   const [validatedEnvironments, setValidatedEnvironments] = useState<Set<EnvironmentId>>(new Set());
   const [validatingEnvironment, setValidatingEnvironment] = useState<EnvironmentId | null>(null);
 
-  // Date/Time Range state
-  const [dateTimeRange, setDateTimeRange] = useState<DateTimeRange>(() => {
-    // Default to last hour
-    const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
-    return {
-      startDate: oneHourAgo.toISOString().split('T')[0],
-      startTime: oneHourAgo.toTimeString().slice(0, 5),
-      endDate: now.toISOString().split('T')[0],
-      endTime: now.toTimeString().slice(0, 5),
-    };
-  });
+  // Date/Time Range state removed - defaulting to last hour on launch
 
   useEffect(() => {
     // Perform initial health check
@@ -179,14 +164,17 @@ const EnvironmentSelectionPage: React.FC = () => {
         // Mark as validated
         setValidatedEnvironments((prev) => new Set([...prev, envId]));
 
-        // Auto-navigate after successful validation with date/time parameters
+        // Auto-navigate after successful validation with default (last hour) parameters
         setTimeout(() => {
+          const now = new Date();
+          const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+
           const params = new URLSearchParams({
             environment: envId,
-            startDate: dateTimeRange.startDate,
-            startTime: dateTimeRange.startTime,
-            endDate: dateTimeRange.endDate,
-            endTime: dateTimeRange.endTime,
+            startDate: oneHourAgo.toISOString().split('T')[0],
+            startTime: oneHourAgo.toTimeString().slice(0, 5),
+            endDate: now.toISOString().split('T')[0],
+            endTime: now.toTimeString().slice(0, 5),
           });
           navigate(`/group-view?${params.toString()}`);
         }, 1000);
@@ -247,22 +235,6 @@ const EnvironmentSelectionPage: React.FC = () => {
           ))}
         </div>
 
-        {/* Date/Time Range Selection */}
-        <div className="max-w-4xl mx-auto mb-12">
-          <div className="bg-black/30 backdrop-blur-sm rounded-xl p-6 border border-gray-700">
-            <h3 className="text-xl font-semibold text-white mb-4">Select Date & Time Range</h3>
-            <p className="text-gray-400 mb-6">
-              Choose the time period you want to analyze. The system will process tracking data for
-              the selected environment within this timeframe.
-            </p>
-            <DateTimeRangePicker
-              value={dateTimeRange}
-              onChange={setDateTimeRange}
-              maxDaysBack={30}
-            />
-          </div>
-        </div>
-
         {/* Validation Status */}
         {validatingEnvironment && (
           <div className="text-center mb-8">
@@ -275,51 +247,7 @@ const EnvironmentSelectionPage: React.FC = () => {
           </div>
         )}
 
-        {/* Quick Actions */}
-        <div className="text-center">
-          <div className="inline-flex flex-col sm:flex-row gap-4">
-            <Link
-              to="/custom-setup"
-              className="px-6 py-3 bg-transparent border-2 border-gray-600 hover:border-orange-400 rounded-lg font-semibold text-gray-300 hover:text-orange-400 transition-all duration-300"
-            >
-              Custom Environment Setup
-            </Link>
 
-            <button
-              onClick={() => healthCheck()}
-              className="px-6 py-3 bg-gray-700 hover:bg-gray-600 rounded-lg font-semibold text-gray-300 transition-all duration-300"
-            >
-              Refresh Backend Status
-            </button>
-          </div>
-        </div>
-
-        {/* Environment Info */}
-        <div className="mt-16 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-          <div>
-            <div className="text-3xl mb-3">🔧</div>
-            <h3 className="text-lg font-semibold mb-2 text-white">Pre-Configured</h3>
-            <p className="text-gray-400 text-sm">
-              Environments come with optimized camera layouts and tracking configurations.
-            </p>
-          </div>
-
-          <div>
-            <div className="text-3xl mb-3">⚡</div>
-            <h3 className="text-lg font-semibold mb-2 text-white">Real-Time Processing</h3>
-            <p className="text-gray-400 text-sm">
-              All environments support real-time tracking at 30 FPS with AI-powered detection.
-            </p>
-          </div>
-
-          <div>
-            <div className="text-3xl mb-3">📊</div>
-            <h3 className="text-lg font-semibold mb-2 text-white">Analytics Ready</h3>
-            <p className="text-gray-400 text-sm">
-              Each environment includes spatial mapping and historical analytics capabilities.
-            </p>
-          </div>
-        </div>
       </main>
     </div>
   );
