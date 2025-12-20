@@ -81,9 +81,6 @@ const Header: React.FC<HeaderProps> = ({
             <Link to="/help" className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full">
               Help
             </Link>
-            <Link to="/about" className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full">
-              About
-            </Link>
           </>
         )}
       </nav>

@@ -371,14 +371,14 @@ const AnalyticsPage: React.FC = () => {
         status: 'warning' as const,
       },
     ], [
-      averageConfidencePercent,
-      cacheHitRatePercent,
-      detectionRatePerSecond,
-      errorRatePercent,
-      displayMetrics?.active_persons,
-      reportingCameraCount,
-      cameraIds.length,
-    ],
+    averageConfidencePercent,
+    cacheHitRatePercent,
+    detectionRatePerSecond,
+    errorRatePercent,
+    displayMetrics?.active_persons,
+    reportingCameraCount,
+    cameraIds.length,
+  ],
   );
 
   const handleCameraToggle = useCallback((cameraId: BackendCameraId) => {
@@ -400,7 +400,7 @@ const AnalyticsPage: React.FC = () => {
 
         const { start, end } = computeTimeRangeWindow(selectedTimeRange);
 
-    const exportRequest: ExportAnalyticsReportRequest = {
+        const exportRequest: ExportAnalyticsReportRequest = {
           environment_id: environment,
           start_time: start.toISOString(),
           end_time: end.toISOString(),
@@ -490,7 +490,7 @@ const AnalyticsPage: React.FC = () => {
   const environmentLabel = environment === 'factory' ? 'Factory Floor' : 'Campus Network';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Header environment={environment} connectionStatus={connectionStatus} showBackButton={true} />
 
       <main className="container mx-auto px-6 py-10 space-y-10">
@@ -661,13 +661,12 @@ const AnalyticsPage: React.FC = () => {
                     key={camera.cameraId}
                     type="button"
                     onClick={() => isSelectable && handleCameraToggle(typedCameraId)}
-                    className={`rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 text-left transition hover:border-blue-400/40 ${
-                      isSelectable
+                    className={`rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 text-left transition hover:border-blue-400/40 ${isSelectable
                         ? isSelected
                           ? 'ring-2 ring-blue-500'
                           : 'hover:ring-2 hover:ring-blue-400'
                         : 'opacity-70 cursor-not-allowed'
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between">
                       <div>

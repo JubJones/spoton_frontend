@@ -10,7 +10,7 @@ import GroupViewPage from './pages/GroupViewPage';
 import AnalyticsPage from './pages/AnalyticsPage';
 import SettingsPage from './pages/SettingsPage';
 import HelpPage from './pages/HelpPage';
-import AboutPage from './pages/AboutPage';
+
 
 function App() {
   return (
@@ -55,7 +55,6 @@ function App() {
                   }
                 />
                 <Route path="/help" element={<HelpPage />} />
-                <Route path="/about" element={<AboutPage />} />
 
                 {/* 404 fallback */}
                 <Route
