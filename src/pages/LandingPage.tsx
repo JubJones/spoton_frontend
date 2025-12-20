@@ -64,7 +64,7 @@ const LandingPage: React.FC = () => {
             <img
               src={heroImage}
               alt="SpotOn Dashboard Preview"
-              className="w-full"
+              className="w-full transform scale-150 origin-center brightness-110 opacity-25"
             />
           </div>
         </div>
