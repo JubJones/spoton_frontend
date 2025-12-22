@@ -387,6 +387,31 @@ export interface SystemStatistics {
   uptime: number;
 }
 
+export interface AnalyticsDashboardResponse {
+  status: string;
+  data: {
+    generated_at: string;
+    summary: {
+      total_detections: number;
+      average_confidence_percent: number;
+      system_uptime_percent: number;
+      uptime_delta_percent: number;
+    };
+    cameras: Array<{
+      camera_id: string;
+      detections: number;
+      unique_entities: number;
+      average_confidence_percent: number;
+      uptime_percent: number;
+    }>;
+    charts: {
+      detections_per_bucket: Array<{ timestamp: string; detections: number }>;
+      average_confidence_trend: Array<{ timestamp: string; confidence_percent: number }>;
+      uptime_trend: Array<{ date: string; uptime_percent: number }>;
+    };
+  };
+}
+
 // ============================================================================
 // Export Types
 // ============================================================================
@@ -689,6 +714,7 @@ export const API_ENDPOINTS = {
   REAL_TIME_METRICS: '/api/v1/analytics/real-time/metrics',
   ACTIVE_PERSONS: '/api/v1/analytics/real-time/active-persons',
   SYSTEM_STATISTICS: '/api/v1/analytics/system/statistics',
+  ANALYTICS_DASHBOARD: '/api/v1/analytics/dashboard',
 } as const;
 
 export const WEBSOCKET_ENDPOINTS = {

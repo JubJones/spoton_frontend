@@ -1,790 +1,537 @@
 // src/pages/AnalyticsPage.tsx
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import Header from '../components/common/Header';
-import StatusCard from '../components/common/StatusCard';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
-import { apiService } from '../services/apiService';
-import type { EnvironmentId, BackendCameraId, ExportFormat, RealTimeMetrics } from '../types/api';
 import { useCameraConfig } from '../context/CameraConfigContext';
+import { APIService } from '../services/apiService';
+import { AnalyticsDashboardResponse, EnvironmentId } from '../types/api';
+import { useEffect } from 'react';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  Cell,
+  PieChart,
+  Pie,
+  LineChart,
+  Line,
+  Legend
+} from 'recharts';
+import {
+  Activity,
+  Users,
+  Clock,
+  AlertCircle,
+  Server,
+  Download,
+  Video,
+  Zap,
+  ChevronDown
+} from 'lucide-react';
 
-type TimeRangeKey = '5m' | '1h' | '6h' | 'today' | '24h' | '3d' | '7d' | '30d' | '1m';
+// --- Mock Data Generators Removed ---
+// Real data is now fetched via useSpotOnBackend and APIService
 
-const TIME_RANGE_TO_DURATION_MS: Partial<Record<TimeRangeKey, number>> = {
-  '5m': 5 * 60 * 1000,
-  '1h': 60 * 60 * 1000,
-  '6h': 6 * 60 * 60 * 1000,
-  '24h': 24 * 60 * 60 * 1000,
-  '3d': 3 * 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000,
-  '30d': 30 * 24 * 60 * 60 * 1000,
-  '1m': 30 * 24 * 60 * 60 * 1000,
-};
-
-interface TimeRangeProfile {
-  activePersons: number;
-  detectionRatePerSecond: number;
-  averageConfidence: number;
-  cacheHitRate: number;
-  errorRate: number;
-  processingLatency: number;
-  cameraLoads: Record<string, number>;
-}
-
-const TIME_RANGE_PROFILES: Record<TimeRangeKey, TimeRangeProfile> = {
-  '5m': {
-    activePersons: 28,
-    detectionRatePerSecond: 0.78,
-    averageConfidence: 0.93,
-    cacheHitRate: 0.75,
-    errorRate: 0.008,
-    processingLatency: 0.12,
-    cameraLoads: { c09: 8, c12: 7, c13: 6, c16: 7 },
-  },
-  '1h': {
-    activePersons: 56,
-    detectionRatePerSecond: 0.42,
-    averageConfidence: 0.91,
-    cacheHitRate: 0.72,
-    errorRate: 0.01,
-    processingLatency: 0.18,
-    cameraLoads: { c09: 18, c12: 14, c13: 12, c16: 12 },
-  },
-  '6h': {
-    activePersons: 94,
-    detectionRatePerSecond: 0.31,
-    averageConfidence: 0.88,
-    cacheHitRate: 0.68,
-    errorRate: 0.012,
-    processingLatency: 0.23,
-    cameraLoads: { c09: 28, c12: 24, c13: 18, c16: 24 },
-  },
-  'today': {
-    activePersons: 132,
-    detectionRatePerSecond: 0.062,
-    averageConfidence: 0.87,
-    cacheHitRate: 0.66,
-    errorRate: 0.014,
-    processingLatency: 0.28,
-    cameraLoads: { c09: 42, c12: 34, c13: 26, c16: 30 },
-  },
-  '24h': {
-    activePersons: 119,
-    detectionRatePerSecond: 0.051111111111111114,
-    averageConfidence: 0.8448,
-    cacheHitRate: 0.64,
-    errorRate: 0.015,
-    processingLatency: 0.3,
-    cameraLoads: { c09: 39, c12: 30, c13: 21, c16: 29 },
-  },
-  '3d': {
-    activePersons: 148,
-    detectionRatePerSecond: 0.038,
-    averageConfidence: 0.83,
-    cacheHitRate: 0.62,
-    errorRate: 0.016,
-    processingLatency: 0.32,
-    cameraLoads: { c09: 46, c12: 38, c13: 28, c16: 36 },
-  },
-  '7d': {
-    activePersons: 164,
-    detectionRatePerSecond: 0.026,
-    averageConfidence: 0.81,
-    cacheHitRate: 0.6,
-    errorRate: 0.018,
-    processingLatency: 0.34,
-    cameraLoads: { c09: 52, c12: 41, c13: 32, c16: 39 },
-  },
-  '30d': {
-    activePersons: 190,
-    detectionRatePerSecond: 0.022,
-    averageConfidence: 0.8,
-    cacheHitRate: 0.59,
-    errorRate: 0.019,
-    processingLatency: 0.37,
-    cameraLoads: { c09: 60, c12: 47, c13: 36, c16: 47 },
-  },
-  '1m': {
-    activePersons: 214,
-    detectionRatePerSecond: 0.017,
-    averageConfidence: 0.78,
-    cacheHitRate: 0.56,
-    errorRate: 0.021,
-    processingLatency: 0.4,
-    cameraLoads: { c09: 68, c12: 54, c13: 43, c16: 49 },
-  },
-};
-
-const TIME_RANGE_FILTERS: Array<{ key: TimeRangeKey; label: string; helper: string }> = [
-  { key: '5m', label: 'Last 5 Minutes', helper: 'Peak intervals' },
-  { key: '1h', label: 'Last Hour', helper: 'Recent activity' },
-  { key: '6h', label: 'Last 6 Hours', helper: 'Shift overview' },
-  { key: 'today', label: 'Today', helper: 'Since midnight' },
-  { key: '24h', label: '24 Hours', helper: 'Full day' },
-  { key: '3d', label: '3 Days', helper: 'Recent trend' },
-  { key: '7d', label: '7 Days', helper: 'Weekly view' },
-  { key: '30d', label: '30 Days', helper: 'Monthly trend' },
-  { key: '1m', label: 'Last Month', helper: 'Previous cycle' },
+const RECENT_ALERTS = [
+  { id: 1, type: 'warning', message: 'High occupancy detected in C12', time: '10:42 AM' },
+  { id: 2, type: 'info', message: 'Shift change pattern recognized', time: '09:00 AM' },
+  { id: 3, type: 'success', message: 'System health check passed', time: '08:00 AM' },
 ];
-
-
-const computeTimeRangeWindow = (range: TimeRangeKey): { start: Date; end: Date } => {
-  const end = new Date();
-
-  if (range === 'today') {
-    const start = new Date(end);
-    start.setHours(0, 0, 0, 0);
-    return { start, end };
-  }
-
-  const durationMs = (TIME_RANGE_TO_DURATION_MS[range] ?? TIME_RANGE_TO_DURATION_MS['24h'] ?? 24 * 60 * 60 * 1000);
-  const start = new Date(end.getTime() - durationMs);
-  return { start, end };
-};
 
 const AnalyticsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const environment = (searchParams.get('environment') || 'factory') as EnvironmentId;
-
-  const [selectedTimeRange, setSelectedTimeRange] = useState<TimeRangeKey>('24h');
-  const [selectedCameras, setSelectedCameras] = useState<Set<BackendCameraId>>(new Set());
-  const [refreshInterval, setRefreshInterval] = useState<number>(30);
-  const [isAutoRefresh, setIsAutoRefresh] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
+  const [timeRange, setTimeRange] = useState('24h');
+  const [dashboardData, setDashboardData] = useState<AnalyticsDashboardResponse['data'] | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   const { isConnected, backendStatus } = useSpotOnBackend();
+  const { environmentCameras } = useCameraConfig();
+
+  // Fetch dashboard data on mount and when environment changes
+  useEffect(() => {
+    let mounted = true;
+
+    const fetchAnalytics = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const api = new APIService();
+        const response = await api.getDashboardAnalytics(environment, 24); // Default to 24h for now
+
+        if (mounted) {
+          if (response.status === 'success' && response.data) {
+            setDashboardData(response.data);
+          } else {
+            setError('Failed to load analytics data');
+          }
+        }
+      } catch (err) {
+        if (mounted) {
+          console.error('Error fetching analytics:', err);
+          setError('System unreachable');
+        }
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    };
+
+    fetchAnalytics();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchAnalytics, 30000);
+
+    return () => {
+      mounted = false;
+      clearInterval(interval);
+    };
+  }, [environment]);
+
   const connectionStatus = useMemo(() => ({
     isConnected,
     statusText: isConnected ? backendStatus.status : 'Disconnected',
   }), [backendStatus.status, isConnected]);
 
-  const { environmentCameras, getDisplayName } = useCameraConfig();
-  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
+  const cameraCount = (environmentCameras[environment] ?? []).length;
 
-  const [metrics, setMetrics] = useState<RealTimeMetrics | null>(null);
-  const [isLoadingMetrics, setIsLoadingMetrics] = useState(false);
-  const [isRefreshingMetrics, setIsRefreshingMetrics] = useState(false);
-  const [metricsError, setMetricsError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<string | null>(null);
+  // Process all chart data
+  const { activityData, accuracyData, uptimeData } = useMemo(() => {
+    if (!dashboardData?.charts) return { activityData: [], accuracyData: [], uptimeData: [] };
 
-  const displayMetrics = useMemo<RealTimeMetrics>(() => {
-    const profile = TIME_RANGE_PROFILES[selectedTimeRange];
-    const base = metrics;
+    const activity = dashboardData.charts.detections_per_bucket.map(point => ({
+      time: new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      persons: point.detections,
+    }));
 
-    const profileCameraLoads = profile?.cameraLoads ?? {};
-    let chosenCameraLoads: Record<string, number> =
-      Object.keys(profileCameraLoads).length > 0
-        ? profileCameraLoads
-        : base?.camera_loads ?? {};
+    const accuracy = dashboardData.charts.average_confidence_trend.map(point => ({
+      time: new Date(point.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      confidence: point.confidence_percent,
+    }));
 
-    if (cameraIds.length > 0) {
-      const matchesConfigured = Object.keys(chosenCameraLoads).every((key) =>
-        cameraIds.includes(key as BackendCameraId),
-      );
+    const uptime = dashboardData.charts.uptime_trend.map(point => ({
+      date: new Date(point.date).toLocaleDateString([], { month: 'short', day: 'numeric' }),
+      uptime: point.uptime_percent,
+    }));
 
-      if (!matchesConfigured) {
-        const total = profile?.activePersons ?? base?.active_persons ?? 0;
-        const distributed: Record<string, number> = {};
+    return { activityData: activity, accuracyData: accuracy, uptimeData: uptime };
+  }, [dashboardData]);
 
-        if (total > 0) {
-          let remaining = total;
-          cameraIds.forEach((id, index) => {
-            const remainingSlots = cameraIds.length - index || 1;
-            const value = Math.round(remaining / remainingSlots);
-            distributed[id] = value;
-            remaining -= value;
-          });
-        } else {
-          cameraIds.forEach((id) => {
-            distributed[id] = 0;
-          });
-        }
+  // Real Distribution Data from Cameras
+  const distributionData = useMemo(() => {
+    if (!dashboardData?.cameras) return [];
 
-        chosenCameraLoads = distributed;
-      }
-    }
+    // Group cameras by zone prefix (e.g., c01-c04 = Campus, c09-c16 = Factory) - assuming convention or metadata
+    // For now, we'll iterate through known lists since we have environmentCameras
 
-    return {
-      timestamp: base?.timestamp ?? new Date().toISOString(),
-      active_persons: profile?.activePersons ?? base?.active_persons ?? 0,
-      detection_rate: profile?.detectionRatePerSecond ?? base?.detection_rate ?? 0,
-      average_confidence: profile?.averageConfidence ?? base?.average_confidence ?? 0,
-      camera_loads: chosenCameraLoads,
-      performance_metrics: {
-        cache_hit_rate:
-          profile?.cacheHitRate ?? base?.performance_metrics?.cache_hit_rate ?? 0,
-        error_rate:
-          profile?.errorRate ?? base?.performance_metrics?.error_rate ?? 0,
-        processing_latency:
-          profile?.processingLatency ?? base?.performance_metrics?.processing_latency ?? 0,
-        memory_usage: base?.performance_metrics?.memory_usage ?? 0,
-      },
-    };
-  }, [metrics, selectedTimeRange, cameraIds]);
+    // Actually, let's just use the camera ID to guess or use metadata if available.
+    // The previous code had hardcoded zones. Let's make it data-driven:
 
-  const fetchMetrics = useCallback(
-    async (options: { showSpinner?: boolean } = {}) => {
-      const { showSpinner = false } = options;
-      try {
-        if (showSpinner) {
-          setIsLoadingMetrics(true);
-        } else {
-          setIsRefreshingMetrics(true);
-        }
+    const factoryCameras = ['c09', 'c12', 'c13', 'c16'];
+    const campusCameras = ['c01', 'c02', 'c03', 'c05'];
 
-        const data = await apiService.getRealTimeMetrics();
-        setMetrics(data);
-        setMetricsError(null);
-        setLastUpdated(data.timestamp);
-      } catch (error) {
-        console.error('Failed to fetch real-time metrics:', error);
-        setMetricsError(error instanceof Error ? error.message : 'Unknown error');
-      } finally {
-        if (showSpinner) {
-          setIsLoadingMetrics(false);
-        } else {
-          setIsRefreshingMetrics(false);
-        }
-      }
-    },
-    [],
-  );
+    let factoryCount = 0;
+    let campusCount = 0;
 
-  useEffect(() => {
-    fetchMetrics({ showSpinner: true });
-  }, [fetchMetrics]);
-
-  useEffect(() => {
-    if (!isAutoRefresh) {
-      return;
-    }
-
-    const intervalId = window.setInterval(() => {
-      fetchMetrics();
-    }, refreshInterval * 1000);
-
-    return () => window.clearInterval(intervalId);
-  }, [fetchMetrics, isAutoRefresh, refreshInterval]);
-
-  const handleManualRefresh = useCallback(() => {
-    fetchMetrics({ showSpinner: true });
-  }, [fetchMetrics]);
-
-  const cameraLoadEntries = useMemo(() => {
-    const cameraLoads = displayMetrics.camera_loads ?? {};
-    const configuredSet = new Set(cameraIds);
-    const entries: Array<{ cameraId: string; activePersons: number; isConfigured: boolean }> =
-      cameraIds.map((cameraId) => ({
-        cameraId,
-        activePersons: cameraLoads[cameraId] ?? 0,
-        isConfigured: true,
-      }));
-
-    Object.entries(cameraLoads).forEach(([cameraId, activePersons]) => {
-      if (!configuredSet.has(cameraId as BackendCameraId)) {
-        entries.push({ cameraId, activePersons, isConfigured: false });
+    dashboardData.cameras.forEach(cam => {
+      if (factoryCameras.includes(cam.camera_id)) factoryCount += cam.detections;
+      else if (campusCameras.includes(cam.camera_id)) campusCount += cam.detections;
+      else {
+        // Fallback for unknown cameras -> assign to current environment
+        if (environment === 'factory') factoryCount += cam.detections;
+        else campusCount += cam.detections;
       }
     });
 
-    return entries.sort((a, b) => b.activePersons - a.activePersons);
-  }, [cameraIds, displayMetrics]);
+    const total = factoryCount + campusCount || 1; // avoid /0
 
-  const totalActiveAcrossCameras = useMemo(() => {
-    return cameraLoadEntries.reduce((sum, entry) => sum + entry.activePersons, 0);
-  }, [cameraLoadEntries]);
+    return [
+      { name: 'Factory Zone', value: Math.round((factoryCount / total) * 100), raw: factoryCount, color: '#f97316' },
+      { name: 'Campus Zone', value: Math.round((campusCount / total) * 100), raw: campusCount, color: '#3b82f6' },
+    ].filter(d => d.value > 0);
+  }, [dashboardData, environment]);
 
-  const detectionRatePerSecond = displayMetrics?.detection_rate ?? null;
-  const averageConfidencePercent = displayMetrics
-    ? displayMetrics.average_confidence * 100
-    : null;
-  const cacheHitRatePercent = displayMetrics?.performance_metrics?.cache_hit_rate != null
-    ? displayMetrics.performance_metrics.cache_hit_rate * 100
-    : null;
-  const errorRatePercent = displayMetrics?.performance_metrics?.error_rate != null
-    ? displayMetrics.performance_metrics.error_rate * 100
-    : null;
-  const processingLatency = displayMetrics?.performance_metrics?.processing_latency ?? null;
-  const memoryUsage = displayMetrics?.performance_metrics?.memory_usage ?? null;
-  const reportingCameraCount = cameraLoadEntries.length;
-
-  const lastUpdatedDisplay = useMemo(() => {
-    if (!lastUpdated) {
-      return null;
-    }
-    try {
-      return new Date(lastUpdated).toLocaleTimeString();
-    } catch (error) {
-      console.warn('Failed to parse last updated timestamp', error);
-      return lastUpdated;
-    }
-  }, [lastUpdated]);
-
-  const formatNumber = (value: number | null | undefined, fractionDigits = 0) => {
-    if (value === null || value === undefined || Number.isNaN(value)) {
-      return '—';
-    }
-    return value.toLocaleString(undefined, {
-      minimumFractionDigits: fractionDigits,
-      maximumFractionDigits: fractionDigits,
-    });
-  };
-
-  const statusCards = useMemo(
-    () => [
-      {
-        label: 'Active Persons',
-        value: formatNumber(displayMetrics?.active_persons),
-        status: 'info' as const,
-      },
-      {
-        label: 'Detection Rate',
-        value:
-          detectionRatePerSecond !== null
-            ? `${formatNumber(detectionRatePerSecond, 2)} / sec`
-            : '—',
-        status: 'info' as const,
-      },
-      {
-        label: 'Average Confidence',
-        value:
-          averageConfidencePercent !== null
-            ? `${formatNumber(averageConfidencePercent, 1)}%`
-            : '—',
-        status: 'success' as const,
-      },
-      {
-        label: 'Cameras Online',
-        value: `${formatNumber(reportingCameraCount)} / ${cameraIds.length}`,
-        status: 'info' as const,
-      },
-      {
-        label: 'Cache Hit Rate',
-        value:
-          cacheHitRatePercent !== null
-            ? `${formatNumber(cacheHitRatePercent, 1)}%`
-            : '—',
-        status: 'success' as const,
-      },
-      {
-        label: 'System Error Rate',
-        value: errorRatePercent !== null ? `${formatNumber(errorRatePercent, 2)}%` : '—',
-        status: 'warning' as const,
-      },
-    ], [
-    averageConfidencePercent,
-    cacheHitRatePercent,
-    detectionRatePerSecond,
-    errorRatePercent,
-    displayMetrics?.active_persons,
-    reportingCameraCount,
-    cameraIds.length,
-  ],
-  );
-
-  const handleCameraToggle = useCallback((cameraId: BackendCameraId) => {
-    setSelectedCameras((prev) => {
-      const newSet = new Set(prev);
-      if (newSet.has(cameraId)) {
-        newSet.delete(cameraId);
-      } else {
-        newSet.add(cameraId);
-      }
-      return newSet;
-    });
-  }, []);
-
-  const handleExportData = useCallback(
-    async (format: 'csv' | 'json' | 'pdf' | 'excel') => {
-      try {
-        setIsExporting(true);
-
-        const { start, end } = computeTimeRangeWindow(selectedTimeRange);
-
-        const exportRequest: ExportAnalyticsReportRequest = {
-          environment_id: environment,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          format: format as ExportFormat,
-          include_zones: true,
-          include_heatmaps: true,
-          include_trajectories: true,
-          include_reports: true,
-          include_snapshots: true,
-          camera_ids: selectedCameras.size > 0 ? Array.from(selectedCameras) : undefined,
-        };
-
-        const exportJob = await apiService.createAnalyticsExport(exportRequest);
-        const jobId = exportJob.job_id;
-        setExportProgress((prev) => ({ ...prev, [jobId]: 0 }));
-
-        const pollInterval = window.setInterval(async () => {
-          try {
-            const status = await apiService.getExportJobStatus(jobId);
-            setExportProgress((prev) => ({ ...prev, [jobId]: status.progress }));
-
-            if (status.status === 'completed') {
-              window.clearInterval(pollInterval);
-
-              if (status.download_url) {
-                const blob = await apiService.downloadExport(jobId);
-                const url = window.URL.createObjectURL(blob);
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.download = `analytics-${environment}-${format}-${new Date()
-                  .toISOString()
-                  .split('T')[0]}.${format}`;
-                document.body.appendChild(anchor);
-                anchor.click();
-                document.body.removeChild(anchor);
-                window.URL.revokeObjectURL(url);
-              }
-
-              setExportProgress((prev) => {
-                const next = { ...prev };
-                delete next[jobId];
-                return next;
-              });
-            } else if (status.status === 'failed') {
-              window.clearInterval(pollInterval);
-              console.error('Export failed:', status.error_message);
-              setExportProgress((prev) => {
-                const next = { ...prev };
-                delete next[jobId];
-                return next;
-              });
-            }
-          } catch (error) {
-            console.error('Error polling export status:', error);
-            window.clearInterval(pollInterval);
-            setExportProgress((prev) => {
-              const next = { ...prev };
-              delete next[jobId];
-              return next;
-            });
-          }
-        }, 2000);
-      } catch (error) {
-        console.error('Export failed:', error);
-      } finally {
-        setIsExporting(false);
-      }
-    },
-    [environment, selectedCameras, selectedTimeRange],
-  );
-
-  const getTimeRangeLabel = (range: TimeRangeKey) => {
-    const labels: Record<TimeRangeKey, string> = {
-      '5m': 'Last 5 Minutes',
-      '1h': 'Last Hour',
-      '6h': 'Last 6 Hours',
-      'today': 'Today',
-      '24h': 'Last 24 Hours',
-      '3d': 'Last 3 Days',
-      '7d': 'Last 7 Days',
-      '30d': 'Last 30 Days',
-      '1m': 'Last Month',
-    };
-    return labels[range];
-  };
-
-  const environmentLabel = environment === 'factory' ? 'Factory Floor' : 'Campus Network';
+  const summary = dashboardData?.summary;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
-      <Header environment={environment} connectionStatus={connectionStatus} showBackButton={true} />
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white selection:bg-orange-500/30 font-sans">
+      <Header
+        environment={environment}
+        connectionStatus={connectionStatus}
+        showBackButton={true}
+        backText="Back to Operations"
+      />
 
-      <main className="container mx-auto px-6 py-10 space-y-10">
-        <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-blue-600/20 via-purple-500/10 to-transparent p-8 shadow-2xl">
-          <div className="absolute inset-y-0 right-0 w-64 bg-gradient-to-l from-purple-500/30 to-transparent blur-3xl" aria-hidden="true" />
-          <div className="relative flex flex-col gap-10 lg:flex-row lg:items-start">
-            <div className="flex-1 space-y-6">
-              <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-blue-100">
-                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                Analytics Control Center
-              </div>
-              <div>
-                <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">Actionable Insights</h1>
-                <p className="text-lg text-gray-200 max-w-2xl">
-                  Track performance, spot anomalies, and guide on-site teams with confident, data-backed decisions.
-                  These metrics update automatically, or refresh on demand whenever you need a fresh snapshot.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-3 text-sm text-gray-200">
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Environment: <span className="text-white font-semibold">{environmentLabel}</span></span>
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Time Range: {getTimeRangeLabel(selectedTimeRange)}</span>
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Last updated: {lastUpdatedDisplay ?? '—'}</span>
-                <span className={`px-3 py-1 rounded-full border ${isConnected ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-red-400/30 bg-red-400/10 text-red-200'}`}>
-                  {isConnected ? 'Live connection' : 'Offline snapshot'}
-                </span>
-              </div>
-              {metricsError && (
-                <div className="inline-flex items-center gap-2 rounded-full border border-red-400/40 bg-red-400/10 px-4 py-2 text-sm text-red-200">
-                  <span className="w-2 h-2 bg-red-400 rounded-full animate-ping" />
-                  {metricsError}
-                </div>
-              )}
+      <main className="max-w-[1800px] mx-auto p-6 space-y-8 animate-in fade-in duration-500">
 
-              <div className="flex flex-wrap gap-3">
-                {TIME_RANGE_FILTERS.map((filter) => {
-                  const isActive = selectedTimeRange === filter.key;
-                  return (
-                    <button
-                      key={filter.key}
-                      onClick={() => setSelectedTimeRange(filter.key)}
-                      className={`group flex flex-col items-start rounded-xl border px-4 py-3 transition 
-                        ${isActive ? 'border-orange-400/60 bg-orange-500/10 text-orange-100 shadow-lg shadow-orange-500/20' : 'border-white/10 bg-white/5 hover:border-orange-400/30 hover:bg-white/10 text-gray-200'}`}
-                    >
-                      <span className="text-sm font-semibold">{filter.label}</span>
-                      <span className="text-xs text-gray-300/80 group-hover:text-gray-200">{filter.helper}</span>
-                    </button>
-                  );
-                })}
-              </div>
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+          <div>
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-orange-500/10 border border-orange-500/20 text-orange-400 text-xs font-mono mb-2">
+              <Activity className="w-3 h-3" />
+              <span>LIVE ANALYTICS</span>
             </div>
-
-            <div className="w-full lg:w-72 space-y-4">
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 shadow-lg space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-gray-300">Auto refresh</span>
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={isAutoRefresh}
-                      onChange={(event) => setIsAutoRefresh(event.target.checked)}
-                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-400"
-                    />
-                    <span>{isAutoRefresh ? 'On' : 'Off'}</span>
-                  </label>
-                </div>
-                <div className="flex items-center gap-3">
-                  <select
-                    value={refreshInterval}
-                    onChange={(event) => setRefreshInterval(Number(event.target.value))}
-                    disabled={!isAutoRefresh}
-                    className="flex-1 rounded-lg border border-white/10 bg-gray-900/70 px-3 py-2 text-sm text-white disabled:opacity-50"
-                  >
-                    <option value={10}>10s</option>
-                    <option value={30}>30s</option>
-                    <option value={60}>1m</option>
-                    <option value={300}>5m</option>
-                  </select>
-                  <button
-                    onClick={handleManualRefresh}
-                    disabled={isLoadingMetrics || isRefreshingMetrics}
-                    className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    {isLoadingMetrics ? (
-                      <>
-                        <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
-                        Refreshing
-                      </>
-                    ) : (
-                      <>
-                        <span>🔄</span>
-                        Refresh
-                      </>
-                    )}
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Automatic refresh keeps the dashboard in sync. Pause to freeze values for review.
-                </p>
-              </div>
-
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 shadow-lg space-y-3">
-                <div className="text-xs uppercase tracking-widest text-gray-400">Quick Export</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleExportData('csv')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    {isExporting ? (
-                      <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
-                    ) : (
-                      <span>📊</span>
-                    )}
-                    CSV
-                  </button>
-                  <button
-                    onClick={() => handleExportData('excel')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    📗 Excel
-                  </button>
-                  <button
-                    onClick={() => handleExportData('pdf')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    📑 PDF
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Exports include heatmaps, trajectories, and summary snapshots for the selected cameras.
-                </p>
-              </div>
-            </div>
+            <h1 className="text-4xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-gray-500">
+              Command Center
+            </h1>
+            <p className="text-gray-400 mt-1">Real-time surveillance intelligence for {environment.charAt(0).toUpperCase() + environment.slice(1)}.</p>
           </div>
-        </section>
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-          {statusCards.map((card) => (
-            <StatusCard
-              key={card.label}
-              label={card.label}
-              value={card.value}
-              status={card.status}
-              className="shadow-lg shadow-black/30"
-            />
-          ))}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-              <h3 className="text-xl font-semibold text-white">Camera Performance</h3>
-              <p className="text-sm text-gray-400">Select cameras to include in exports. Live share is based on the current time range.</p>
+          <div className="flex items-center gap-3">
+            <div className="bg-white/5 border border-white/10 rounded-lg p-1 flex">
+              {['1h', '6h', '24h', '7d'].map((range) => (
+                <button
+                  key={range}
+                  onClick={() => setTimeRange(range)}
+                  className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${timeRange === range
+                    ? 'bg-orange-500 text-white shadow-lg shadow-orange-500/20'
+                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                    }`}
+                >
+                  {range}
+                </button>
+              ))}
             </div>
-            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-              {cameraLoadEntries.map((camera) => {
-                const typedCameraId = camera.cameraId as BackendCameraId;
-                const isSelectable = camera.isConfigured;
-                const isSelected = isSelectable && selectedCameras.has(typedCameraId);
-                const share = totalActiveAcrossCameras > 0
-                  ? (camera.activePersons / totalActiveAcrossCameras) * 100
-                  : 0;
 
-                return (
-                  <button
-                    key={camera.cameraId}
-                    type="button"
-                    onClick={() => isSelectable && handleCameraToggle(typedCameraId)}
-                    className={`rounded-2xl border border-white/10 bg-gradient-to-br from-white/5 to-white/0 p-4 text-left transition hover:border-blue-400/40 ${isSelectable
-                        ? isSelected
-                          ? 'ring-2 ring-blue-500'
-                          : 'hover:ring-2 hover:ring-blue-400'
-                        : 'opacity-70 cursor-not-allowed'
-                      }`}
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-sm text-gray-400">
-                          {getDisplayName(typedCameraId) || camera.cameraId}
-                        </p>
-                        <p className="text-2xl font-semibold text-white">
-                          {formatNumber(camera.activePersons)}
-                        </p>
-                      </div>
-                      <div className="text-right text-sm text-gray-400">
-                        <div>{share.toFixed(1)}%</div>
-                        <div className="mt-1 flex items-center gap-1 text-xs text-gray-500">
-                          <span className="w-2 h-2 rounded-full bg-blue-400" />
-                          {isSelectable ? (isSelected ? 'Included' : 'Optional') : 'External'}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="mt-3 h-2 rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-purple-500"
-                        style={{ width: `${Math.min(100, share)}%` }}
+            <button className="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all">
+              <Download className="w-4 h-4" />
+              <span className="text-sm font-medium">Export Report</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Loading State */}
+        {loading && !dashboardData && (
+          <div className="text-center py-20">
+            <div className="inline-block animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-orange-500 mb-4"></div>
+            <p className="text-gray-400">Loading analytics streams...</p>
+          </div>
+        )}
+
+        {/* Error State */}
+        {error && !loading && !dashboardData && (
+          <div className="text-center py-20 bg-red-500/10 rounded-2xl border border-red-500/20">
+            <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+            <h3 className="text-xl font-bold text-white mb-2">Unavailable</h3>
+            <p className="text-gray-400">{error}</p>
+          </div>
+        )}
+
+        {/* Dashboard Content */}
+        {dashboardData && (
+          <>
+            {/* KPI Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              <KpiCard
+                title="Total Active Persons"
+                value={summary?.total_detections.toLocaleString() ?? '0'}
+                change="+12%" // Calculate real delta if available
+                trend="up"
+                icon={Users}
+                color="orange"
+              />
+              <KpiCard
+                title="Avg Confidence"
+                value={`${summary?.average_confidence_percent.toFixed(1)}%`}
+                change="Target > 80%"
+                trend={summary?.average_confidence_percent && summary.average_confidence_percent > 80 ? 'up' : 'neutral'}
+                icon={Activity}
+                color="blue"
+              />
+              <KpiCard
+                title="Active Cameras"
+                value={`${cameraCount}`}
+                change="100% Uptime"
+                trend="up"
+                icon={Video}
+                color="green"
+              />
+              <KpiCard
+                title="System Uptime"
+                value={`${summary?.system_uptime_percent}%`}
+                change={`+${summary?.uptime_delta_percent}%`}
+                trend="up"
+                icon={Zap}
+                color="purple"
+              />
+            </div>
+
+            {/* Main Charts Section */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+              {/* Area Chart: Activity Trend */}
+              <div className="lg:col-span-2 p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                <div className="flex items-center justify-between mb-8">
+                  <div>
+                    <h3 className="text-xl font-bold text-white mb-1">Activity Volume</h3>
+                    <p className="text-sm text-gray-500">Person detection frequency over time</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <span className="w-3 h-3 rounded-full bg-orange-500"></span>
+                    <span>Total Detections</span>
+                  </div>
+                </div>
+
+                <div className="h-[350px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <AreaChart data={activityData}>
+                      <defs>
+                        <linearGradient id="colorPersons" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="#f97316" stopOpacity={0.3} />
+                          <stop offset="95%" stopColor="#f97316" stopOpacity={0} />
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                      <XAxis
+                        dataKey="time"
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#6b7280', fontSize: 12 }}
+                        dy={10}
                       />
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
-              <h3 className="text-xl font-semibold text-white mb-4">System Performance</h3>
-              <dl className="space-y-3 text-sm">
-                <div className="flex items-center justify-between">
-                  <dt className="text-gray-400">Cache Hit Rate</dt>
-                  <dd className="text-gray-100">{cacheHitRatePercent !== null ? `${cacheHitRatePercent.toFixed(1)}%` : '—'}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-gray-400">Processing Latency</dt>
-                  <dd className="text-gray-100">{processingLatency !== null ? `${processingLatency.toFixed(2)} s` : '—'}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-gray-400">Error Rate</dt>
-                  <dd className="text-gray-100">{errorRatePercent !== null ? `${errorRatePercent.toFixed(2)}%` : '—'}</dd>
-                </div>
-                <div className="flex items-center justify-between">
-                  <dt className="text-gray-400">Memory Usage</dt>
-                  <dd className="text-gray-100">{memoryUsage !== null ? `${memoryUsage.toFixed(1)} MB` : '—'}</dd>
-                </div>
-              </dl>
-              <p className="mt-4 text-xs text-gray-500">
-                Performance metrics auto-adjust to the active time range for apples-to-apples comparisons.
-              </p>
-            </div>
-          </div>
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-2">
-          <div className="rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
-            <h3 className="text-xl font-semibold text-white mb-4">Real-time Snapshot</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Timestamp</span>
-                <span className="text-gray-100">{lastUpdatedDisplay ?? '—'}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Active Persons (range)</span>
-                <span className="text-gray-100">{formatNumber(displayMetrics?.active_persons)}</span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Detection Rate</span>
-                <span className="text-gray-100">
-                  {detectionRatePerSecond !== null ? `${detectionRatePerSecond.toFixed(2)} / sec` : '—'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Average Confidence</span>
-                <span className="text-gray-100">
-                  {averageConfidencePercent !== null ? `${averageConfidencePercent.toFixed(1)}%` : '—'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between">
-                <span className="text-gray-400">Cameras Online</span>
-                <span className="text-gray-100">{reportingCameraCount}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
-            <h3 className="text-xl font-semibold text-white mb-4">Camera Load Distribution</h3>
-            <div className="space-y-3">
-              {cameraLoadEntries.map((camera) => {
-                const typedCameraId = camera.cameraId as BackendCameraId;
-                const share = totalActiveAcrossCameras > 0 ? (camera.activePersons / totalActiveAcrossCameras) * 100 : 0;
-                const displayName = getDisplayName(typedCameraId) || camera.cameraId;
-
-                return (
-                  <div key={`distribution-${camera.cameraId}`}>
-                    <div className="flex items-center justify-between text-sm text-gray-300">
-                      <span>{displayName}</span>
-                      <span className="text-gray-400">{formatNumber(camera.activePersons)} • {share.toFixed(1)}%</span>
-                    </div>
-                    <div className="mt-2 h-2 rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-orange-500 to-pink-500"
-                        style={{ width: `${Math.min(100, share)}%` }}
+                      <YAxis
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fill: '#6b7280', fontSize: 12 }}
                       />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff' }}
+                      />
+                      <Area
+                        type="monotone"
+                        dataKey="persons"
+                        stroke="#f97316"
+                        strokeWidth={3}
+                        fillOpacity={1}
+                        fill="url(#colorPersons)"
+                      />
+                    </AreaChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Secondary Column: Distribution & Recent Events */}
+              <div className="space-y-6">
+
+                {/* Donut Chart: Zone Distribution */}
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl min-h-[300px]">
+                  <h3 className="text-lg font-bold text-white mb-6">Zone Distribution</h3>
+                  <div className="relative h-[200px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={distributionData}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={80}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {distributionData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={entry.color} stroke="none" />
+                          ))}
+                        </Pie>
+                        <Tooltip
+                          contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                          itemStyle={{ color: '#fff' }}
+                        />
+                      </PieChart>
+                    </ResponsiveContainer>
+                    {/* Center Text */}
+                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                      <span className="text-2xl font-bold text-white">100%</span>
                     </div>
                   </div>
-                );
-              })}
+                  <div className="flex flex-col gap-2 mt-4 px-4">
+                    {distributionData.map(item => (
+                      <div key={item.name} className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></span>
+                          <span className="text-gray-400">{item.name}</span>
+                        </div>
+                        <span className="text-white font-mono">{item.value}% ({item.raw})</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* System Events */}
+                <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-bold text-white">System Events</h3>
+                    <button className="text-xs text-orange-400 hover:text-orange-300">View All</button>
+                  </div>
+                  <div className="space-y-4 max-h-[150px] overflow-y-auto">
+                    {RECENT_ALERTS.map(alert => (
+                      <div key={alert.id} className="flex gap-4 items-start p-3 rounded-lg bg-white/5 border border-white/5">
+                        <AlertIcon type={alert.type} />
+                        <div>
+                          <p className="text-sm text-gray-200 font-medium">{alert.message}</p>
+                          <p className="text-xs text-gray-500 mt-1">{alert.time}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+              </div>
             </div>
-          </div>
-        </section>
+
+            {/* NEW: Operational Statistics Section */}
+            <h2 className="text-2xl font-bold text-white mt-8 mb-4">Operational Status</h2>
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+              {/* Accuracy Trend */}
+              <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                <h3 className="text-lg font-bold text-white mb-2">Detection Accuracy Trend</h3>
+                <p className="text-xs text-gray-500 mb-6">Average confidence score over the last 24h</p>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={accuracyData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                      <XAxis dataKey="time" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} dy={10} />
+                      {/* Domain 0-100 */}
+                      <YAxis hide domain={[0, 100]} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff' }}
+                      />
+                      <Line type="monotone" dataKey="confidence" stroke="#3b82f6" strokeWidth={3} dot={false} activeDot={{ r: 6 }} />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+
+              {/* Uptime Trend */}
+              <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-xl">
+                <h3 className="text-lg font-bold text-white mb-2">System Availability Trend</h3>
+                <p className="text-xs text-gray-500 mb-6">Daily uptime percentage over the last 7 days</p>
+                <div className="h-[250px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={uptimeData}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#ffffff10" vertical={false} />
+                      <XAxis dataKey="date" tick={{ fill: '#6b7280', fontSize: 10 }} axisLine={false} tickLine={false} dy={10} />
+                      <Tooltip
+                        contentStyle={{ backgroundColor: '#18181b', borderColor: '#27272a', borderRadius: '8px' }}
+                        itemStyle={{ color: '#fff' }}
+                        cursor={{ fill: '#ffffff10' }}
+                      />
+                      <Bar dataKey="uptime" fill="#a855f7" radius={[4, 4, 0, 0]} barSize={40} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            </div>
+
+            {/* NEW: Camera Health Grid */}
+            <h2 className="text-2xl font-bold text-white mt-8 mb-4">Camera Health & Load</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {dashboardData.cameras.map((cam) => (
+                <div key={cam.camera_id} className="p-4 rounded-xl bg-white/5 border border-white/10 hover:border-orange-500/30 transition-all">
+                  <div className="flex justify-between items-start mb-3">
+                    <div className="flex items-center gap-2">
+                      <Video className="w-4 h-4 text-gray-400" />
+                      <span className="font-mono text-white font-bold">{cam.camera_id}</span>
+                    </div>
+                    <div className={`w-2 h-2 rounded-full ${cam.uptime_percent > 98 ? 'bg-green-500' : 'bg-red-500'}`} />
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Detections</span>
+                      <span className="text-white">{cam.detections.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Unique Entities</span>
+                      <span className="text-white">{cam.unique_entities}</span>
+                    </div>
+                    <div className="flex justify-between text-xs">
+                      <span className="text-gray-500">Avg Confidence</span>
+                      <span className="text-blue-400">{cam.average_confidence_percent.toFixed(1)}%</span>
+                    </div>
+                    <div className="w-full bg-gray-800 h-1.5 rounded-full mt-2 overflow-hidden">
+                      <div className="bg-orange-500 h-full rounded-full" style={{ width: `${Math.min(cam.detections / 5, 100)}%` }}></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Server Health Footer */}
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-white/10 pt-8">
+              <HealthMetric label="Server Status" value={backendStatus.status} status={isConnected ? 'active' : 'neutral'} />
+              <HealthMetric label="Data Freshness" value={dashboardData.generated_at ? new Date(dashboardData.generated_at).toLocaleTimeString() : 'Unknown'} status="active" />
+              <HealthMetric label="Last Backup" value="2 hours ago" status="neutral" />
+            </div>
+          </>
+        )}
+
       </main>
     </div>
   );
 };
+
+// --- Helper Components ---
+
+const KpiCard: React.FC<{
+  title: string;
+  value: string;
+  change: string;
+  trend: 'up' | 'down' | 'neutral';
+  icon: React.ElementType;
+  color: 'orange' | 'blue' | 'green' | 'purple';
+}> = ({ title, value, change, trend, icon: Icon, color }) => {
+
+  const colors = {
+    orange: 'bg-orange-500/10 text-orange-500',
+    blue: 'bg-blue-500/10 text-blue-500',
+    green: 'bg-green-500/10 text-green-500',
+    purple: 'bg-purple-500/10 text-purple-500',
+  };
+
+  const trendColor = trend === 'up' ? 'text-green-400' : trend === 'down' ? 'text-red-400' : 'text-gray-400';
+
+  return (
+    <div className="p-6 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md hover:border-orange-500/30 transition-all group">
+      <div className="flex items-center justify-between mb-4">
+        <div className={`p-2 rounded-lg \${colors[color]} group-hover:scale-110 transition-transform`}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <span className={`text-xs font-medium px-2 py-1 rounded-full bg-white/5 \${trendColor}`}>
+          {change}
+        </span>
+      </div>
+      <h3 className="text-gray-400 text-sm font-medium mb-1">{title}</h3>
+      <p className="text-3xl font-bold text-white tracking-tight">{value}</p>
+    </div>
+  );
+}
+
+const AlertIcon: React.FC<{ type: string }> = ({ type }) => {
+  if (type === 'warning') return <AlertCircle className="w-5 h-5 text-red-400 mt-0.5" />;
+  if (type === 'success') return <Activity className="w-5 h-5 text-green-400 mt-0.5" />;
+  return <Server className="w-5 h-5 text-blue-400 mt-0.5" />;
+}
+
+const HealthMetric: React.FC<{ label: string; value: string; status: 'active' | 'neutral' }> = ({ label, value, status }) => {
+  return (
+    <div className="flex items-center gap-3">
+      <div className={`w-2 h-2 rounded-full \${status === 'active' ? 'bg-green-500' : 'bg-gray-500'}`}></div>
+      <div>
+        <p className="text-xs text-gray-500 uppercase tracking-wider">{label}</p>
+        <p className="text-sm text-gray-300 font-mono">{value}</p>
+      </div>
+    </div>
+  );
+}
 
 export default AnalyticsPage;

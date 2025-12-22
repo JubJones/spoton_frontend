@@ -249,7 +249,7 @@ const HelpPage: React.FC = () => {
   ];
 
   return (
-    <div className="min-h-screen bg-black text-white flex flex-col font-sans selection:bg-orange-500/30">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white flex flex-col font-sans selection:bg-orange-500/30">
       <Header
         connectionStatus={connectionStatus}
         showBackButton={true}
@@ -275,8 +275,8 @@ const HelpPage: React.FC = () => {
                 key={section.id}
                 onClick={() => setActiveSection(section.id)}
                 className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 flex items-center justify-between group ${activeSection === section.id
-                    ? 'bg-orange-500/10 text-orange-400'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
+                  ? 'bg-orange-500/10 text-orange-400'
+                  : 'text-gray-400 hover:text-white hover:bg-white/5'
                   }`}
               >
                 {section.title}

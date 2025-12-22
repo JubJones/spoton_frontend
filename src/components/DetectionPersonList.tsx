@@ -32,7 +32,7 @@ interface DetectedPerson {
 
 interface CameraDetection {
   camera_id: string;
-  frame_image_base64: string;
+  frame_image_base64?: string;
   detections: DetectedPerson[];
   processing_time_ms: number;
 }
@@ -77,7 +77,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       // Set canvas size to match the crop area
       const cropWidth = Math.max(bbox.width, 64); // Minimum width
       const cropHeight = Math.max(bbox.height, 96); // Minimum height
-      
+
       canvas.width = cropWidth;
       canvas.height = cropHeight;
 
@@ -94,7 +94,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       // Convert to base64 and store
       const croppedDataUrl = canvas.toDataURL('image/jpeg', 0.8);
       const cropKey = `${camera_id}-${detection_id}`;
-      
+
       setCroppedImages(prev => ({
         ...prev,
         [cropKey]: croppedDataUrl
@@ -115,7 +115,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       if (cameraData.detections && cameraData.frame_image_base64) {
         cameraData.detections.forEach((detection) => {
           cropPersonFromImage(
-            cameraData.frame_image_base64,
+            cameraData.frame_image_base64!,
             detection.bbox,
             detection.detection_id,
             camera_id
@@ -163,8 +163,8 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
   return (
     <div className={`bg-gray-800 rounded-md p-3 ${className}`}>
       {/* Hidden canvas for image cropping */}
-      <canvas 
-        ref={canvasRef} 
+      <canvas
+        ref={canvasRef}
         style={{ display: 'none' }}
         aria-hidden="true"
       />
@@ -221,11 +221,10 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                 <div
                   key={cropKey}
                   onClick={() => handlePersonClick(detection, detection.camera_id)}
-                  className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${
-                    isSelected 
-                      ? 'ring-2 ring-blue-500 bg-blue-600' 
-                      : 'hover:bg-gray-600 hover:shadow-lg'
-                  }`}
+                  className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${isSelected
+                    ? 'ring-2 ring-blue-500 bg-blue-600'
+                    : 'hover:bg-gray-600 hover:shadow-lg'
+                    }`}
                 >
                   {/* Cropped Person Image */}
                   <div className="aspect-[3/4] relative">
@@ -240,15 +239,14 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                         <div className="text-gray-400 text-sm">Loading...</div>
                       </div>
                     )}
-                    
+
                     {/* Confidence Badge */}
-                    <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${
-                      detection.confidence >= 0.8 
-                        ? 'bg-green-500 text-white' 
-                        : detection.confidence >= 0.6 
-                          ? 'bg-yellow-500 text-black'
-                          : 'bg-red-500 text-white'
-                    }`}>
+                    <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${detection.confidence >= 0.8
+                      ? 'bg-green-500 text-white'
+                      : detection.confidence >= 0.6
+                        ? 'bg-yellow-500 text-black'
+                        : 'bg-red-500 text-white'
+                      }`}>
                       {Math.round(detection.confidence * 100)}%
                     </div>
 
