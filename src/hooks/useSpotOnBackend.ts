@@ -302,8 +302,8 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
               case 'connection_established':
                 updateState({
                   connectionEstablished: true,
-                  binaryFramesEnabled: message.capabilities.includes('binary_frames'),
-                  compressionEnabled: message.capabilities.includes('message_compression'),
+                  binaryFramesEnabled: (message.payload as any).capabilities?.includes('binary_frames'),
+                  compressionEnabled: (message.payload as any).capabilities?.includes('message_compression'),
                 });
                 break;
 
@@ -319,7 +319,7 @@ const useSpotOnBackendInternal = (): [SpotOnBackendState, SpotOnBackendActions] 
                 break;
 
               case 'system_status':
-                console.log('System status:', message.data);
+                console.log('System status:', message.payload);
                 break;
 
               default:

@@ -83,6 +83,9 @@ describe('Tracking Data Processor', () => {
               confidence: 0.85,
               class_id: 1,
               map_coords: [50.5, 25.3],
+              is_focused: false,
+              detection_time: '2024-01-01T00:00:00Z',
+              tracking_duration: 0,
             },
             {
               track_id: 2,
@@ -90,6 +93,10 @@ describe('Tracking Data Processor', () => {
               bbox_xyxy: [300, 150, 400, 250],
               confidence: 0.92,
               class_id: 1,
+              is_focused: false,
+              detection_time: '2024-01-01T00:00:00Z',
+              tracking_duration: 0,
+              map_coords: [60.5, 35.3],
             },
           ],
         },
@@ -102,10 +109,16 @@ describe('Tracking Data Processor', () => {
               bbox_xyxy: [150, 200, 250, 300],
               confidence: 0.78,
               class_id: 1,
+              is_focused: false,
+              detection_time: '2024-01-01T00:00:00Z',
+              tracking_duration: 0,
+              map_coords: [50.5, 25.3],
             },
           ],
         },
       },
+      person_count_per_camera: {},
+      focus_person_id: null,
     };
 
     const mockDisplaySizes = {
@@ -125,7 +138,7 @@ describe('Tracking Data Processor', () => {
     });
 
     it('should handle missing display sizes', () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { });
 
       const incompleteDisplaySizes = {
         c09: { width: 640, height: 480 },
@@ -590,6 +603,9 @@ describe('Tracking Data Processor', () => {
           bbox_xyxy: [100, 100, 200, 200],
           confidence: 0.85,
           class_id: 1,
+          is_focused: false,
+          detection_time: '2024-01-01T00:00:00Z',
+          tracking_duration: 0,
         };
 
         const sanitized = sanitizePersonTrack(track);
@@ -648,7 +664,7 @@ describe('Tracking Data Processor', () => {
             { global_id: 'person_001', confidence: 0.7 } as any, // Same person
           ],
         } as CameraTrackingDisplayData,
-      };
+      } as unknown as Record<BackendCameraId, CameraTrackingDisplayData>;
 
       it('should calculate tracking statistics', () => {
         const stats = getTrackingStatistics(mockProcessedCameras);
@@ -675,7 +691,7 @@ describe('Tracking Data Processor', () => {
             { global_id: 'person_001' } as any, // Same person
           ],
         } as CameraTrackingDisplayData,
-      };
+      } as unknown as Record<BackendCameraId, CameraTrackingDisplayData>;
 
       it('should find person across cameras', () => {
         const results = findPersonAcrossCameras('person_001', mockProcessedCameras);

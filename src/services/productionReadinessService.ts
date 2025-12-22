@@ -138,31 +138,31 @@ class ProductionReadinessService {
     try {
       // 1. System Integration Checks
       await this.runSystemIntegrationChecks(report);
-      
+
       // 2. Performance Validation Checks
       await this.runPerformanceValidationChecks(report);
-      
+
       // 3. Quality Assurance Checks
       await this.runQualityAssuranceChecks(report);
-      
+
       // 4. Security Assessment Checks
       await this.runSecurityAssessmentChecks(report);
-      
+
       // 5. Deployment Readiness Checks
       await this.runDeploymentReadinessChecks(report);
-      
+
       // 6. Monitoring & Observability Checks
       await this.runMonitoringChecks(report);
 
       // Finalize assessment
       this.finalizeProductionReadiness(report);
-      
+
       this.reportHistory.push(report);
       console.log(`✅ Production readiness assessment completed: ${report.readinessStatus} (${report.overallScore.toFixed(1)}/100)`);
 
     } catch (error) {
       console.error('❌ Production readiness assessment failed:', error);
-      report.criticalBlockers.push(`Assessment error: ${error.message}`);
+      report.criticalBlockers.push(`Assessment error: ${(error as any).message}`);
       report.readinessStatus = 'not_ready';
     } finally {
       this.isRunning = false;
@@ -188,7 +188,7 @@ class ProductionReadinessService {
       backendCheck.startTime = Date.now();
 
       const integration = await backendIntegrationService.validateBackendIntegration();
-      
+
       if (integration.isValid) {
         this.completeCheck(backendCheck, 'passed', 95, 'Backend integration validated', {
           apiLatency: integration.status.latency.api,
@@ -199,7 +199,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Backend integration failure');
       }
     } catch (error) {
-      this.completeCheck(backendCheck, 'failed', 0, `Backend check failed: ${error.message}`);
+      this.completeCheck(backendCheck, 'failed', 0, `Backend check failed: ${(error as any).message}`);
       report.criticalBlockers.push('Backend connectivity failure');
     }
 
@@ -212,10 +212,10 @@ class ProductionReadinessService {
       serviceCheck.startTime = Date.now();
 
       const discovery = await serviceDiscoveryService.discoverServices(true);
-      
+
       if (discovery.isAvailable && discovery.configuration) {
         const validation = serviceDiscoveryService.validateConfiguration(discovery.configuration);
-        
+
         if (validation.isValid) {
           this.completeCheck(serviceCheck, 'passed', 90, 'Service discovery operational', {
             endpoints: discovery.configuration.endpoints.length,
@@ -229,7 +229,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Service discovery failure');
       }
     } catch (error) {
-      this.completeCheck(serviceCheck, 'failed', 0, `Service check failed: ${error.message}`);
+      this.completeCheck(serviceCheck, 'failed', 0, `Service check failed: ${(error as any).message}`);
     }
 
     // Check 3: WebSocket Reliability
@@ -266,7 +266,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('WebSocket reliability failure');
       }
     } catch (error) {
-      this.completeCheck(wsCheck, 'failed', 0, `WebSocket check failed: ${error.message}`);
+      this.completeCheck(wsCheck, 'failed', 0, `WebSocket check failed: ${(error as any).message}`);
     }
 
     this.updateCategoryScore(report.categories.system, report.checks.filter(c => c.category === 'system'));
@@ -316,7 +316,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Load testing failure');
       }
     } catch (error) {
-      this.completeCheck(loadTestCheck, 'failed', 0, `Load test failed: ${error.message}`);
+      this.completeCheck(loadTestCheck, 'failed', 0, `Load test failed: ${(error as any).message}`);
     }
 
     // Check 2: Memory Leak Detection
@@ -346,7 +346,7 @@ class ProductionReadinessService {
         }
       }
     } catch (error) {
-      this.completeCheck(memoryCheck, 'failed', 0, `Memory test failed: ${error.message}`);
+      this.completeCheck(memoryCheck, 'failed', 0, `Memory test failed: ${(error as any).message}`);
     }
 
     // Check 3: Real-time Latency Validation
@@ -369,7 +369,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Real-time latency requirements not met');
       }
     } catch (error) {
-      this.completeCheck(latencyCheck, 'warning', 50, `Latency test warning: ${error.message}`);
+      this.completeCheck(latencyCheck, 'warning', 50, `Latency test warning: ${(error as any).message}`);
     }
 
     this.updateCategoryScore(report.categories.performance, report.checks.filter(c => c.category === 'performance'));
@@ -418,7 +418,7 @@ class ProductionReadinessService {
       }
 
     } catch (error) {
-      this.completeCheck(qaCheck, 'failed', 0, `Quality check failed: ${error.message}`);
+      this.completeCheck(qaCheck, 'failed', 0, `Quality check failed: ${(error as any).message}`);
       report.criticalBlockers.push('Quality assurance validation failure');
     }
 
@@ -480,7 +480,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Configuration security issues must be resolved');
       }
     } catch (error) {
-      this.completeCheck(configSecurityCheck, 'failed', 0, `Security check failed: ${error.message}`);
+      this.completeCheck(configSecurityCheck, 'failed', 0, `Security check failed: ${(error as any).message}`);
     }
 
     // Check 2: Data Protection Validation
@@ -509,7 +509,7 @@ class ProductionReadinessService {
         passedChecks,
       });
     } catch (error) {
-      this.completeCheck(dataProtectionCheck, 'failed', 0, `Data protection check failed: ${error.message}`);
+      this.completeCheck(dataProtectionCheck, 'failed', 0, `Data protection check failed: ${(error as any).message}`);
     }
 
     this.updateCategoryScore(report.categories.security, report.checks.filter(c => c.category === 'security'));
@@ -545,7 +545,7 @@ class ProductionReadinessService {
         checksPerformed: buildChecks.length,
       });
     } catch (error) {
-      this.completeCheck(buildCheck, 'failed', 0, `Build validation failed: ${error.message}`);
+      this.completeCheck(buildCheck, 'failed', 0, `Build validation failed: ${(error as any).message}`);
       report.criticalBlockers.push('Production build validation failure');
     }
 
@@ -576,7 +576,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Environment configuration issues');
       }
     } catch (error) {
-      this.completeCheck(envCheck, 'failed', 0, `Environment check failed: ${error.message}`);
+      this.completeCheck(envCheck, 'failed', 0, `Environment check failed: ${(error as any).message}`);
     }
 
     // Check 3: Dependency Validation
@@ -595,8 +595,8 @@ class ProductionReadinessService {
         low: 5,
       };
 
-      const depScore = vulnerabilities.critical === 0 && vulnerabilities.high === 0 ? 90 : 
-                      vulnerabilities.critical === 0 && vulnerabilities.high <= 2 ? 70 : 40;
+      const depScore = vulnerabilities.critical === 0 && vulnerabilities.high === 0 ? 90 :
+        vulnerabilities.critical === 0 && vulnerabilities.high <= 2 ? 70 : 40;
 
       if (depScore >= 80) {
         this.completeCheck(depCheck, 'passed', depScore, 'Dependency security audit passed', vulnerabilities);
@@ -608,7 +608,7 @@ class ProductionReadinessService {
         report.criticalBlockers.push('Critical dependency vulnerabilities must be patched');
       }
     } catch (error) {
-      this.completeCheck(depCheck, 'warning', 60, `Dependency check warning: ${error.message}`);
+      this.completeCheck(depCheck, 'warning', 60, `Dependency check warning: ${(error as any).message}`);
     }
 
     this.updateCategoryScore(report.categories.deployment, report.checks.filter(c => c.category === 'deployment'));
@@ -644,7 +644,7 @@ class ProductionReadinessService {
         featuresEnabled: monitoringFeatures.length,
       });
     } catch (error) {
-      this.completeCheck(perfMonitoringCheck, 'warning', 60, `Monitoring check warning: ${error.message}`);
+      this.completeCheck(perfMonitoringCheck, 'warning', 60, `Monitoring check warning: ${(error as any).message}`);
     }
 
     // Check 2: Health Check Validation
@@ -667,7 +667,7 @@ class ProductionReadinessService {
         endpointsValidated: healthEndpoints.length,
       });
     } catch (error) {
-      this.completeCheck(healthCheck, 'warning', 70, `Health check warning: ${error.message}`);
+      this.completeCheck(healthCheck, 'warning', 70, `Health check warning: ${(error as any).message}`);
     }
 
     this.updateCategoryScore(report.categories.monitoring, report.checks.filter(c => c.category === 'monitoring'));
@@ -726,7 +726,7 @@ class ProductionReadinessService {
     }
 
     category.blockers = checks.filter(c => c.blockers && c.blockers.length > 0)
-                              .flatMap(c => c.blockers || []);
+      .flatMap(c => c.blockers || []);
   }
 
   private finalizeProductionReadiness(report: ProductionReadinessReport): void {
@@ -853,7 +853,7 @@ class ProductionReadinessService {
       '',
       '## Category Assessment',
       '',
-      ...Object.entries(report.categories).map(([name, cat]) => 
+      ...Object.entries(report.categories).map(([name, cat]) =>
         `- **${name.charAt(0).toUpperCase() + name.slice(1)}**: ${cat.score.toFixed(1)}/100 (${cat.status.replace(/_/g, ' ')})`
       ),
       '',
@@ -907,27 +907,27 @@ class ProductionReadinessService {
     Object.entries(checksByCategory).forEach(([category, checks]) => {
       reportText.push(`### ${category.charAt(0).toUpperCase() + category.slice(1)} Checks`);
       reportText.push('');
-      
+
       checks.forEach(check => {
         const statusIcon = check.status === 'passed' ? '✅' : check.status === 'failed' ? '❌' : '⚠️';
         reportText.push(`#### ${statusIcon} ${check.name}`);
         reportText.push(`**Priority**: ${check.priority}`);
         reportText.push(`**Score**: ${check.score?.toFixed(1) || 0}/100`);
-        
+
         if (check.duration) {
           reportText.push(`**Duration**: ${check.duration}ms`);
         }
-        
+
         if (check.blockers && check.blockers.length > 0) {
           reportText.push('**Blockers**:');
           check.blockers.forEach(blocker => reportText.push(`- ${blocker}`));
         }
-        
+
         if (check.recommendations && check.recommendations.length > 0) {
           reportText.push('**Recommendations**:');
           check.recommendations.forEach(rec => reportText.push(`- ${rec}`));
         }
-        
+
         reportText.push('');
       });
     });

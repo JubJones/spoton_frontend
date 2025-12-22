@@ -339,7 +339,7 @@ export class WebSocketManagerService {
       this.handleTrackingUpdate(connectionId, payload);
     });
 
-    service.addEventListener('system-status', (payload) => {
+    service.addEventListener('system-status' as any, (payload) => {
       // Forward to application handlers
       this.handleSystemStatus(connectionId, payload);
     });
@@ -355,7 +355,7 @@ export class WebSocketManagerService {
     // This can be extended to provide centralized tracking update handling
     console.debug(`Tracking update from ${connectionId}:`, {
       timestamp: payload.timestamp_processed_utc,
-      cameras: Object.keys(payload.frame_data || {}),
+      cameras: Object.keys(payload.cameras || {}),
     });
   }
 
@@ -520,9 +520,10 @@ export class WebSocketManagerService {
       for (const key of connectionKeys) {
         try {
           const persistData = await statePersistenceService.loadState(key);
-          if (persistData && persistData.id && persistData.endpoint) {
+          const persistDataAny = persistData as any;
+          if (persistDataAny && persistDataAny.id && persistDataAny.endpoint) {
             // Attempt to restore connection (will fail silently if server not available)
-            console.log(`Attempting to restore connection: ${persistData.id}`);
+            console.log(`Attempting to restore connection: ${persistDataAny.id}`);
             // Note: In a real implementation, you might want to validate
             // that the server is still available before attempting to reconnect
           }

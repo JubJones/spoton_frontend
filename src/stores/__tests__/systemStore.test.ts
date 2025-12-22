@@ -116,7 +116,7 @@ describe('System Store', () => {
       };
 
       act(() => {
-        result.current.setDateTimeRange(dateTimeRange);
+        result.current.setDateTimeRange(dateTimeRange as any);
       });
 
       const { result: rangeResult } = renderHook(() => useDateTimeRange());
@@ -227,7 +227,7 @@ describe('System Store', () => {
     });
 
     it('should handle task status update error', async () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
       mockApiService.getTaskStatus.mockRejectedValueOnce(new Error('Network error'));
 
       const { result } = renderHook(() => useSystemActions());
@@ -344,7 +344,7 @@ describe('System Store', () => {
     });
 
     it('should handle system health check failure', async () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
       mockApiService.getSystemHealth.mockRejectedValueOnce(new Error('Health check failed'));
 
       const { result } = renderHook(() => useSystemActions());
@@ -501,9 +501,9 @@ describe('System Store', () => {
             taskError: undefined,
             systemHealth: {
               status: 'healthy',
-              detector_model_status: 'ready',
+              detector_model_status: 'loaded',
               tracker_factory_status: 'ready',
-              homography_matrices_status: 'ready',
+              homography_matrices_status: 'loaded',
               timestamp: '2024-01-01T00:00:00Z',
             },
           });
@@ -575,8 +575,11 @@ describe('System Store', () => {
       act(() => {
         result.current.actions.setEnvironment('factory');
         result.current.actions.setDateTimeRange({
-          start: '2024-01-01T00:00:00Z',
-          end: '2024-01-01T01:00:00Z',
+          earliest_date: '2024-01-01T00:00:00Z',
+          latest_date: '2024-01-02T00:00:00Z',
+          total_days: 2,
+          has_data: true,
+          data_gaps: [],
         });
       });
 

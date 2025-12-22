@@ -65,9 +65,10 @@ export const Skeleton: React.FC<SkeletonProps> = ({
 interface CameraSkeletonProps {
   count?: number;
   layout?: '2x2' | '1x4' | 'focus';
+  className?: string;
 }
 
-export const CameraSkeleton: React.FC<CameraSkeletonProps> = ({ count = 4, layout = '2x2' }) => {
+export const CameraSkeleton: React.FC<CameraSkeletonProps> = ({ count = 4, layout = '2x2', className = '' }) => {
   const getGridClasses = () => {
     switch (layout) {
       case '2x2':
@@ -82,7 +83,7 @@ export const CameraSkeleton: React.FC<CameraSkeletonProps> = ({ count = 4, layou
   };
 
   return (
-    <div className={getGridClasses()}>
+    <div className={`${getGridClasses()} ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className="bg-gray-800 rounded-lg overflow-hidden">
           {/* Camera header skeleton */}

@@ -2,6 +2,7 @@
 // src/types/ui.ts
 
 import { BackendCameraId, FrontendCameraId, EnvironmentId, TrackedPerson } from './api';
+export type { BackendCameraId, FrontendCameraId, EnvironmentId, TrackedPerson };
 
 // ============================================================================
 // UI State Types
@@ -82,6 +83,89 @@ export interface UIControlState {
   isMobile: boolean;
   isTablet: boolean;
   screenSize: 'mobile' | 'tablet' | 'desktop';
+}
+
+export interface CameraDisplayConfig {
+  isVisible: boolean;
+  showBoundingBoxes: boolean;
+  showPersonIds: boolean;
+  showConfidence: boolean;
+  boundingBoxColor: string;
+  boundingBoxThickness: number;
+  opacity: number;
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  showGrid: boolean;
+  gridColor: string;
+  gridOpacity: number;
+  zoom: number;
+  panX: number;
+  panY: number;
+}
+
+export interface MapDisplayConfig {
+  isVisible: boolean;
+  showTrajectories: boolean;
+  showHeatmap: boolean;
+  showZones: boolean;
+  trajectoryColor: string;
+  trajectoryThickness: number;
+  trajectoryOpacity: number;
+  heatmapOpacity: number;
+  zoneOpacity: number;
+  zoom: number;
+  center: [number, number];
+  mapStyle: string;
+}
+
+export interface FilterConfig {
+  confidenceThreshold: number;
+  showLowConfidence: boolean;
+  personIdFilter: string[];
+  cameraFilter: string[];
+  timeRangeStart?: string;
+  timeRangeEnd?: string;
+  minTrajectoryLength: number;
+  maxTrajectoryLength?: number;
+}
+
+export type ViewMode = 'dashboard' | 'multi-camera' | 'single-camera' | 'map-only';
+
+export interface PanelState {
+  isVisible: boolean;
+  isCollapsed: boolean;
+}
+
+export interface ModalState {
+  isOpen: boolean;
+  data?: any;
+}
+
+export interface LayoutConfig {
+  sidebarWidth: number;
+  gridLayout: 'grid' | 'list' | 'focus';
+  compactMode: boolean;
+}
+
+export interface UIState {
+  // View configuration
+  viewMode: ViewMode;
+  isFullscreen: boolean;
+  fullscreenCameraId?: BackendCameraId;
+
+  // Configurations
+  cameras: Record<BackendCameraId, CameraDisplayConfig>;
+  map: MapDisplayConfig;
+  filters: FilterConfig;
+
+  // UI State
+  panels: Record<string, PanelState>;
+  modals: Record<string, ModalState>;
+  layout: LayoutConfig;
+
+  // User Preferences
+  preferences: UserSettings;
 }
 
 // ============================================================================
@@ -250,12 +334,22 @@ export interface UserSettings {
   theme: 'light' | 'dark' | 'auto';
   language: string; // ISO language code
 
+  // Performance settings
+  frameRate: number;
+  quality: 'low' | 'medium' | 'high';
+  highPerformanceMode: boolean;
+
+  // Accessibility
+  highContrast: boolean;
+  reducedMotion: boolean;
+  fontSize: 'small' | 'medium' | 'large';
+
   // Tracking display settings
   boundingBoxStyle: 'solid' | 'dashed' | 'dotted';
   personLabelFormat: 'id_only' | 'id_with_confidence' | 'custom';
   trajectoryLineWidth: number;
 
-  // Performance settings
+  // Advanced settings
   maxTrajectoryPoints: number;
   updateInterval: number; // ms
   enableGPUAcceleration: boolean;
@@ -445,6 +539,12 @@ export const DEFAULT_UI_STATE: UIControlState = {
 export const DEFAULT_USER_SETTINGS: UserSettings = {
   theme: 'auto',
   language: 'en',
+  frameRate: 30,
+  quality: 'high',
+  highPerformanceMode: false,
+  highContrast: false,
+  reducedMotion: false,
+  fontSize: 'medium',
   boundingBoxStyle: 'solid',
   personLabelFormat: 'id_with_confidence',
   trajectoryLineWidth: 2,

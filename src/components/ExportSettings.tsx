@@ -198,9 +198,12 @@ const ExportSettings: React.FC<ExportSettingsProps> = ({
         prev.map((template) =>
           template.id === templateId
             ? {
-                ...template,
-                [key]: typeof template[key] === 'object' ? { ...template[key], ...value } : value,
-              }
+              ...template,
+              [key as keyof ExportTemplate]:
+                typeof template[key as keyof ExportTemplate] === 'object'
+                  ? { ...(template[key as keyof ExportTemplate] as any), ...(value as any) }
+                  : value,
+            }
             : template
         )
       );
@@ -347,11 +350,10 @@ const ExportSettings: React.FC<ExportSettingsProps> = ({
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${
-              activeTab === tab.key
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${activeTab === tab.key
+              ? 'bg-orange-500 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
           >
             <span>{tab.icon}</span>
             <span>{tab.label}</span>
@@ -372,11 +374,10 @@ const ExportSettings: React.FC<ExportSettingsProps> = ({
                 {exportTemplates.map((template) => (
                   <div
                     key={template.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedTemplate === template.id
-                        ? 'border-orange-400 bg-orange-500/10'
-                        : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                    }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedTemplate === template.id
+                      ? 'border-orange-400 bg-orange-500/10'
+                      : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
+                      }`}
                     onClick={() => setSelectedTemplate(template.id)}
                   >
                     <div className="flex items-center justify-between mb-2">

@@ -4,7 +4,7 @@ import { MapContainer, TileLayer, Marker, Popup, Circle, Polyline, useMap } from
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import type { TrackedPerson, BackendCameraId, EnvironmentId } from '../types/api';
-import { getCameraDisplayName, getEnvironmentConfiguration } from '../config/environments';
+import { getCameraDisplayName, getEnvironmentConfig } from '../config/environments';
 
 // Fix for default markers in React Leaflet
 delete (L.Icon.Default.prototype as any)._getIconUrl;
@@ -134,7 +134,7 @@ const TrackingMap: React.FC<TrackingMapProps> = ({
   const [mapZoom, setMapZoom] = useState(18);
 
   // Get environment configuration
-  const envConfig = useMemo(() => getEnvironmentConfiguration(environment), [environment]);
+  const envConfig = useMemo(() => getEnvironmentConfig(environment), [environment]);
 
   // Set initial map bounds based on environment
   useEffect(() => {
@@ -313,15 +313,15 @@ const TrackingMap: React.FC<TrackingMapProps> = ({
             const point1 = [
               lat + (distance * Math.cos(directionRad - angleRad / 2)) / 111320,
               lng +
-                (distance * Math.sin(directionRad - angleRad / 2)) /
-                  (111320 * Math.cos((lat * Math.PI) / 180)),
+              (distance * Math.sin(directionRad - angleRad / 2)) /
+              (111320 * Math.cos((lat * Math.PI) / 180)),
             ] as [number, number];
 
             const point2 = [
               lat + (distance * Math.cos(directionRad + angleRad / 2)) / 111320,
               lng +
-                (distance * Math.sin(directionRad + angleRad / 2)) /
-                  (111320 * Math.cos((lat * Math.PI) / 180)),
+              (distance * Math.sin(directionRad + angleRad / 2)) /
+              (111320 * Math.cos((lat * Math.PI) / 180)),
             ] as [number, number];
 
             return (

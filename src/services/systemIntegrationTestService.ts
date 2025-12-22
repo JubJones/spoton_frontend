@@ -114,24 +114,24 @@ class SystemIntegrationTestService {
     try {
       // 15.1.1 - Backend System Integration
       await this.runBackendIntegrationTests(suite);
-      
+
       // 15.1.2 - Real Tracking Data Tests
       await this.runRealTrackingDataTests(suite);
-      
+
       // 15.1.3 - WebSocket Scenario Tests
       await this.runWebSocketScenarioTests(suite);
-      
+
       // 15.1.4 - Cross-Camera Tracking Tests
       await this.runCrossCameraTrackingTests(suite);
-      
+
       // 15.1.5 - End-to-End User Workflow Tests
       await this.runEndToEndWorkflowTests(suite);
-      
+
       this.finalizeSuite(suite);
       this.testHistory.push(suite);
-      
+
       console.log(`✅ System integration test completed: ${suite.summary.passed}/${suite.summary.total} passed`);
-      
+
     } catch (error) {
       console.error('❌ System integration test failed:', error);
       suite.status = 'failed';
@@ -152,13 +152,13 @@ class SystemIntegrationTestService {
     // Test 1: Backend connectivity and health
     const healthTest = this.createTest('Backend Health Check', 'integration');
     suite.tests.push(healthTest);
-    
+
     try {
       healthTest.status = 'running';
       healthTest.startTime = Date.now();
-      
+
       const validation = await backendIntegrationService.validateBackendIntegration();
-      
+
       if (validation.isValid) {
         this.completeTest(healthTest, 'passed', 'Backend health validation successful', {
           latency: validation.status.latency.api,
@@ -168,22 +168,22 @@ class SystemIntegrationTestService {
         this.completeTest(healthTest, 'failed', `Backend issues: ${validation.issues.join(', ')}`, validation);
       }
     } catch (error) {
-      this.completeTest(healthTest, 'failed', `Backend test failed: ${error.message}`);
+      this.completeTest(healthTest, 'failed', `Backend test failed: ${(error as any).message}`);
     }
 
     // Test 2: Service discovery validation
     const discoveryTest = this.createTest('Service Discovery', 'integration');
     suite.tests.push(discoveryTest);
-    
+
     try {
       discoveryTest.status = 'running';
       discoveryTest.startTime = Date.now();
-      
+
       const discovery = await serviceDiscoveryService.discoverServices(true);
-      
+
       if (discovery.isAvailable && discovery.configuration) {
         const validation = serviceDiscoveryService.validateConfiguration(discovery.configuration);
-        
+
         if (validation.isValid) {
           this.completeTest(discoveryTest, 'passed', 'Service discovery successful', {
             endpoints: discovery.configuration.endpoints.length,
@@ -196,30 +196,30 @@ class SystemIntegrationTestService {
         this.completeTest(discoveryTest, 'failed', 'Service discovery failed', discovery);
       }
     } catch (error) {
-      this.completeTest(discoveryTest, 'failed', `Discovery test failed: ${error.message}`);
+      this.completeTest(discoveryTest, 'failed', `Discovery test failed: ${(error as any).message}`);
     }
 
     // Test 3: Processing task lifecycle
     const taskTest = this.createTest('Processing Task Lifecycle', 'integration');
     suite.tests.push(taskTest);
-    
+
     try {
       taskTest.status = 'running';
       taskTest.startTime = Date.now();
-      
+
       // Start a processing task
       const taskResponse = await apiService.startProcessingTask({
         environment_id: suite.environment,
       });
-      
+
       const taskId = taskResponse.task_id;
       let attempts = 0;
       const maxAttempts = 30; // 30 seconds max
-      
+
       // Monitor task progress
       while (attempts < maxAttempts) {
         const status = await apiService.getTaskStatus(taskId);
-        
+
         if (status.status === 'COMPLETED' || status.status === 'FAILED') {
           if (status.status === 'COMPLETED') {
             this.completeTest(taskTest, 'passed', 'Task lifecycle completed successfully', {
@@ -232,14 +232,14 @@ class SystemIntegrationTestService {
           }
           return;
         }
-        
+
         await new Promise(resolve => setTimeout(resolve, 1000));
         attempts++;
       }
-      
+
       this.completeTest(taskTest, 'warning', 'Task still processing after timeout', { taskId, attempts });
     } catch (error) {
-      this.completeTest(taskTest, 'failed', `Task test failed: ${error.message}`);
+      this.completeTest(taskTest, 'failed', `Task test failed: ${(error as any).message}`);
     }
   }
 
@@ -249,32 +249,32 @@ class SystemIntegrationTestService {
   private async runRealTrackingDataTests(suite: SystemTestSuite): Promise<void> {
     const trackingTest = this.createTest('Real Tracking Data Processing', 'integration');
     suite.tests.push(trackingTest);
-    
+
     try {
       trackingTest.status = 'running';
       trackingTest.startTime = Date.now();
-      
+
       // Start a real processing task
       const taskResponse = await apiService.startProcessingTask({
         environment_id: suite.environment,
       });
-      
+
       const taskId = taskResponse.task_id;
-      
+
       // Connect WebSocket and monitor for real data
       const wsService = new WebSocketService({
         enableBinaryFrames: true,
         enableCompression: true,
       });
-      
+
       let trackingDataReceived = false;
       let frameCount = 0;
       let personCount = 0;
-      
+
       wsService.addEventListener('tracking-update', (payload: any) => {
         trackingDataReceived = true;
         frameCount++;
-        
+
         // Count persons across all cameras
         if (payload.cameras) {
           personCount += Object.values(payload.cameras).reduce(
@@ -282,18 +282,18 @@ class SystemIntegrationTestService {
           );
         }
       });
-      
+
       await wsService.connect(`/ws/tracking/${taskId}`);
       wsService.subscribeToTracking();
-      
+
       // Wait for tracking data (up to 30 seconds)
       const startTime = Date.now();
       while ((Date.now() - startTime) < 30000 && frameCount < 5) {
         await new Promise(resolve => setTimeout(resolve, 1000));
       }
-      
+
       wsService.disconnect();
-      
+
       if (trackingDataReceived && frameCount > 0) {
         this.completeTest(trackingTest, 'passed', 'Real tracking data processed successfully', {
           frameCount,
@@ -307,7 +307,7 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(trackingTest, 'failed', `Tracking data test failed: ${error.message}`);
+      this.completeTest(trackingTest, 'failed', `Tracking data test Failed: ${(error as any).message}`);
     }
   }
 
@@ -317,21 +317,21 @@ class SystemIntegrationTestService {
   private async runWebSocketScenarioTests(suite: SystemTestSuite): Promise<void> {
     const wsTest = this.createTest('WebSocket Scenarios & Edge Cases', 'integration');
     suite.tests.push(wsTest);
-    
+
     try {
       wsTest.status = 'running';
       wsTest.startTime = Date.now();
-      
+
       const wsValidation = await websocketValidationService.validateWebSocketConnection({
         timeout: 15000,
         testEnvironment: suite.environment,
         enableComprehensiveTest: true,
         testReconnection: true,
       });
-      
+
       const passedTests = Object.values(wsValidation.testResults).filter(result => result).length;
       const totalTests = Object.keys(wsValidation.testResults).length;
-      
+
       if (wsValidation.isValid && passedTests >= totalTests * 0.8) {
         this.completeTest(wsTest, 'passed', `WebSocket validation successful (${passedTests}/${totalTests} tests passed)`, {
           connectionTime: wsValidation.connectionTime,
@@ -343,7 +343,7 @@ class SystemIntegrationTestService {
         this.completeTest(wsTest, 'warning', `WebSocket issues detected (${passedTests}/${totalTests} tests passed)`, wsValidation);
       }
     } catch (error) {
-      this.completeTest(wsTest, 'failed', `WebSocket scenario test failed: ${error.message}`);
+      this.completeTest(wsTest, 'failed', `WebSocket scenario test Failed: ${(error as any).message}`);
     }
   }
 
@@ -353,31 +353,31 @@ class SystemIntegrationTestService {
   private async runCrossCameraTrackingTests(suite: SystemTestSuite): Promise<void> {
     const trackingTest = this.createTest('Cross-Camera Tracking Accuracy', 'integration');
     suite.tests.push(trackingTest);
-    
+
     try {
       trackingTest.status = 'running';
       trackingTest.startTime = Date.now();
-      
+
       // This test would normally require actual video data with known ground truth
       // For now, we'll simulate testing the mapping and coordination systems
-      
+
       // Test camera ID mapping
       const environments = ['factory', 'campus'];
       let mappingTests = 0;
       let mappingPassed = 0;
-      
+
       for (const env of environments) {
         try {
           // Test camera mappings exist and are valid
           const { getCameraMapping, getBackendCameraId, getFrontendCameraId } = await import('../config/environments');
           const mapping = getCameraMapping(env as EnvironmentId);
-          
+
           // Test bidirectional mapping
           const frontendIds = ['camera1', 'camera2', 'camera3', 'camera4'];
           for (const frontendId of frontendIds) {
             const backendId = getBackendCameraId(frontendId as any, env as EnvironmentId);
             const mappedBack = getFrontendCameraId(backendId, env as EnvironmentId);
-            
+
             if (mappedBack === frontendId) {
               mappingPassed++;
             }
@@ -387,9 +387,9 @@ class SystemIntegrationTestService {
           console.warn(`Camera mapping test failed for ${env}:`, error);
         }
       }
-      
+
       const accuracy = mappingTests > 0 ? (mappingPassed / mappingTests) * 100 : 0;
-      
+
       if (accuracy >= 95) {
         this.completeTest(trackingTest, 'passed', `Camera mapping accuracy: ${accuracy.toFixed(1)}%`, {
           accuracy,
@@ -410,7 +410,7 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(trackingTest, 'failed', `Cross-camera tracking test failed: ${error.message}`);
+      this.completeTest(trackingTest, 'failed', `Cross-camera tracking test Failed: ${(error as any).message}`);
     }
   }
 
@@ -420,24 +420,24 @@ class SystemIntegrationTestService {
   private async runEndToEndWorkflowTests(suite: SystemTestSuite): Promise<void> {
     const workflowTest = this.createTest('End-to-End User Workflows', 'e2e');
     suite.tests.push(workflowTest);
-    
+
     try {
       workflowTest.status = 'running';
       workflowTest.startTime = Date.now();
-      
+
       // Simulate key user workflows
       const workflows = [
         'Environment Selection',
-        'Task Initialization', 
+        'Task Initialization',
         'Real-time Monitoring',
         'Person Selection',
         'Cross-Camera Tracking',
         'Map Visualization',
         'Settings Configuration',
       ];
-      
+
       let workflowsPassed = 0;
-      
+
       // For each workflow, test the critical components
       for (const workflow of workflows) {
         try {
@@ -449,13 +449,13 @@ class SystemIntegrationTestService {
               const campusConfig = getEnvironmentConfig('campus');
               if (factoryConfig && campusConfig) workflowsPassed++;
               break;
-              
+
             case 'Task Initialization':
               // Test task creation API
               const health = await apiService.getSystemHealth();
               if (health.status === 'healthy') workflowsPassed++;
               break;
-              
+
             case 'Real-time Monitoring':
               // Test WebSocket connection capability
               const wsTest = await websocketValidationService.validateWebSocketConnection({
@@ -465,7 +465,7 @@ class SystemIntegrationTestService {
               });
               if (wsTest.testResults.basicConnection) workflowsPassed++;
               break;
-              
+
             default:
               // For other workflows, assume they pass if we reach this point
               workflowsPassed++;
@@ -475,9 +475,9 @@ class SystemIntegrationTestService {
           console.warn(`Workflow test failed for ${workflow}:`, error);
         }
       }
-      
+
       const workflowSuccess = (workflowsPassed / workflows.length) * 100;
-      
+
       if (workflowSuccess >= 90) {
         this.completeTest(workflowTest, 'passed', `User workflows: ${workflowSuccess.toFixed(1)}% successful`, {
           workflowSuccess,
@@ -498,7 +498,7 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(workflowTest, 'failed', `E2E workflow test failed: ${error.message}`);
+      this.completeTest(workflowTest, 'failed', `E2E workflow test Failed: ${(error as any).message}`);
     }
   }
 
@@ -511,17 +511,17 @@ class SystemIntegrationTestService {
    */
   async runPerformanceValidation(): Promise<SystemTestResult[]> {
     console.log('🔥 Starting performance validation tests...');
-    
+
     const tests: SystemTestResult[] = [];
-    
+
     // Test 1: Load testing simulation
     const loadTest = this.createTest('Load Testing Simulation', 'performance');
     tests.push(loadTest);
-    
+
     try {
       loadTest.status = 'running';
       loadTest.startTime = Date.now();
-      
+
       // Simulate concurrent users by making multiple API calls
       const concurrentRequests = 10;
       const requests = Array(concurrentRequests).fill(0).map(async (_, i) => {
@@ -533,12 +533,12 @@ class SystemIntegrationTestService {
           return -1; // Error indicator
         }
       });
-      
+
       const results = await Promise.all(requests);
       const successfulRequests = results.filter(time => time > 0);
       const avgResponseTime = successfulRequests.reduce((sum, time) => sum + time, 0) / successfulRequests.length;
       const successRate = (successfulRequests.length / concurrentRequests) * 100;
-      
+
       if (successRate >= 95 && avgResponseTime < 2000) {
         this.completeTest(loadTest, 'passed', `Load test: ${successRate}% success, ${avgResponseTime.toFixed(0)}ms avg`, {
           successRate,
@@ -553,20 +553,20 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(loadTest, 'failed', `Load test failed: ${error.message}`);
+      this.completeTest(loadTest, 'failed', `Load test Failed: ${(error as any).message}`);
     }
-    
+
     // Test 2: Memory usage monitoring
     const memoryTest = this.createTest('Memory Usage Monitoring', 'performance');
     tests.push(memoryTest);
-    
+
     try {
       memoryTest.status = 'running';
       memoryTest.startTime = Date.now();
-      
+
       const metrics = performanceOptimizationService.getMetrics();
       const memoryUsage = metrics.memoryUsage.percentage;
-      
+
       if (memoryUsage < 70) {
         this.completeTest(memoryTest, 'passed', `Memory usage optimal: ${memoryUsage.toFixed(1)}%`, {
           memoryUsage,
@@ -584,27 +584,27 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(memoryTest, 'failed', `Memory test failed: ${error.message}`);
+      this.completeTest(memoryTest, 'failed', `Memory test Failed: ${(error as any).message}`);
     }
-    
+
     // Test 3: Network latency validation
     const latencyTest = this.createTest('Network Latency Validation', 'performance');
     tests.push(latencyTest);
-    
+
     try {
       latencyTest.status = 'running';
       latencyTest.startTime = Date.now();
-      
+
       const latencyTests = [];
       for (let i = 0; i < 5; i++) {
         const start = Date.now();
         await apiService.getSystemHealth();
         latencyTests.push(Date.now() - start);
       }
-      
+
       const avgLatency = latencyTests.reduce((sum, time) => sum + time, 0) / latencyTests.length;
       const maxLatency = Math.max(...latencyTests);
-      
+
       if (avgLatency < 500 && maxLatency < 1000) {
         this.completeTest(latencyTest, 'passed', `Network latency good: ${avgLatency.toFixed(0)}ms avg, ${maxLatency}ms max`, {
           avgLatency,
@@ -622,9 +622,9 @@ class SystemIntegrationTestService {
         });
       }
     } catch (error) {
-      this.completeTest(latencyTest, 'failed', `Latency test failed: ${error.message}`);
+      this.completeTest(latencyTest, 'failed', `Latency test Failed: ${(error as any).message}`);
     }
-    
+
     return tests;
   }
 
@@ -637,21 +637,21 @@ class SystemIntegrationTestService {
    */
   async runQualityAssurance(): Promise<SystemTestResult[]> {
     console.log('🔍 Starting quality assurance validation...');
-    
+
     const tests: SystemTestResult[] = [];
-    
+
     // Test 1: Feature completeness validation
     const featureTest = this.createTest('Feature Completeness Validation', 'quality');
     tests.push(featureTest);
-    
+
     try {
       featureTest.status = 'running';
       featureTest.startTime = Date.now();
-      
+
       const requiredFeatures = [
         'Environment Selection',
         'Real-time Tracking',
-        'Cross-camera Re-identification', 
+        'Cross-camera Re-identification',
         'Map Visualization',
         'Person Focus Tracking',
         'Analytics Dashboard',
@@ -660,81 +660,81 @@ class SystemIntegrationTestService {
         'Performance Monitoring',
         'Error Handling',
       ];
-      
+
       // For this test, assume all features are implemented since we've built them
       const implementedFeatures = requiredFeatures.length;
       const completeness = (implementedFeatures / requiredFeatures.length) * 100;
-      
+
       this.completeTest(featureTest, 'passed', `Feature completeness: ${completeness}%`, {
         completeness,
         implementedFeatures,
         totalFeatures: requiredFeatures.length,
       });
     } catch (error) {
-      this.completeTest(featureTest, 'failed', `Feature test failed: ${error.message}`);
+      this.completeTest(featureTest, 'failed', `Feature test Failed: ${(error as any).message}`);
     }
-    
+
     // Test 2: UI/UX validation
     const uiTest = this.createTest('UI/UX Validation', 'quality');
     tests.push(uiTest);
-    
+
     try {
       uiTest.status = 'running';
       uiTest.startTime = Date.now();
-      
+
       // Test responsive design classes and layout
       const responsiveTests = [
         'Mobile layout support',
-        'Tablet layout support', 
+        'Tablet layout support',
         'Desktop layout support',
         'Touch gesture support',
         'Keyboard navigation',
         'Screen reader support',
       ];
-      
+
       // Simulate UI validation - in real scenario would use automated testing
       const passedUITests = responsiveTests.length; // Assume all pass
       const uiScore = (passedUITests / responsiveTests.length) * 100;
-      
+
       this.completeTest(uiTest, 'passed', `UI/UX validation: ${uiScore}% compliant`, {
         uiScore,
         passedUITests,
         totalUITests: responsiveTests.length,
       });
     } catch (error) {
-      this.completeTest(uiTest, 'failed', `UI/UX test failed: ${error.message}`);
+      this.completeTest(uiTest, 'failed', `UI/UX test Failed: ${(error as any).message}`);
     }
-    
+
     // Test 3: Security validation
     const securityTest = this.createTest('Security Validation', 'security');
     tests.push(securityTest);
-    
+
     try {
       securityTest.status = 'running';
       securityTest.startTime = Date.now();
-      
+
       const securityChecks = [
         'No hardcoded credentials',
-        'Input validation', 
+        'Input validation',
         'XSS protection',
         'CSRF protection',
         'Secure WebSocket connections',
         'Environment variable security',
       ];
-      
+
       // For this test, assume security measures are in place
       const passedSecurityTests = securityChecks.length;
       const securityScore = (passedSecurityTests / securityChecks.length) * 100;
-      
+
       this.completeTest(securityTest, 'passed', `Security validation: ${securityScore}% compliant`, {
         securityScore,
         passedSecurityTests,
         totalSecurityTests: securityChecks.length,
       });
     } catch (error) {
-      this.completeTest(securityTest, 'failed', `Security test failed: ${error.message}`);
+      this.completeTest(securityTest, 'failed', `Security test Failed: ${(error as any).message}`);
     }
-    
+
     return tests;
   }
 
@@ -777,9 +777,9 @@ class SystemIntegrationTestService {
   }
 
   private completeTest(
-    test: SystemTestResult, 
-    status: 'passed' | 'failed' | 'warning', 
-    message?: string, 
+    test: SystemTestResult,
+    status: 'passed' | 'failed' | 'warning',
+    message?: string,
     details?: any,
     metrics?: Record<string, number>
   ): void {
@@ -795,18 +795,18 @@ class SystemIntegrationTestService {
     suite.endTime = Date.now();
     suite.duration = suite.endTime - suite.startTime;
     suite.status = 'completed';
-    
+
     // Calculate summary
     suite.summary.total = suite.tests.length;
     suite.summary.passed = suite.tests.filter(t => t.status === 'passed').length;
     suite.summary.failed = suite.tests.filter(t => t.status === 'failed').length;
     suite.summary.warnings = suite.tests.filter(t => t.status === 'warning').length;
     suite.summary.coverage = suite.summary.total > 0 ? (suite.summary.passed / suite.summary.total) * 100 : 0;
-    
+
     // Calculate performance metrics
     const performanceTests = suite.tests.filter(t => t.metrics);
     if (performanceTests.length > 0) {
-      suite.performance.avgResponseTime = performanceTests.reduce((sum, t) => 
+      suite.performance.avgResponseTime = performanceTests.reduce((sum, t) =>
         sum + (t.metrics?.avgResponseTime || t.metrics?.latency || 0), 0) / performanceTests.length;
     }
   }
@@ -866,22 +866,22 @@ class SystemIntegrationTestService {
     suite.tests.forEach(test => {
       const statusIcon = test.status === 'passed' ? '✅' : test.status === 'failed' ? '❌' : '⚠️';
       report.push(`### ${statusIcon} ${test.testName} (${test.category})`);
-      
+
       if (test.message) {
         report.push(`**Result**: ${test.message}`);
       }
-      
+
       if (test.duration) {
         report.push(`**Duration**: ${test.duration}ms`);
       }
-      
+
       if (test.metrics && Object.keys(test.metrics).length > 0) {
         report.push('**Metrics**:');
         Object.entries(test.metrics).forEach(([key, value]) => {
           report.push(`- ${key}: ${typeof value === 'number' ? value.toFixed(2) : value}`);
         });
       }
-      
+
       report.push('');
     });
 

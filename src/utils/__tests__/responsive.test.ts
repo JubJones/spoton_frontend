@@ -235,7 +235,7 @@ describe('Responsive Utilities', () => {
       // Simulate touch start
       const touchStartEvent = {
         touches: [{ clientX: 100, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       act(() => {
         result.current.onTouchStart(touchStartEvent);
@@ -244,7 +244,7 @@ describe('Responsive Utilities', () => {
       // Simulate swipe right
       const touchEndEvent = {
         changedTouches: [{ clientX: 200, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       // Mock Date.now to ensure consistent timing
       const mockNow = Date.now();
@@ -263,7 +263,7 @@ describe('Responsive Utilities', () => {
       // Simulate touch start
       const touchStartEvent = {
         touches: [{ clientX: 100, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       act(() => {
         result.current.onTouchStart(touchStartEvent);
@@ -272,7 +272,7 @@ describe('Responsive Utilities', () => {
       // Simulate swipe down
       const touchEndEvent = {
         changedTouches: [{ clientX: 100, clientY: 200 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       // Mock Date.now to ensure swipe is detected
       const mockNow = Date.now();
@@ -290,7 +290,7 @@ describe('Responsive Utilities', () => {
 
       const touchStartEvent = {
         touches: [{ clientX: 100, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       act(() => {
         result.current.onTouchStart(touchStartEvent);
@@ -298,7 +298,7 @@ describe('Responsive Utilities', () => {
 
       const touchEndEvent = {
         changedTouches: [{ clientX: 200, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       // Mock Date.now to simulate slow movement (>500ms)
       const mockNow = Date.now();
@@ -316,7 +316,7 @@ describe('Responsive Utilities', () => {
 
       const touchStartEvent = {
         touches: [{ clientX: 100, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       act(() => {
         result.current.onTouchStart(touchStartEvent);
@@ -325,7 +325,7 @@ describe('Responsive Utilities', () => {
       // Small movement (less than 50px)
       const touchEndEvent = {
         changedTouches: [{ clientX: 120, clientY: 100 }],
-      } as React.TouchEvent;
+      } as unknown as React.TouchEvent;
 
       const mockNow = Date.now();
       vi.spyOn(Date, 'now').mockReturnValue(mockNow + 100);

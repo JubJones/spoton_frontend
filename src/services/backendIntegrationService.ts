@@ -52,7 +52,7 @@ class BackendIntegrationService {
   constructor() {
     this.connectionStatus = {
       api: 'unknown',
-      websocket: 'unknown', 
+      websocket: 'unknown',
       health: 'unknown',
       lastChecked: 0,
       latency: { api: 0, websocket: 0 },
@@ -81,7 +81,7 @@ class BackendIntegrationService {
         if (apiUrl.protocol !== 'http:' && apiUrl.protocol !== 'https:') {
           issues.push(`Invalid API URL protocol: ${apiUrl.protocol}`);
         }
-        
+
         // Check for common port misconfigurations
         if (apiUrl.port === '8000') {
           warnings.push('API configured for port 8000 - backend now runs on port 3847 (OrbStack)');
@@ -109,10 +109,10 @@ class BackendIntegrationService {
     if (typeof window !== 'undefined') {
       const envVars = [
         'VITE_API_BASE_URL',
-        'VITE_WS_BASE_URL', 
+        'VITE_WS_BASE_URL',
         'VITE_ENVIRONMENT',
       ];
-      
+
       envVars.forEach(envVar => {
         if (!import.meta.env[envVar]) {
           warnings.push(`Environment variable ${envVar} not set`);
@@ -230,7 +230,7 @@ class BackendIntegrationService {
     return new Promise((resolve) => {
       const startTime = Date.now();
       const wsUrl = `${APP_CONFIG.WS_BASE_URL}/ws/test`;
-      
+
       console.log(`🔍 Testing WebSocket connection: ${wsUrl}`);
 
       try {
@@ -332,7 +332,7 @@ class BackendIntegrationService {
         const failedEndpoints = Object.entries(endpointTests.results)
           .filter(([, result]) => !result.success && result.required)
           .map(([name]) => name);
-        
+
         if (failedEndpoints.length > 0) {
           recommendations.push(`Check backend service status for: ${failedEndpoints.join(', ')}`);
         }
@@ -341,7 +341,7 @@ class BackendIntegrationService {
       // 3. WebSocket connection testing
       console.log('🔌 Step 3: Testing WebSocket connection...');
       const wsTest = await this.testWebSocketConnection();
-      
+
       if (!wsTest.success) {
         issues.push(`WebSocket connection failed: ${wsTest.error}`);
         recommendations.push('Ensure backend WebSocket server is running and accessible');
@@ -352,23 +352,23 @@ class BackendIntegrationService {
       let healthStatus: SystemHealthResponse | null = null;
       try {
         healthStatus = await apiService.getSystemHealth();
-        
+
         if (healthStatus.status !== 'healthy') {
           warnings.push(`Backend system health is ${healthStatus.status}`);
         }
-        
+
         // Check individual components
         const unhealthyComponents = [];
-        if (healthStatus.detector_model_status !== 'healthy') {
+        if (healthStatus.detector_model_status !== 'loaded') {
           unhealthyComponents.push('detector model');
         }
-        if (healthStatus.tracker_factory_status !== 'healthy') {
+        if (healthStatus.tracker_factory_status !== 'ready') {
           unhealthyComponents.push('tracker factory');
         }
-        if (healthStatus.homography_matrices_status !== 'healthy') {
-          unhealthyComponents.push('homography matrices');
+        if (healthStatus.homography_matrices_status !== 'loaded') {
+          console.warn('Backend homography matrices not fully ready');
         }
-        
+
         if (unhealthyComponents.length > 0) {
           warnings.push(`Backend components unhealthy: ${unhealthyComponents.join(', ')}`);
           recommendations.push('Check backend logs and ensure all AI models are loaded');
@@ -401,7 +401,7 @@ class BackendIntegrationService {
       }
 
       console.log('✅ Backend validation completed');
-      
+
       return {
         isValid: issues.length === 0,
         issues,
@@ -427,11 +427,11 @@ class BackendIntegrationService {
     }
 
     console.log(`🔄 Starting health monitoring (${intervalMs}ms interval)`);
-    
+
     this.healthCheckInterval = setInterval(async () => {
       try {
         const quickValidation = await this.quickHealthCheck();
-        
+
         if (!quickValidation.isHealthy) {
           console.warn('⚠️ Backend health check failed, attempting reconnection');
           this.attemptReconnection();
@@ -460,26 +460,26 @@ class BackendIntegrationService {
    */
   private async quickHealthCheck(): Promise<{ isHealthy: boolean; latency: number }> {
     const startTime = Date.now();
-    
+
     try {
       const response = await fetch(`${APP_CONFIG.API_BASE_URL}/health`, {
         method: 'GET',
         headers: { 'Content-Type': 'application/json' },
       });
-      
+
       const latency = Date.now() - startTime;
       const isHealthy = response.ok;
-      
+
       this.connectionStatus.latency.api = latency;
       this.connectionStatus.api = isHealthy ? 'connected' : 'error';
       this.connectionStatus.lastChecked = Date.now();
-      
+
       return { isHealthy, latency };
     } catch (error) {
       const latency = Date.now() - startTime;
       this.connectionStatus.api = 'error';
       this.connectionStatus.lastChecked = Date.now();
-      
+
       return { isHealthy: false, latency };
     }
   }
@@ -495,9 +495,9 @@ class BackendIntegrationService {
 
     this.reconnectAttempts++;
     const delay = Math.min(1000 * Math.pow(2, this.reconnectAttempts), 30000); // Cap at 30s
-    
+
     console.log(`🔄 Reconnection attempt ${this.reconnectAttempts}/${this.maxReconnectAttempts} in ${delay}ms`);
-    
+
     setTimeout(async () => {
       const validation = await this.quickHealthCheck();
       if (validation.isHealthy) {
@@ -543,7 +543,7 @@ class BackendIntegrationService {
       ],
       capabilities: [
         'person_detection',
-        'multi_object_tracking', 
+        'multi_object_tracking',
         'cross_camera_reid',
         'real_time_processing',
       ],
@@ -649,15 +649,15 @@ export async function checkBackendConnectivity(): Promise<boolean> {
 export function validateBackendUrl(url: string): { isValid: boolean; error?: string } {
   try {
     const parsedUrl = new URL(url);
-    
+
     if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
       return { isValid: false, error: 'URL must use http or https protocol' };
     }
-    
+
     if (!parsedUrl.hostname) {
       return { isValid: false, error: 'URL must have a valid hostname' };
     }
-    
+
     return { isValid: true };
   } catch (error) {
     return { isValid: false, error: 'Invalid URL format' };

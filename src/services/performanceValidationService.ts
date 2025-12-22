@@ -168,7 +168,7 @@ class PerformanceValidationService {
       // Ramp up users gradually
       for (let i = 0; i < testConfig.concurrency; i++) {
         const delay = (testConfig.rampUpTime * 1000 * i) / testConfig.concurrency;
-        
+
         workers.push(
           new Promise(resolve => {
             setTimeout(async () => {
@@ -185,7 +185,7 @@ class PerformanceValidationService {
 
       // Wait for all workers to complete
       const workerResults = await Promise.all(workers);
-      
+
       // Aggregate metrics
       test.metrics = this.aggregateWorkerMetrics(workerResults);
       test.status = 'completed';
@@ -193,7 +193,7 @@ class PerformanceValidationService {
       test.duration = test.endTime - test.startTime;
 
       console.log(`✅ Load test completed: ${test.metrics.throughput.requestsPerSecond.toFixed(1)} RPS`);
-      
+
     } catch (error) {
       test.status = 'failed';
       test.errors = [error instanceof Error ? error.message : 'Load test failed'];
@@ -225,10 +225,10 @@ class PerformanceValidationService {
       try {
         // Select scenario based on weight
         const scenario = this.selectScenario(scenarios);
-        
+
         for (const action of scenario.actions) {
           const actionStart = Date.now();
-          
+
           switch (action.type) {
             case 'http':
               await this.executeHttpAction(action, metrics);
@@ -265,7 +265,7 @@ class PerformanceValidationService {
   private async executeHttpAction(action: ScenarioAction, metrics: any): Promise<void> {
     const url = `${APP_CONFIG.API_BASE_URL}${action.endpoint}`;
     const method = action.data ? 'POST' : 'GET';
-    
+
     const response = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
@@ -338,7 +338,7 @@ class PerformanceValidationService {
    */
   async runMemoryLeakDetection(duration: number = 300000): Promise<MemoryLeakTest> {
     console.log(`🧠 Starting memory leak detection test (${duration / 1000}s)...`);
-    
+
     const test: MemoryLeakTest = {
       testName: 'Memory Leak Detection',
       initialMemory: 0,
@@ -350,38 +350,38 @@ class PerformanceValidationService {
 
     const startTime = Date.now();
     const sampleInterval = 5000; // Sample every 5 seconds
-    
+
     // Get initial memory
     test.initialMemory = this.getCurrentMemoryUsage();
     test.peakMemory = test.initialMemory;
-    
+
     return new Promise((resolve) => {
       const sampleMemory = () => {
         const currentMemory = this.getCurrentMemoryUsage();
         test.samples.push(currentMemory);
-        
+
         if (currentMemory > test.peakMemory) {
           test.peakMemory = currentMemory;
         }
-        
+
         // Continue sampling if test duration not reached
         if ((Date.now() - startTime) < duration) {
           setTimeout(sampleMemory, sampleInterval);
         } else {
           // Test completed
           test.finalMemory = currentMemory;
-          
+
           // Analyze for memory leaks
           test.leakDetected = this.analyzeMemoryLeak(test);
-          
+
           console.log(`🧠 Memory leak test completed: ${test.leakDetected ? 'LEAK DETECTED' : 'NO LEAKS'}`);
           resolve(test);
         }
       };
-      
+
       // Start sampling
       setTimeout(sampleMemory, sampleInterval);
-      
+
       // Simulate memory-intensive operations during test
       this.simulateMemoryIntensiveOperations(duration);
     });
@@ -394,7 +394,7 @@ class PerformanceValidationService {
     if (typeof (performance as any).memory !== 'undefined') {
       return (performance as any).memory.usedJSHeapSize / (1024 * 1024); // MB
     }
-    
+
     // Fallback estimation
     return this.estimateMemoryUsage();
   }
@@ -414,22 +414,22 @@ class PerformanceValidationService {
    */
   private analyzeMemoryLeak(test: MemoryLeakTest): boolean {
     if (test.samples.length < 10) return false;
-    
+
     // Calculate trend using linear regression
     const n = test.samples.length;
     const x = Array.from({ length: n }, (_, i) => i);
     const y = test.samples;
-    
+
     const sumX = x.reduce((a, b) => a + b, 0);
     const sumY = y.reduce((a, b) => a + b, 0);
     const sumXY = x.reduce((sum, xi, i) => sum + xi * y[i], 0);
     const sumXX = x.reduce((sum, xi) => sum + xi * xi, 0);
-    
+
     const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX);
-    
+
     // If slope > 0.1 MB per sample, consider it a leak
     test.leakRate = slope * (60000 / 5000); // Convert to MB per minute
-    
+
     return slope > 0.1;
   }
 
@@ -438,32 +438,32 @@ class PerformanceValidationService {
    */
   private simulateMemoryIntensiveOperations(duration: number): void {
     const startTime = Date.now();
-    const operations = [];
-    
+    const operations: any[] = [];
+
     const createMemoryPressure = () => {
       if ((Date.now() - startTime) >= duration) {
         // Clean up
         operations.length = 0;
         return;
       }
-      
+
       // Create some memory pressure
       const data = new Array(10000).fill(0).map(() => ({
         id: Math.random(),
         data: new Array(100).fill(Math.random()),
         timestamp: Date.now(),
       }));
-      
+
       operations.push(data);
-      
+
       // Occasionally clean up to simulate normal memory management
       if (operations.length > 20) {
         operations.splice(0, 10);
       }
-      
+
       setTimeout(createMemoryPressure, 1000);
     };
-    
+
     createMemoryPressure();
   }
 
@@ -476,7 +476,7 @@ class PerformanceValidationService {
    */
   async runBandwidthOptimizationTest(): Promise<BandwidthOptimizationTest> {
     console.log('📡 Starting bandwidth optimization test...');
-    
+
     const test: BandwidthOptimizationTest = {
       testName: 'Bandwidth Optimization',
       uncompressed: { size: 0, transferTime: 0 },
@@ -488,33 +488,33 @@ class PerformanceValidationService {
       // Test uncompressed data transfer
       const uncompressedData = this.generateTestData(1024 * 100); // 100KB
       const uncompressedStart = Date.now();
-      
+
       // Simulate network transfer (using fetch to self)
       const uncompressedBlob = new Blob([JSON.stringify(uncompressedData)]);
       test.uncompressed.size = uncompressedBlob.size;
-      
+
       // Simulate transfer time based on size
       test.uncompressed.transferTime = this.simulateTransferTime(test.uncompressed.size);
-      
+
       // Test compressed data transfer
       const compressedData = performanceOptimizationService.compressData(uncompressedData);
-      const compressedSize = typeof compressedData === 'string' 
-        ? new Blob([compressedData]).size 
+      const compressedSize = typeof compressedData === 'string'
+        ? new Blob([compressedData]).size
         : compressedData.byteLength || new Blob([compressedData]).size;
-      
+
       test.compressed.size = compressedSize;
       test.compressed.transferTime = this.simulateTransferTime(compressedSize);
-      
+
       // Calculate optimizations
       test.optimization.sizeReduction = ((test.uncompressed.size - test.compressed.size) / test.uncompressed.size) * 100;
       test.optimization.speedImprovement = ((test.uncompressed.transferTime - test.compressed.transferTime) / test.uncompressed.transferTime) * 100;
-      
+
       console.log(`📡 Bandwidth test: ${test.optimization.sizeReduction.toFixed(1)}% size reduction, ${test.optimization.speedImprovement.toFixed(1)}% speed improvement`);
-      
+
     } catch (error) {
       console.error('❌ Bandwidth optimization test failed:', error);
     }
-    
+
     return test;
   }
 
@@ -527,10 +527,10 @@ class PerformanceValidationService {
       environment: 'factory',
       cameras: {} as any,
     };
-    
+
     // Generate camera data to reach target size
     const camerasNeeded = Math.ceil(targetSize / 1000); // Rough estimate
-    
+
     for (let i = 0; i < Math.min(camerasNeeded, 10); i++) {
       const cameraId = `c${i.toString().padStart(2, '0')}`;
       data.cameras[cameraId] = {
@@ -545,7 +545,7 @@ class PerformanceValidationService {
         frameImage: 'data:image/jpeg;base64,' + 'A'.repeat(1000), // Simulate base64 image
       };
     }
-    
+
     return data;
   }
 
@@ -559,7 +559,7 @@ class PerformanceValidationService {
       '4G': 10 * 1024 * 1024,  // 10 Mbps in bytes/sec
       'WiFi': 50 * 1024 * 1024, // 50 Mbps in bytes/sec
     };
-    
+
     // Use 4G as baseline
     const bytesPerSecond = networkSpeeds['4G'];
     return (sizeBytes / bytesPerSecond) * 1000; // Convert to ms
@@ -574,7 +574,7 @@ class PerformanceValidationService {
    */
   async measureRealTimeLatency(duration: number = 30000): Promise<PerformanceMetrics['webSocket']> {
     console.log(`⚡ Measuring real-time latency (${duration / 1000}s)...`);
-    
+
     const metrics = {
       connectionTime: 0,
       messageLatency: 0,
@@ -585,18 +585,18 @@ class PerformanceValidationService {
     return new Promise((resolve, reject) => {
       const wsUrl = `${APP_CONFIG.WS_BASE_URL}/ws/test`;
       const ws = new WebSocket(wsUrl);
-      
+
       let connected = false;
       let messageCount = 0;
       let latencySum = 0;
       const startTime = Date.now();
       let connectionStartTime = Date.now();
-      
+
       ws.onopen = () => {
         connected = true;
         metrics.connectionTime = Date.now() - connectionStartTime;
         console.log(`⚡ WebSocket connected in ${metrics.connectionTime}ms`);
-        
+
         // Start sending ping messages
         const pingInterval = setInterval(() => {
           if (connected && ws.readyState === WebSocket.OPEN) {
@@ -604,20 +604,20 @@ class PerformanceValidationService {
             ws.send(JSON.stringify({ type: 'ping', timestamp: pingTime }));
           }
         }, 1000);
-        
+
         // End test after duration
         setTimeout(() => {
           clearInterval(pingInterval);
           ws.close();
-          
+
           metrics.messageLatency = messageCount > 0 ? latencySum / messageCount : 0;
           metrics.dataRate = messageCount / (duration / 1000);
-          
+
           console.log(`⚡ Latency test completed: ${metrics.messageLatency.toFixed(1)}ms avg latency`);
           resolve(metrics);
         }, duration);
       };
-      
+
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
@@ -630,7 +630,7 @@ class PerformanceValidationService {
           // Ignore parsing errors
         }
       };
-      
+
       ws.onclose = () => {
         connected = false;
         if (messageCount === 0) {
@@ -638,7 +638,7 @@ class PerformanceValidationService {
           resolve(metrics);
         }
       };
-      
+
       ws.onerror = () => {
         connected = false;
         reject(new Error('WebSocket connection failed'));
@@ -663,14 +663,14 @@ class PerformanceValidationService {
   private selectScenario(scenarios: LoadTestScenario[]): LoadTestScenario {
     const random = Math.random();
     let cumulative = 0;
-    
+
     for (const scenario of scenarios) {
       cumulative += scenario.weight;
       if (random <= cumulative) {
         return scenario;
       }
     }
-    
+
     return scenarios[0]; // Fallback
   }
 
@@ -679,16 +679,16 @@ class PerformanceValidationService {
     const totalErrors = workerResults.reduce((sum, result) => sum + result.errors, 0);
     const allResponseTimes = workerResults.flatMap(result => result.responseTimes);
     const totalDataTransferred = workerResults.reduce((sum, result) => sum + result.dataTransferred, 0);
-    
+
     // Calculate response time percentiles
     allResponseTimes.sort((a, b) => a - b);
     const p95Index = Math.floor(allResponseTimes.length * 0.95);
     const p99Index = Math.floor(allResponseTimes.length * 0.99);
-    
-    const testDurationSeconds = Math.max(...workerResults.map(r => 
+
+    const testDurationSeconds = Math.max(...workerResults.map(r =>
       r.responseTimes.length > 0 ? r.responseTimes.length : 1
     ));
-    
+
     return {
       responseTime: {
         min: Math.min(...allResponseTimes) || 0,
@@ -756,7 +756,7 @@ class PerformanceValidationService {
    */
   generatePerformanceReport(test: PerformanceTest): string {
     if (!test.metrics) return 'No metrics available';
-    
+
     const report = [
       `# Performance Test Report: ${test.name}`,
       '',

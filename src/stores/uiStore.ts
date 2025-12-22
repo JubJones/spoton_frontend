@@ -10,6 +10,8 @@ import {
   ViewMode,
   FilterConfig,
   BackendCameraId,
+  UserSettings,
+  DEFAULT_USER_SETTINGS,
 } from '../types/ui';
 import { dataCacheService } from '../services/dataCacheService';
 import { statePersistenceService } from '../services/statePersistenceService';
@@ -170,14 +172,10 @@ const initialState: Omit<UIStoreState, 'actions'> = {
 
   // User preferences
   preferences: {
+    ...DEFAULT_USER_SETTINGS,
+    // Override defaults if needed for initial state
     theme: 'light',
-    language: 'en',
-    frameRate: 30,
     quality: 'high',
-    highPerformanceMode: false,
-    highContrast: false,
-    reducedMotion: false,
-    fontSize: 'medium',
   },
 };
 
@@ -280,7 +278,7 @@ export const useUIStore = create<UIStoreState>()(
                     cameras: {
                       ...state.cameras,
                       [cameraId]: updatedConfig,
-                    },
+                    } as Record<BackendCameraId, CameraDisplayConfig>,
                   }),
                   false,
                   'updateCameraConfig'
@@ -347,7 +345,7 @@ export const useUIStore = create<UIStoreState>()(
                 const additions: Partial<Record<BackendCameraId, CameraDisplayConfig>> = {};
 
                 cameraIds.forEach((cameraId) => {
-                  if (!state.cameras[cameraId]) {
+                  if (!(state.cameras as Record<BackendCameraId, CameraDisplayConfig>)[cameraId]) {
                     additions[cameraId] = createDefaultCameraConfig();
                   }
                 });
@@ -822,18 +820,18 @@ export const useUIStore = create<UIStoreState>()(
         // Merge persisted state with initial state
         merge: (persistedState, currentState) => ({
           ...currentState,
-          ...persistedState,
+          ...(persistedState as any),
         }),
         version: 2,
         // Custom storage implementation using our enhanced service
         storage: {
-          getItem: async (name: string): Promise<string | null> => {
+          getItem: async (name: string): Promise<any | null> => {
             return statePersistenceService
               .loadState(name)
               .then((data) => (data ? JSON.stringify(data) : null))
               .catch(() => null);
           },
-          setItem: async (name: string, value: string): Promise<void> => {
+          setItem: async (name: string, value: any): Promise<void> => {
             const serializedValue = typeof value === 'string' ? value : JSON.stringify(value);
             let parsedValue: any;
             try {
@@ -899,7 +897,7 @@ export const useCameraDisplayConfig = () => useUIStore((state) => state.cameras)
  * Get specific camera configuration
  */
 export const useCameraConfigById = (cameraId: BackendCameraId) =>
-  useUIStore((state) => state.cameras[cameraId]);
+  useUIStore((state) => (state.cameras as Record<BackendCameraId, CameraDisplayConfig>)[cameraId]);
 
 /**
  * Get map configuration
@@ -1019,10 +1017,10 @@ export async function initializeUIStore() {
 
   try {
     // Try to restore cached configurations
-    const cachedTheme = await dataCacheService.get('theme-preference');
-    const cachedPerformance = await dataCacheService.get('performance-preferences');
-    const cachedFilters = await dataCacheService.get('filter-config');
-    const cachedMapConfig = await dataCacheService.get('map-config');
+    const cachedTheme = (await dataCacheService.get('theme-preference')) as UserSettings['theme'] | undefined;
+    const cachedPerformance = (await dataCacheService.get('performance-preferences')) as Partial<UserSettings> | undefined;
+    const cachedFilters = (await dataCacheService.get('filter-config')) as FilterConfig | undefined;
+    const cachedMapConfig = (await dataCacheService.get('map-config')) as MapDisplayConfig | undefined;
 
     // Restore theme preference or detect system preference
     if (cachedTheme) {

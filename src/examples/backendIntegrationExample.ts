@@ -59,11 +59,11 @@ export class BackendIntegrationExample {
   async checkSystemHealth(): Promise<{ isHealthy: boolean; details: any }> {
     try {
       const health = await this.apiService.getSystemHealth();
-      
+
       const isHealthy = health.status === 'healthy' &&
-                       health.detector_model_status === 'loaded' &&
-                       health.tracker_factory_status === 'ready' &&
-                       health.homography_matrices_status === 'loaded';
+        health.detector_model_status === 'loaded' &&
+        health.tracker_factory_status === 'ready' &&
+        health.homography_matrices_status === 'loaded';
 
       return {
         isHealthy,
@@ -84,7 +84,7 @@ export class BackendIntegrationExample {
         active_only: true,
         include_data_check: true
       });
-      
+
       return environments;
     } catch (error) {
       console.error('Failed to get environments:', error);
@@ -127,10 +127,10 @@ export class BackendIntegrationExample {
     const checkStatus = async (): Promise<void> => {
       try {
         const status = await this.apiService.getTaskStatus(this.currentTask.task_id);
-        
+
         console.log(`Task ${status.task_id}: ${status.status} (${Math.round(status.progress * 100)}%)`);
         console.log(`Step: ${status.current_step}`);
-        
+
         if (status.details) {
           console.log('Details:', status.details);
         }
@@ -139,14 +139,14 @@ export class BackendIntegrationExample {
           case 'PROCESSING':
             console.log('✅ Task ready for WebSocket connection');
             return; // Ready for WebSocket
-            
+
           case 'COMPLETED':
             console.log('✅ Task completed successfully');
             return;
-            
+
           case 'FAILED':
             throw new Error(`Task failed: ${status.details || 'Unknown error'}`);
-            
+
           default:
             // Continue monitoring for other states (QUEUED, INITIALIZING, DOWNLOADING, EXTRACTING)
             console.log(`⏳ Task still ${status.status}, waiting...`);
@@ -198,7 +198,7 @@ export class BackendIntegrationExample {
       console.log('📊 Tracking update received:');
       console.log(`Frame ${payload.global_frame_index} processed at ${payload.timestamp_processed_utc}`);
       console.log(`Scene: ${payload.scene_id}`);
-      
+
       // Process each camera
       Object.entries(payload.cameras).forEach(([cameraId, cameraData]) => {
         console.log(`📷 Camera ${cameraId}:`);
@@ -219,7 +219,7 @@ export class BackendIntegrationExample {
 
       // Show person counts per camera
       console.log('👥 Person counts:', payload.person_count_per_camera);
-      
+
       if (payload.focus_person_id) {
         console.log(`🎯 Focused person: ${payload.focus_person_id}`);
       }
@@ -257,7 +257,8 @@ export class BackendIntegrationExample {
 
     try {
       console.log(`🎯 Setting focus on person ${globalPersonId}...`);
-      
+
+      /*
       const focusResponse = await this.apiService.setFocus(this.currentTask.task_id, {
         global_person_id: globalPersonId,
         cross_camera_sync: true,
@@ -269,16 +270,16 @@ export class BackendIntegrationExample {
           glow_effect: true
         }
       });
-
       console.log('✅ Focus set:', focusResponse);
+      */
 
       // Get focus state
-      const focusState = await this.apiService.getFocusState(this.currentTask.task_id);
-      console.log('Focus state:', focusState);
+      // const focusState = await this.apiService.getFocusState(this.currentTask.task_id);
+      // console.log('Focus state:', focusState);
 
       // Get person details
-      const personDetails = await this.apiService.getPersonDetails(globalPersonId, true, 10);
-      console.log('Person details:', personDetails);
+      // const personDetails = await this.apiService.getPersonDetails(globalPersonId, true, 10);
+      // console.log('Person details:', personDetails);
 
     } catch (error) {
       console.error('Focus tracking failed:', error);
@@ -295,7 +296,7 @@ export class BackendIntegrationExample {
 
     try {
       console.log('▶️ Starting playback...');
-      await this.apiService.startPlayback(this.currentTask.task_id, 1.0);
+      // await this.apiService.startPlayback(this.currentTask.task_id, 1.0);
 
       // Get playback status
       const status = await this.apiService.getPlaybackStatus(this.currentTask.task_id);
@@ -304,14 +305,16 @@ export class BackendIntegrationExample {
       // Pause after 5 seconds
       setTimeout(async () => {
         console.log('⏸️ Pausing playback...');
-        await this.apiService.pausePlayback(this.currentTask.task_id);
+        await this.apiService.pauseTaskPlayback(this.currentTask.task_id);
       }, 5000);
 
+      /*
       // Seek to 50% after 8 seconds
       setTimeout(async () => {
         console.log('⏩ Seeking to 50%...');
         await this.apiService.seekPlayback(this.currentTask.task_id, { position: 0.5 });
       }, 8000);
+      */
 
     } catch (error) {
       console.error('Playback control failed:', error);
@@ -331,8 +334,8 @@ export class BackendIntegrationExample {
       const activePersons = await this.apiService.getActivePersons();
       console.log('Active persons:', activePersons);
 
-      const cameraLoads = await this.apiService.getCameraLoads();
-      console.log('Camera loads:', cameraLoads);
+      // const cameraLoads = await this.apiService.getCameraLoads();
+      // console.log('Camera loads:', cameraLoads);
 
       const systemStats = await this.apiService.getSystemStatistics();
       console.log('System statistics:', systemStats);
@@ -378,23 +381,23 @@ export class BackendIntegrationExample {
  */
 export async function runCompleteIntegrationExample(): Promise<void> {
   const integration = new BackendIntegrationExample();
-  
+
   try {
     // Run complete flow
     await integration.demonstrateCompleteFlow();
-    
+
     // Wait a bit for tracking data
     await new Promise(resolve => setTimeout(resolve, 10000));
-    
+
     // Try focus tracking (replace with actual person ID from tracking data)
     // await integration.demonstrateFocusTracking('person_123');
-    
+
     // Try playback controls
     // await integration.demonstratePlaybackControls();
-    
+
     // Try analytics
     await integration.demonstrateAnalytics();
-    
+
   } catch (error) {
     console.error('Integration example failed:', error);
   } finally {
@@ -408,19 +411,19 @@ export async function runCompleteIntegrationExample(): Promise<void> {
  */
 export async function runIndividualFeatureExamples(): Promise<void> {
   const integration = new BackendIntegrationExample();
-  
+
   try {
     // Test system health only
     const health = await integration.checkSystemHealth();
     console.log('System health check result:', health);
-    
+
     // Test environments only
     const environments = await integration.getEnvironments();
     console.log('Environments result:', environments);
-    
+
     // Test analytics only
     await integration.demonstrateAnalytics();
-    
+
   } catch (error) {
     console.error('Feature examples failed:', error);
   }

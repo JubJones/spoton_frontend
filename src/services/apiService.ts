@@ -108,7 +108,7 @@ export class NetworkError extends APIServiceError {
   constructor(message: string, originalError?: Error) {
     super(message, 0);
     this.name = 'NetworkError';
-    this.cause = originalError;
+    (this as any).cause = originalError;
   }
 }
 
@@ -261,10 +261,12 @@ class HTTPClient {
         lastError = error as Error;
 
         // Handle network errors
-        if (error instanceof TypeError || error.name === 'AbortError') {
+        // Handle network errors
+        const err = error as any;
+        if (err instanceof TypeError || err.name === 'AbortError') {
           const networkError = new NetworkError(
-            error.name === 'AbortError' ? 'Request timeout' : 'Network error',
-            error as Error
+            err.name === 'AbortError' ? 'Request timeout' : 'Network error',
+            err
           );
 
           if (this.shouldRetry(0, attempt)) {
@@ -284,7 +286,7 @@ class HTTPClient {
         // Handle other errors
         if (attempt === mergedConfig.retryAttempts) {
           throw new APIServiceError(
-            `Request failed after ${mergedConfig.retryAttempts} attempts: ${error.message}`,
+            `Request failed after ${mergedConfig.retryAttempts} attempts: ${(error as any).message}`,
             0,
             undefined,
             error
@@ -532,7 +534,7 @@ export class APIService {
             camera_metadata: Object.keys(cameraMetadata).length > 0 ? cameraMetadata : undefined,
           } as DetectionProcessingEnvironment;
         })
-        .filter((env): env is DetectionProcessingEnvironment => Boolean(env) && env.cameras.length > 0);
+        .filter((env: any): env is DetectionProcessingEnvironment => Boolean(env) && env.cameras.length > 0);
 
       if (normalized.length === 0) {
         throw new ValidationError('Detection environment response did not include any valid environments');
@@ -599,6 +601,61 @@ export class APIService {
       return response;
     } catch (error) {
       throw this.handleError('Failed to get system health', error);
+    }
+  }
+
+  // ========================================================================
+  // Environment API
+  // ========================================================================
+
+  async getEnvironments(params?: any): Promise<any[]> {
+    try {
+      const response = await this.http.get<any>(API_ENDPOINTS.ENVIRONMENTS);
+      return response.environments || [];
+    } catch (error) {
+      throw this.handleError('Failed to get environments', error);
+    }
+  }
+
+  async getEnvironmentDetails(environmentId: string, validate?: boolean): Promise<any> {
+    try {
+      return await this.http.get<any>(API_ENDPOINTS.ENVIRONMENT_DETAILS(environmentId));
+    } catch (error) {
+      throw this.handleError(`Failed to get environment details for ${environmentId}`, error);
+    }
+  }
+
+  async getEnvironmentCameras(environmentId: string, activeOnly?: boolean): Promise<any[]> {
+    try {
+      const response = await this.http.get<any>(API_ENDPOINTS.ENVIRONMENT_CAMERAS(environmentId));
+      return response.cameras || [];
+    } catch (error) {
+      throw this.handleError(`Failed to get environment cameras for ${environmentId}`, error);
+    }
+  }
+
+  async getEnvironmentZones(environmentId: string, type?: string): Promise<any[]> {
+    try {
+      const response = await this.http.get<any>(API_ENDPOINTS.ENVIRONMENT_ZONES(environmentId));
+      return response.zones || [];
+    } catch (error) {
+      throw this.handleError(`Failed to get environment zones for ${environmentId}`, error);
+    }
+  }
+
+  async getEnvironmentDateRanges(environmentId: string, detailed?: boolean): Promise<any> {
+    try {
+      return await this.http.get<any>(API_ENDPOINTS.ENVIRONMENT_DATE_RANGES(environmentId));
+    } catch (error) {
+      throw this.handleError(`Failed to get environment date ranges for ${environmentId}`, error);
+    }
+  }
+
+  async createAnalysisSession(environmentId: string, session: any): Promise<any> {
+    try {
+      return await this.http.post<any>(API_ENDPOINTS.ENVIRONMENT_SESSIONS(environmentId), session);
+    } catch (error) {
+      throw this.handleError(`Failed to create analysis session for ${environmentId}`, error);
     }
   }
 
@@ -746,7 +803,8 @@ export class APIService {
               total_detections: 0,
               average_confidence_percent: 0,
               system_uptime_percent: 100,
-              uptime_delta_percent: 0
+              uptime_delta_percent: 0,
+              total_cameras: 10,
             },
             cameras: [],
             charts: {
@@ -1050,7 +1108,12 @@ export const mockResponses = {
   }),
 
   realTimeMetrics: (): RealTimeMetrics => ({
+    timestamp: new Date().toISOString(),
     active_persons: 0,
+    detection_rate: 0,
+    average_confidence: 0,
+    camera_loads: {},
+    performance_metrics: {},
     total_cameras: 8,
   }),
 

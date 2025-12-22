@@ -720,7 +720,7 @@ export class DataCacheService {
         totalSize: this.metrics.totalSize,
       },
       entries: Array.from(this.cache.entries()).map(([key, entry]) => ({
-        key,
+        // key property is already in entry
         ...entry,
       })),
     };

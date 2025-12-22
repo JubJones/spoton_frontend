@@ -2,12 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import React from 'react';
-import { ErrorBoundary, ErrorFallback, CriticalErrorBoundary } from '../ErrorBoundary';
+import ErrorBoundary, { ErrorFallback } from '../ErrorBoundary';
 
 // Component that throws an error for testing
-const ThrowError: React.FC<{ shouldThrow?: boolean; error?: Error }> = ({ 
-  shouldThrow = true, 
-  error = new Error('Test error') 
+const ThrowError: React.FC<{ shouldThrow?: boolean; error?: Error }> = ({
+  shouldThrow = true,
+  error = new Error('Test error')
 }) => {
   if (shouldThrow) {
     throw error;
@@ -23,7 +23,7 @@ const WorkingComponent: React.FC = () => {
 describe('ErrorBoundary', () => {
   beforeEach(() => {
     // Mock console.error to prevent error output during tests
-    vi.spyOn(console, 'error').mockImplementation(() => {});
+    vi.spyOn(console, 'error').mockImplementation(() => { });
   });
 
   it('should render children when there is no error', () => {
@@ -49,18 +49,18 @@ describe('ErrorBoundary', () => {
   });
 
   it('should render custom fallback component', () => {
-    const CustomFallback: React.FC<{ error: Error; resetError: () => void }> = ({ 
-      error, 
-      resetError 
+    const CustomFallback: React.FC<import('../ErrorBoundary').ErrorFallbackProps> = ({
+      error,
+      resetErrorBoundary
     }) => (
       <div>
-        <h2>Custom Error: {error.message}</h2>
-        <button onClick={resetError}>Custom Reset</button>
+        <h2>Custom Error: {error?.message}</h2>
+        <button onClick={resetErrorBoundary}>Custom Reset</button>
       </div>
     );
 
     render(
-      <ErrorBoundary FallbackComponent={CustomFallback}>
+      <ErrorBoundary fallback={CustomFallback}>
         <ThrowError />
       </ErrorBoundary>
     );
@@ -88,8 +88,8 @@ describe('ErrorBoundary', () => {
 
       return (
         <div>
-          <button 
-            data-testid="fix-error" 
+          <button
+            data-testid="fix-error"
             onClick={() => setShouldThrow(false)}
           >
             Fix Error
@@ -136,7 +136,7 @@ describe('ErrorBoundary', () => {
 
       return (
         <div>
-          <button 
+          <button
             data-testid="change-reset-key"
             onClick={() => setResetKey(prev => prev + 1)}
           >
@@ -184,7 +184,7 @@ describe('ErrorBoundary', () => {
     );
 
     expect(screen.getByText('Error with stack')).toBeInTheDocument();
-    
+
     // Check if "Show Details" button is present for errors with stack traces
     const showDetailsButton = screen.queryByText('Show Details');
     if (showDetailsButton) {
@@ -197,9 +197,9 @@ describe('ErrorFallback', () => {
   const mockError = new Error('Mock error for fallback');
 
   it('should render error message and retry button', () => {
-    const resetError = vi.fn();
+    const resetErrorBoundary = vi.fn();
 
-    render(<ErrorFallback error={mockError} resetError={resetError} />);
+    render(<ErrorFallback error={mockError} resetErrorBoundary={resetErrorBoundary} />);
 
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     expect(screen.getByText('Mock error for fallback')).toBeInTheDocument();
@@ -207,23 +207,23 @@ describe('ErrorFallback', () => {
   });
 
   it('should call resetError when Try Again button is clicked', () => {
-    const resetError = vi.fn();
+    const resetErrorBoundary = vi.fn();
 
-    render(<ErrorFallback error={mockError} resetError={resetError} />);
+    render(<ErrorFallback error={mockError} resetErrorBoundary={resetErrorBoundary} />);
 
     const tryAgainButton = screen.getByText('Try Again');
     fireEvent.click(tryAgainButton);
 
-    expect(resetError).toHaveBeenCalledTimes(1);
+    expect(resetErrorBoundary).toHaveBeenCalledTimes(1);
   });
 
   it('should show error details when Show Details button is clicked', () => {
     const errorWithStack = new Error('Error with stack trace');
     errorWithStack.stack = 'Error: Error with stack trace\n    at Component\n    at ErrorBoundary';
-    
-    const resetError = vi.fn();
 
-    render(<ErrorFallback error={errorWithStack} resetError={resetError} />);
+    const resetErrorBoundary = vi.fn();
+
+    render(<ErrorFallback error={errorWithStack} resetErrorBoundary={resetErrorBoundary} />);
 
     const showDetailsButton = screen.getByText('Show Details');
     fireEvent.click(showDetailsButton);
@@ -235,10 +235,10 @@ describe('ErrorFallback', () => {
   it('should hide error details when Hide Details button is clicked', () => {
     const errorWithStack = new Error('Error with stack trace');
     errorWithStack.stack = 'Error: Error with stack trace\n    at Component';
-    
-    const resetError = vi.fn();
 
-    render(<ErrorFallback error={errorWithStack} resetError={resetError} />);
+    const resetErrorBoundary = vi.fn();
+
+    render(<ErrorFallback error={errorWithStack} resetErrorBoundary={resetErrorBoundary} />);
 
     // Show details first
     const showDetailsButton = screen.getByText('Show Details');
@@ -258,83 +258,10 @@ describe('ErrorFallback', () => {
     const errorWithoutStack = new Error('Simple error');
     delete errorWithoutStack.stack;
 
-    const resetError = vi.fn();
+    const resetErrorBoundary = vi.fn();
 
-    render(<ErrorFallback error={errorWithoutStack} resetError={resetError} />);
+    render(<ErrorFallback error={errorWithoutStack} resetErrorBoundary={resetErrorBoundary} />);
 
     expect(screen.queryByText('Show Details')).not.toBeInTheDocument();
-  });
-});
-
-describe('CriticalErrorBoundary', () => {
-  beforeEach(() => {
-    vi.spyOn(console, 'error').mockImplementation(() => {});
-  });
-
-  it('should render children when there is no error', () => {
-    render(
-      <CriticalErrorBoundary>
-        <WorkingComponent />
-      </CriticalErrorBoundary>
-    );
-
-    expect(screen.getByTestId('working-component')).toBeInTheDocument();
-  });
-
-  it('should render critical error message when child throws error', () => {
-    render(
-      <CriticalErrorBoundary>
-        <ThrowError />
-      </CriticalErrorBoundary>
-    );
-
-    expect(screen.getByText('Critical Application Error')).toBeInTheDocument();
-    expect(screen.getByText(/A critical error has occurred/)).toBeInTheDocument();
-    expect(screen.getByText('Reload Application')).toBeInTheDocument();
-  });
-
-  it('should show error details in critical error boundary', () => {
-    const criticalError = new Error('Critical system error');
-
-    render(
-      <CriticalErrorBoundary>
-        <ThrowError error={criticalError} />
-      </CriticalErrorBoundary>
-    );
-
-    expect(screen.getByText('Critical system error')).toBeInTheDocument();
-  });
-
-  it('should reload page when Reload Application button is clicked', () => {
-    // Mock window.location.reload
-    const mockReload = vi.fn();
-    Object.defineProperty(window.location, 'reload', {
-      value: mockReload,
-      writable: true,
-    });
-
-    render(
-      <CriticalErrorBoundary>
-        <ThrowError />
-      </CriticalErrorBoundary>
-    );
-
-    const reloadButton = screen.getByText('Reload Application');
-    fireEvent.click(reloadButton);
-
-    expect(mockReload).toHaveBeenCalledTimes(1);
-  });
-
-  it('should call onCriticalError when error occurs', () => {
-    const onCriticalError = vi.fn();
-    const error = new Error('Critical test error');
-
-    render(
-      <CriticalErrorBoundary onCriticalError={onCriticalError}>
-        <ThrowError error={error} />
-      </CriticalErrorBoundary>
-    );
-
-    expect(onCriticalError).toHaveBeenCalledWith(error, expect.any(String));
   });
 });

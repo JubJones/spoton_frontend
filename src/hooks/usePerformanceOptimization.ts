@@ -20,8 +20,8 @@ export function useDebounce<T>(value: T, delay: number): T {
 
 // Hook for throttling high-frequency events
 export function useThrottle<T extends (...args: any[]) => any>(callback: T, delay: number): T {
-  const lastRan = useRef<number>();
-  const timeout = useRef<NodeJS.Timeout>();
+  const lastRan = useRef<number | undefined>(undefined);
+  const timeout = useRef<NodeJS.Timeout | undefined>(undefined);
 
   return useCallback(
     ((...args: Parameters<T>) => {
@@ -51,7 +51,7 @@ export function useMemoWithComparison<T>(
   deps: React.DependencyList,
   compare?: (a: T, b: T) => boolean
 ): T {
-  const ref = useRef<{ deps: React.DependencyList; value: T }>();
+  const ref = useRef<{ deps: React.DependencyList; value: T } | undefined>(undefined);
 
   const depsChanged =
     !ref.current ||
@@ -66,7 +66,7 @@ export function useMemoWithComparison<T>(
     }
   }
 
-  return ref.current.value;
+  return ref.current!.value;
 }
 
 // Hook for intersection observer (lazy loading, infinite scroll)
@@ -103,7 +103,7 @@ export function useIntersectionObserver(
 // Hook for tracking component render performance
 export function useRenderPerformance(componentName: string) {
   const renderCount = useRef(0);
-  const lastRenderTime = useRef<number>();
+  const lastRenderTime = useRef<number | undefined>(undefined);
   const totalRenderTime = useRef(0);
 
   useEffect(() => {
@@ -194,7 +194,7 @@ export function useViewportVisibility(threshold = 0.1) {
 
 // Hook for efficient frame-based animations
 export function useAnimationFrame(callback: () => void, active = true) {
-  const requestRef = useRef<number>();
+  const requestRef = useRef<number | undefined>(undefined);
 
   const animate = useCallback(() => {
     callback();
@@ -225,7 +225,7 @@ export function useAnimationFrame(callback: () => void, active = true) {
 }
 
 // React import fix
-import React from 'react';
+
 
 // =============================================================================
 // Phase 11: Advanced Performance Monitoring and Optimization
@@ -262,7 +262,7 @@ export function useAdvancedPerformance(options?: {
   memoryThreshold?: number;
   updateInterval?: number;
 }): [AdvancedPerformanceState, PerformanceActions] {
-  
+
   const config = {
     enableAutoOptimization: false, // Disabled by default to prevent infinite loops
     memoryThreshold: 85,
@@ -283,7 +283,7 @@ export function useAdvancedPerformance(options?: {
   const lastOptimizationTime = useRef(0);
   const optimizationInProgress = useRef(false);
   const consecutiveOptimizations = useRef(0);
-  
+
   // Monitor performance metrics
   useEffect(() => {
     if (!APP_CONFIG.ENABLE_PERFORMANCE_MONITORING) {
@@ -297,18 +297,18 @@ export function useAdvancedPerformance(options?: {
       }
 
       const metrics = performanceOptimizationService.getMetrics();
-      
+
       setPerformanceState(prevState => {
         // Only update if metrics have meaningfully changed to prevent infinite loops
-        const significantChange = 
+        const significantChange =
           Math.abs(prevState.memoryUsage - metrics.memoryUsage.percentage) > 5 ||
           Math.abs(prevState.frameRate - metrics.frameRate) > 5 ||
           Date.now() - prevState.lastUpdate > 5000; // Force update every 5 seconds
-        
+
         if (!significantChange) {
           return prevState;
         }
-        
+
         return {
           isOptimized: metrics.memoryUsage.percentage < config.memoryThreshold,
           memoryUsage: metrics.memoryUsage.percentage,
@@ -323,10 +323,10 @@ export function useAdvancedPerformance(options?: {
       if (config.enableAutoOptimization && !optimizationInProgress.current) {
         const now = Date.now();
         const timeSinceLastOptimization = now - lastOptimizationTime.current;
-        
+
         // Progressive throttling: longer delays after consecutive optimizations
         const minDelayMs = Math.min(10000 + (consecutiveOptimizations.current * 5000), 60000);
-        
+
         // Only trigger optimization if enough time has passed and we haven't had too many consecutive optimizations
         if (timeSinceLastOptimization > minDelayMs && consecutiveOptimizations.current < 3) {
           if (metrics.memoryUsage.percentage > config.memoryThreshold) {
@@ -401,24 +401,24 @@ export function useAdvancedPerformance(options?: {
     if (optimizationInProgress.current) {
       return; // Prevent overlapping optimizations
     }
-    
+
     optimizationInProgress.current = true;
-    
+
     try {
       // Clear cache first
       clearCache();
-      
+
       // Wait a bit for cache clearing to complete
       await new Promise(resolve => setTimeout(resolve, 100));
-      
+
       // Trigger garbage collection if available
       if (typeof (window as any).gc === 'function') {
         (window as any).gc();
       }
-      
+
       // Wait for GC to complete
       await new Promise(resolve => setTimeout(resolve, 500));
-      
+
     } finally {
       // Always reset the flag after a delay to ensure operations complete
       setTimeout(() => {
@@ -495,9 +495,9 @@ export function useTrackingDataPerformance() {
     };
 
     cacheData(`tracking-${trackingData.global_frame_index}`, processedData, 60000);
-    
+
     const duration = endMeasurement('tracking-update-processing');
-    
+
     return {
       data: processedData,
       processingTime: duration,

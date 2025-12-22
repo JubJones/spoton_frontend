@@ -98,7 +98,7 @@ export class MonitoringService {
       });
 
       const apiResponseTime = performance.now() - apiStartTime;
-      
+
       if (response.ok) {
         const healthData = await response.json();
         checks.push({
@@ -160,7 +160,7 @@ export class MonitoringService {
     return new Promise((resolve) => {
       const startTime = performance.now();
       const ws = new WebSocket(`${this.wsBaseUrl}/ws/health`);
-      
+
       const timeout = setTimeout(() => {
         ws.close();
         resolve({
@@ -206,7 +206,7 @@ export class MonitoringService {
     ];
 
     const missingFeatures: string[] = [];
-    
+
     requiredFeatures.forEach(feature => {
       if (!(feature in window)) {
         missingFeatures.push(feature);
@@ -243,9 +243,9 @@ export class MonitoringService {
       const usedMB = Math.round(memory.usedJSHeapSize / 1048576);
       const totalMB = Math.round(memory.totalJSHeapSize / 1048576);
       const limitMB = Math.round(memory.jsHeapSizeLimit / 1048576);
-      
+
       const usagePercent = (usedMB / limitMB) * 100;
-      
+
       let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
       if (usagePercent > 90) status = 'unhealthy';
       else if (usagePercent > 75) status = 'degraded';
@@ -276,11 +276,11 @@ export class MonitoringService {
     try {
       const testKey = '__spoton_health_check__';
       const testValue = Date.now().toString();
-      
+
       localStorage.setItem(testKey, testValue);
       const retrieved = localStorage.getItem(testKey);
       localStorage.removeItem(testKey);
-      
+
       if (retrieved === testValue) {
         return {
           name: 'Local Storage',
@@ -317,7 +317,7 @@ export class MonitoringService {
     const connection = (navigator as any).connection;
     const effectiveType = connection?.effectiveType || 'unknown';
     const downlink = connection?.downlink || 0;
-    
+
     let status: 'healthy' | 'degraded' | 'unhealthy' = 'healthy';
     if (downlink < 1) status = 'unhealthy';
     else if (downlink < 5 || effectiveType === 'slow-2g' || effectiveType === '2g') status = 'degraded';
@@ -380,7 +380,7 @@ export class MonitoringService {
         console.log('LCP:', lastEntry.startTime);
         this.reportMetric('lcp', lastEntry.startTime);
       });
-      
+
       try {
         lcpObserver.observe({ entryTypes: ['largest-contentful-paint'] });
       } catch (e) {
@@ -508,7 +508,7 @@ export class MonitoringService {
     this.healthCheckInterval = setInterval(async () => {
       try {
         const healthResult = await this.performHealthCheck();
-        
+
         if (healthResult.status === 'unhealthy') {
           console.warn('System unhealthy:', healthResult);
           this.reportSystemIssue(healthResult);
@@ -524,7 +524,7 @@ export class MonitoringService {
    */
   private reportPerformanceMetrics(timing: PerformanceNavigationTiming): void {
     const metrics: PerformanceMetrics = {
-      loadTime: timing.loadEventEnd - timing.navigationStart,
+      loadTime: timing.loadEventEnd - timing.startTime,
       firstContentfulPaint: 0, // Will be updated by paint observer
       largestContentfulPaint: 0, // Will be updated by LCP observer
       firstInputDelay: 0, // Will be updated by FID observer
@@ -597,7 +597,7 @@ export class MonitoringService {
     return {
       errorCount: this.errorCount,
       errorTypes: { ...this.errorTypes },
-      criticalErrors: Object.keys(this.errorTypes).filter(type => 
+      criticalErrors: Object.keys(this.errorTypes).filter(type =>
         this.criticalErrors.some(critical => type.includes(critical))
       ).reduce((sum, type) => sum + this.errorTypes[type], 0),
       lastError: (window as any).__spoton_last_error__

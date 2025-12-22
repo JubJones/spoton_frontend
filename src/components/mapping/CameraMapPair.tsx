@@ -1,5 +1,6 @@
 import React from 'react';
 import { MiniMapComponent } from './MiniMapComponent';
+import { BackendCameraId } from '../../types/api';
 
 /**
  * Mapping coordinate interface (matches MiniMapComponent)
@@ -22,10 +23,10 @@ interface MappingCoordinate {
  * Props for CameraMapPair component
  */
 interface CameraMapPairProps {
-  cameraId: string;
+  cameraId: BackendCameraId;
   frameData?: string; // base64 encoded frame
   mappingCoordinates: MappingCoordinate[];
-  onToggleMap?: (cameraId: string, visible: boolean) => void;
+  onToggleMap?: (cameraId: BackendCameraId, visible: boolean) => void;
   mapVisible?: boolean;
   className?: string;
   children?: React.ReactNode; // For the camera component
@@ -73,7 +74,7 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
             {children}
           </div>
         )}
-        
+
         {/* Camera Controls */}
         <div className="camera-controls mt-2 flex items-center justify-between">
           <div className="camera-info text-sm text-gray-600">
@@ -84,14 +85,13 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
               </span>
             )}
           </div>
-          
+
           <button
             onClick={handleToggleMap}
-            className={`toggle-map-btn px-3 py-1 text-sm rounded transition-colors ${
-              mapVisible 
-                ? 'bg-blue-500 text-white hover:bg-blue-600' 
-                : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-            }`}
+            className={`toggle-map-btn px-3 py-1 text-sm rounded transition-colors ${mapVisible
+              ? 'bg-blue-500 text-white hover:bg-blue-600'
+              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
+              }`}
             aria-label={`${mapVisible ? 'Hide' : 'Show'} map for camera ${cameraId}`}
             data-testid={`toggle-map-${cameraId}`}
           >
@@ -99,7 +99,7 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
           </button>
         </div>
       </div>
-      
+
       {/* Map Section */}
       {mapVisible && (
         <div className="map-section mt-3">
@@ -112,7 +112,7 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
           />
         </div>
       )}
-      
+
       {/* Status Information */}
       {mapVisible && mappingCoordinates.length > 0 && (
         <div className="status-info mt-2 text-xs text-gray-500">

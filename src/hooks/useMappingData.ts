@@ -62,7 +62,7 @@ interface DetectionWebSocketMessage {
  */
 interface MappingDataState {
   // Mapping coordinates by camera
-  mappingByCamera: Record<BackendCameraId, MappingCoordinate[]>;
+  mappingByCamera: Partial<Record<BackendCameraId, MappingCoordinate[]>>;
   // Statistics
   totalPersons: number;
   totalCamerasWithData: number;
@@ -124,7 +124,7 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
 
   // Refs for cleanup and optimization
   const cleanupIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const lastProcessedFrameRef = useRef<Record<BackendCameraId, number>>({});
+  const lastProcessedFrameRef = useRef<Partial<Record<BackendCameraId, number>>>({});
 
   // Process WebSocket message
   const processDetectionMessage = useCallback((message: DetectionWebSocketMessage) => {
@@ -137,15 +137,15 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
       const cameraId = camera_id as BackendCameraId;
 
       // Check if this is a newer frame (avoid processing old messages)
-      if (lastProcessedFrameRef.current[cameraId] && 
-          global_frame_index <= lastProcessedFrameRef.current[cameraId]) {
+      if (lastProcessedFrameRef.current[cameraId] &&
+        global_frame_index <= lastProcessedFrameRef.current[cameraId]) {
         return;
       }
       lastProcessedFrameRef.current[cameraId] = global_frame_index;
 
       // Extract mapping coordinates
       const mappingCoordinates = future_pipeline_data?.mapping_coordinates || [];
-      
+
       if (mappingCoordinates.length === 0) {
         // Clear mapping data for this camera if no coordinates
         setMappingData(prev => ({
@@ -178,7 +178,7 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
         // Calculate statistics
         const totalPersons = Object.values(newMappingByCamera)
           .reduce((sum, coords) => sum + coords.length, 0);
-        
+
         const totalCamerasWithData = Object.values(newMappingByCamera)
           .filter(coords => coords.length > 0).length;
 
@@ -194,12 +194,12 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
 
     } catch (error) {
       console.error('Error processing mapping data:', error);
-      
+
       setMappingData(prev => ({
         ...prev,
         processingErrors: [
           ...prev.processingErrors.slice(-4), // Keep last 4 errors
-          `${new Date().toISOString()}: ${error.message}`,
+          `${new Date().toISOString()}: ${(error as Error).message}`,
         ],
       }));
     }
@@ -228,12 +228,12 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
 
     cleanupIntervalRef.current = setInterval(() => {
       const now = new Date();
-      
+
       setMappingData(prev => {
         if (!prev.lastUpdate) return prev;
 
         const ageInSeconds = (now.getTime() - prev.lastUpdate.getTime()) / 1000;
-        
+
         // Clear data older than maxAge
         if (ageInSeconds > maxAge) {
           return {
@@ -263,7 +263,7 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
   // Get statistics
   const getStatistics = useCallback(() => {
     const camerasWithData = Object.keys(mappingData.mappingByCamera).filter(
-      cameraId => mappingData.mappingByCamera[cameraId as BackendCameraId].length > 0
+      cameraId => (mappingData.mappingByCamera[cameraId as BackendCameraId]?.length || 0) > 0
     ) as BackendCameraId[];
 
     const allTrails = Object.values(mappingData.mappingByCamera)
@@ -271,11 +271,11 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
       .map(coord => coord.trail?.length || 0)
       .filter(length => length > 0);
 
-    const averageTrailLength = allTrails.length > 0 
+    const averageTrailLength = allTrails.length > 0
       ? allTrails.reduce((sum, length) => sum + length, 0) / allTrails.length
       : 0;
 
-    const lastUpdateAge = mappingData.lastUpdate 
+    const lastUpdateAge = mappingData.lastUpdate
       ? (new Date().getTime() - mappingData.lastUpdate.getTime()) / 1000
       : 0;
 
@@ -318,4 +318,4 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
 };
 
 // Export types for external use
-export type { MappingCoordinate, DetectionWebSocketMessage, TrailPoint };
+export type { DetectionWebSocketMessage, TrailPoint };

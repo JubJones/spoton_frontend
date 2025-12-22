@@ -3,7 +3,7 @@
 
 import { APIService } from './apiService';
 import { SpotOnWebSocketClient } from './spotOnWebSocketClient';
-import { 
+import {
   ProcessingTaskStartRequest,
   ProcessingTaskCreateResponse,
   TaskStatusResponse,
@@ -77,7 +77,7 @@ export class TaskManagementService {
    */
   async startTaskWithLifecycle(config: TaskConfig): Promise<void> {
     this.config = config;
-    
+
     try {
       console.log('🚀 Starting task lifecycle for environment:', config.environment_id);
 
@@ -154,14 +154,14 @@ export class TaskManagementService {
       const checkStatus = async () => {
         try {
           checkCount++;
-          
+
           if (checkCount > maxChecks) {
             reject(new Error('Task monitoring timeout - max status checks exceeded'));
             return;
           }
 
           const status = await this.getTaskStatus();
-          
+
           console.log(`Status check ${checkCount}: ${status.status} (${Math.round(status.progress * 100)}%)`);
           console.log(`Step: ${status.current_step}`);
 
@@ -202,7 +202,7 @@ export class TaskManagementService {
         } catch (error) {
           console.error('Status check failed:', error);
           this.currentState.errorCount++;
-          
+
           if (this.currentState.errorCount < 3) {
             // Retry after longer delay
             this.statusPollingTimer = setTimeout(checkStatus, pollingInterval * 2);
@@ -227,7 +227,7 @@ export class TaskManagementService {
 
     try {
       const status = await this.apiService.getTaskStatus(this.currentState.task.task_id);
-      
+
       // Update state
       this.currentState.status = status;
       this.currentState.lastStatusUpdate = Date.now();
@@ -260,7 +260,7 @@ export class TaskManagementService {
 
     try {
       console.log('🔌 Connecting WebSocket for task:', this.currentState.task.task_id);
-      
+
       // Create WebSocket client
       this.currentState.wsClient = new SpotOnWebSocketClient(this.currentState.task.task_id);
       this.setupWebSocketHandlers();
@@ -287,13 +287,13 @@ export class TaskManagementService {
   disconnectWebSocket(): void {
     if (this.currentState.wsClient) {
       console.log('🔌 Disconnecting WebSocket...');
-      
+
       this.currentState.wsClient.disconnect();
       this.currentState.wsClient = null;
       this.currentState.isConnected = false;
       this.currentState.isSubscribed = false;
 
-      this.emit('websocket-disconnected');
+      this.emit('websocket-disconnected', { timestamp: Date.now() } as any);
       console.log('✅ WebSocket disconnected');
     }
   }
@@ -324,7 +324,7 @@ export class TaskManagementService {
     // Status updates via WebSocket
     this.currentState.wsClient.onStatusUpdate((payload) => {
       console.log('📊 WebSocket status update:', payload.status, `(${Math.round(payload.progress * 100)}%)`);
-      
+
       // Update cached status
       if (this.currentState.status) {
         this.currentState.status.status = payload.status;
@@ -339,9 +339,9 @@ export class TaskManagementService {
       if (payload.status === 'COMPLETED') {
         this.emit('task-completed', this.currentState.status!);
       } else if (payload.status === 'FAILED') {
-        this.emit('task-failed', { 
-          status: this.currentState.status!, 
-          error: 'Task failed (WebSocket update)' 
+        this.emit('task-failed', {
+          status: this.currentState.status!,
+          error: 'Task failed (WebSocket update)'
         });
       }
     });
@@ -349,9 +349,9 @@ export class TaskManagementService {
     // Connection state changes
     this.currentState.wsClient.onConnectionStateChange((state) => {
       console.log(`🔗 WebSocket state: ${state}`);
-      
+
       this.currentState.isConnected = state === 'connected';
-      
+
       if (!this.currentState.isConnected) {
         this.currentState.isSubscribed = false;
         this.currentState.reconnectAttempts++;
@@ -411,11 +411,11 @@ export class TaskManagementService {
    */
   isTaskActive(): boolean {
     const status = this.currentState.status?.status;
-    return status === 'PROCESSING' || 
-           status === 'QUEUED' || 
-           status === 'INITIALIZING' || 
-           status === 'DOWNLOADING' || 
-           status === 'EXTRACTING';
+    return status === 'PROCESSING' ||
+      status === 'QUEUED' ||
+      status === 'INITIALIZING' ||
+      status === 'DOWNLOADING' ||
+      status === 'EXTRACTING';
   }
 
   /**
@@ -429,7 +429,7 @@ export class TaskManagementService {
    * Get task metrics
    */
   getTaskMetrics() {
-    const connectionTime = this.currentState.connectionStartTime ? 
+    const connectionTime = this.currentState.connectionStartTime ?
       Date.now() - this.currentState.connectionStartTime : 0;
 
     const timeSinceLastStatus = this.currentState.lastStatusUpdate ?
@@ -510,7 +510,7 @@ export class TaskManagementService {
    * Add event listener
    */
   addEventListener<T extends keyof TaskEvents>(
-    event: T, 
+    event: T,
     listener: TaskEventListener<T>
   ): void {
     if (!this.eventListeners.has(event)) {
@@ -523,7 +523,7 @@ export class TaskManagementService {
    * Remove event listener
    */
   removeEventListener<T extends keyof TaskEvents>(
-    event: T, 
+    event: T,
     listener: TaskEventListener<T>
   ): void {
     const listeners = this.eventListeners.get(event);
@@ -572,7 +572,7 @@ export function createTaskManagementService(apiService?: APIService): TaskManage
  */
 export async function startTaskQuick(environmentId: 'campus' | 'factory'): Promise<TaskManagementService> {
   const service = createTaskManagementService();
-  
+
   await service.startTaskWithLifecycle({
     environment_id: environmentId,
     autoConnect: true,

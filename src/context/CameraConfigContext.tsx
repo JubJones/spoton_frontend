@@ -19,8 +19,8 @@ import { useTrackingStore } from '../stores/trackingStore';
 
 interface CameraConfigContextValue {
   environmentCameras: Record<EnvironmentId, BackendCameraId[]>;
-  cameraDisplayNames: Record<BackendCameraId, string>;
-  cameraColors: Record<BackendCameraId, string>;
+  cameraDisplayNames: Partial<Record<BackendCameraId, string>>;
+  cameraColors: Partial<Record<BackendCameraId, string>>;
   cameraMetadata: Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>;
   isLoading: boolean;
   error?: string;
@@ -37,7 +37,7 @@ const DEFAULT_ENVIRONMENT_CAMERAS: Record<EnvironmentId, BackendCameraId[]> = {
   factory: ['c09', 'c12', 'c13', 'c16'] as BackendCameraId[],
 };
 
-const DEFAULT_CAMERA_NAMES_BY_ENVIRONMENT: Record<EnvironmentId, Record<BackendCameraId, string>> = {
+const DEFAULT_CAMERA_NAMES_BY_ENVIRONMENT: Record<EnvironmentId, Partial<Record<BackendCameraId, string>>> = {
   campus: {
     c01: 'Campus Gate Camera',
     c02: 'Campus Plaza Camera',
@@ -52,7 +52,7 @@ const DEFAULT_CAMERA_NAMES_BY_ENVIRONMENT: Record<EnvironmentId, Record<BackendC
   },
 };
 
-const DEFAULT_CAMERA_COLORS: Record<BackendCameraId, string> = {
+const DEFAULT_CAMERA_COLORS: Partial<Record<BackendCameraId, string>> = {
   c01: 'bg-blue-400',
   c02: 'bg-green-500',
   c03: 'bg-orange-400',
@@ -67,11 +67,11 @@ function extractEnvironmentCameraData(
   payload: DetectionProcessingEnvironmentsResponse
 ): {
   camerasByEnvironment: Partial<Record<EnvironmentId, BackendCameraId[]>>;
-  displayNames: Record<BackendCameraId, string>;
+  displayNames: Partial<Record<BackendCameraId, string>>;
   metadata: Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>>;
 } {
   const camerasByEnvironment: Partial<Record<EnvironmentId, BackendCameraId[]>> = {};
-  const displayNames: Record<BackendCameraId, string> = {};
+  const displayNames: Partial<Record<BackendCameraId, string>> = {};
   const metadata: Partial<Record<BackendCameraId, DetectionProcessingEnvironmentCameraMetadata>> = {};
 
   payload.environments.forEach((environment: DetectionProcessingEnvironment) => {
@@ -97,8 +97,8 @@ export const CameraConfigProvider: React.FC<React.PropsWithChildren> = ({ childr
   const [environmentCameras, setEnvironmentCameras] = useState<Record<EnvironmentId, BackendCameraId[]>>(
     DEFAULT_ENVIRONMENT_CAMERAS
   );
-  const [cameraDisplayNames, setCameraDisplayNames] = useState<Record<BackendCameraId, string>>(() => {
-    const defaults: Record<BackendCameraId, string> = {};
+  const [cameraDisplayNames, setCameraDisplayNames] = useState<Partial<Record<BackendCameraId, string>>>(() => {
+    const defaults: Partial<Record<BackendCameraId, string>> = {};
     (Object.keys(DEFAULT_CAMERA_NAMES_BY_ENVIRONMENT) as EnvironmentId[]).forEach((env) => {
       const envEntries = DEFAULT_CAMERA_NAMES_BY_ENVIRONMENT[env];
       Object.entries(envEntries).forEach(([cameraId, name]) => {

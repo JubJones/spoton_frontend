@@ -177,11 +177,10 @@ const BackendIntegratedView: React.FC = () => {
                   key={env}
                   onClick={() => handleEnvironmentChange(env)}
                   disabled={backendState.isConnected}
-                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${
-                    selectedEnvironment === env
+                  className={`px-4 py-2 rounded-lg font-medium transition-colors ${selectedEnvironment === env
                       ? 'bg-blue-500 text-white'
                       : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-                  } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
                 >
                   {env.charAt(0).toUpperCase() + env.slice(1)}
                 </button>
@@ -218,32 +217,32 @@ const BackendIntegratedView: React.FC = () => {
               </div>
             </div>
 
-          <div className="bg-gray-50 p-3 rounded">
-            <div className="text-sm text-gray-600">Progress</div>
-            <div className="font-semibold">
-              {backendState.taskStatus
-                ? `${Math.round(backendState.taskStatus.progress * 100)}%`
-                : 'N/A'}
+            <div className="bg-gray-50 p-3 rounded">
+              <div className="text-sm text-gray-600">Progress</div>
+              <div className="font-semibold">
+                {backendState.taskStatus
+                  ? `${Math.round(backendState.taskStatus.progress * 100)}%`
+                  : 'N/A'}
+              </div>
             </div>
           </div>
-        </div>
 
-        <div className="mt-6">
-          <TaskPlaybackControls
-            taskId={backendState.currentTaskId}
-            playbackStatus={backendState.playbackStatus}
-            onPause={handlePausePlayback}
-            onResume={handleResumePlayback}
-            onRefresh={handleRefreshPlayback}
-          />
-        </div>
+          <div className="mt-6">
+            <TaskPlaybackControls
+              taskId={backendState.currentTaskId}
+              playbackStatus={backendState.playbackStatus}
+              onPause={handlePausePlayback}
+              onResume={handleResumePlayback}
+              onRefresh={handleRefreshPlayback}
+            />
+          </div>
 
-        {/* Current Step */}
-        {backendState.taskStatus && (
-          <div className="mt-3 text-sm text-gray-600">
-            Current Step: {backendState.taskStatus.current_step}
+          {/* Current Step */}
+          {backendState.taskStatus && (
+            <div className="mt-3 text-sm text-gray-600">
+              Current Step: {backendState.taskStatus.current_step}
               {backendState.taskStatus.details && (
-                <span className="text-gray-500"> - {backendState.taskStatus.details}</span>
+                <span className="text-gray-500"> - {JSON.stringify(backendState.taskStatus.details)}</span>
               )}
             </div>
           )}

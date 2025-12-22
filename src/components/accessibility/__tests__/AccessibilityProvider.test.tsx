@@ -73,10 +73,10 @@ describe('AccessibilityProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     localStorageMock.getItem.mockReturnValue(null);
-    
+
     // Reset document classes
     document.documentElement.className = '';
-    
+
     // Mock querySelector for main content
     document.querySelector = vi.fn().mockImplementation((selector) => {
       if (selector === 'main, [role="main"], #main-content') {
@@ -103,7 +103,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const settings = JSON.parse(screen.getByTestId('settings').textContent || '{}');
-    
+
     expect(settings.reduceMotion).toBe(false);
     expect(settings.highContrast).toBe(false);
     expect(settings.largeText).toBe(false);
@@ -118,7 +118,7 @@ describe('AccessibilityProvider', () => {
       largeText: true,
       reduceMotion: false,
     };
-    
+
     localStorageMock.getItem.mockReturnValue(JSON.stringify(savedSettings));
 
     render(
@@ -128,7 +128,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const settings = JSON.parse(screen.getByTestId('settings').textContent || '{}');
-    
+
     expect(settings.highContrast).toBe(true);
     expect(settings.largeText).toBe(true);
   });
@@ -159,7 +159,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const toggleButton = screen.getByTestId('toggle-high-contrast');
-    
+
     await act(async () => {
       fireEvent.click(toggleButton);
     });
@@ -180,7 +180,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const toggleButton = screen.getByTestId('toggle-high-contrast');
-    
+
     await act(async () => {
       fireEvent.click(toggleButton);
     });
@@ -203,7 +203,7 @@ describe('AccessibilityProvider', () => {
     });
 
     const toggleButton = screen.getByTestId('toggle-high-contrast');
-    
+
     await act(async () => {
       fireEvent.click(toggleButton);
     });
@@ -222,7 +222,7 @@ describe('AccessibilityProvider', () => {
 
     const liveRegions = document.querySelectorAll('[aria-live]');
     expect(liveRegions.length).toBeGreaterThan(0);
-    
+
     const liveRegion = liveRegions[0] as HTMLElement;
     expect(liveRegion.getAttribute('aria-live')).toBe('polite');
     expect(liveRegion.getAttribute('aria-atomic')).toBe('true');
@@ -236,7 +236,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const announceButton = screen.getByTestId('announce');
-    
+
     await act(async () => {
       fireEvent.click(announceButton);
     });
@@ -282,7 +282,7 @@ describe('AccessibilityProvider', () => {
       <div tabindex="0">Focusable Div</div>
       <div tabindex="-1">Non-focusable Div</div>
     `;
-    
+
     // Mock computed styles
     window.getComputedStyle = vi.fn().mockReturnValue({
       display: 'block',
@@ -308,7 +308,7 @@ describe('AccessibilityProvider', () => {
 
     const { result } = renderAccessibilityHook();
     const focusableElements = result.current.getFocusableElements(container);
-    
+
     // Should find enabled button, input, link, and focusable div (not disabled button or tabindex="-1")
     expect(focusableElements.length).toBe(4);
   });
@@ -317,10 +317,10 @@ describe('AccessibilityProvider', () => {
     const container = document.createElement('div');
     const button1 = document.createElement('button');
     const button2 = document.createElement('button');
-    
+
     button1.textContent = 'First';
     button2.textContent = 'Last';
-    
+
     container.appendChild(button1);
     container.appendChild(button2);
     document.body.appendChild(container);
@@ -331,7 +331,7 @@ describe('AccessibilityProvider', () => {
       visibility: 'visible',
       opacity: '1',
     });
-    
+
     Object.defineProperty(HTMLElement.prototype, 'offsetWidth', {
       configurable: true,
       value: 100,
@@ -350,11 +350,11 @@ describe('AccessibilityProvider', () => {
     expect(button1.focus).toHaveBeenCalled();
 
     // Simulate Tab on last element
-    Object.defineProperty(document, 'activeElement', { 
+    Object.defineProperty(document, 'activeElement', {
       value: button2,
       configurable: true,
     });
-    
+
     fireEvent.keyDown(container, { key: 'Tab' });
     expect(button1.focus).toHaveBeenCalledTimes(2); // Initial focus + trap
 
@@ -377,7 +377,7 @@ describe('AccessibilityProvider', () => {
     );
 
     const skipButton = screen.getByTestId('skip-content');
-    
+
     await act(async () => {
       fireEvent.click(skipButton);
     });
@@ -415,7 +415,7 @@ describe('SkipLink', () => {
 
   it('should scroll into view when focused', () => {
     const mockScrollIntoView = vi.fn();
-    
+
     render(
       <SkipLink href="#main-content">Skip to main content</SkipLink>
     );
@@ -424,7 +424,7 @@ describe('SkipLink', () => {
     skipLink.scrollIntoView = mockScrollIntoView;
 
     fireEvent.focus(skipLink);
-    
+
     expect(mockScrollIntoView).toHaveBeenCalledWith({ block: 'center' });
   });
 });
@@ -450,60 +450,24 @@ describe('ScreenReaderOnly', () => {
   });
 });
 
-// Helper function to render accessibility hook
-function renderAccessibilityHook() {
-  const wrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => (
-    <AccessibilityProvider>{children}</AccessibilityProvider>
-  );
 
-  const TestHookComponent = () => {
-    const accessibility = useAccessibility();
-    return <div data-testid="hook-test">{JSON.stringify(accessibility.settings)}</div>;
-  };
-
-  const result = render(
-    <wrapper>
-      <TestHookComponent />
-    </wrapper>
-  );
-
-  return {
-    result: {
-      current: result.container.querySelector('[data-testid="hook-test"]')
-        ? (() => {
-            const component = result.getByTestId('hook-test');
-            const TestComponent = () => {
-              const accessibility = useAccessibility();
-              return null;
-            };
-            const { rerender } = render(
-              <wrapper>
-                <TestComponent />
-              </wrapper>
-            );
-            return useAccessibility();
-          })()
-        : null,
-    },
-  };
-}
 
 // Fix for the hook testing - use a proper test component
 const HookTestComponent: React.FC<{
   onAccessibility: (accessibility: ReturnType<typeof useAccessibility>) => void;
 }> = ({ onAccessibility }) => {
   const accessibility = useAccessibility();
-  
+
   React.useEffect(() => {
     onAccessibility(accessibility);
   }, [accessibility, onAccessibility]);
-  
+
   return null;
 };
 
 function renderAccessibilityHookProper() {
   let accessibilityHook: ReturnType<typeof useAccessibility>;
-  
+
   const onAccessibility = (accessibility: ReturnType<typeof useAccessibility>) => {
     accessibilityHook = accessibility;
   };

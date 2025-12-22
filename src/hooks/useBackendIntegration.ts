@@ -41,22 +41,22 @@ interface UseBackendIntegrationReturn {
   isConnected: boolean;
   isValidating: boolean;
   connectionStatus: BackendConnectionStatus | null;
-  
+
   // Validation results
   validationResult: BackendValidationResult | null;
   lastValidation: number;
-  
+
   // Control methods
   validateIntegration: () => Promise<BackendValidationResult>;
   startMonitoring: () => void;
   stopMonitoring: () => void;
   retryConnection: () => Promise<void>;
-  
+
   // Utility methods
   getIntegrationReport: () => string;
   isBackendReady: () => boolean;
   getLatencyMetrics: () => { api: number; websocket: number };
-  
+
   // Status helpers
   hasErrors: boolean;
   hasWarnings: boolean;
@@ -81,17 +81,17 @@ const DEFAULT_OPTIONS: UseBackendIntegrationOptions = {
 export function useBackendIntegration(
   options: UseBackendIntegrationOptions = DEFAULT_OPTIONS
 ): UseBackendIntegrationReturn {
-  
+
   const opts = { ...DEFAULT_OPTIONS, ...options };
-  
+
   // State
   const [isValidating, setIsValidating] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<BackendConnectionStatus | null>(null);
   const [validationResult, setValidationResult] = useState<BackendValidationResult | null>(null);
   const [lastValidation, setLastValidation] = useState(0);
-  
+
   // Refs
-  const monitoringIntervalRef = useRef<NodeJS.Timeout>();
+  const monitoringIntervalRef = useRef<NodeJS.Timeout | undefined>(undefined);
   const retryCountRef = useRef(0);
   const isInitializedRef = useRef(false);
 
@@ -105,22 +105,22 @@ export function useBackendIntegration(
 
     try {
       const result = await backendIntegrationService.validateBackendIntegration();
-      
+
       setValidationResult(result);
       setConnectionStatus(result.status);
       setLastValidation(Date.now());
-      
+
       if (result.isValid) {
         console.log('✅ Backend integration validation successful');
         retryCountRef.current = 0; // Reset retry count on success
       } else {
         console.warn('⚠️ Backend integration validation failed:', result.issues);
-        
+
         // Auto-retry on failure if enabled
         if (opts.retryOnFailure && retryCountRef.current < (opts.maxRetries || 3)) {
           retryCountRef.current++;
           console.log(`🔄 Retrying validation (${retryCountRef.current}/${opts.maxRetries})`);
-          
+
           // Exponential backoff: 2s, 4s, 8s
           const delay = Math.min(2000 * Math.pow(2, retryCountRef.current - 1), 10000);
           setTimeout(() => {
@@ -128,11 +128,11 @@ export function useBackendIntegration(
           }, delay);
         }
       }
-      
+
       return result;
     } catch (error) {
       console.error('❌ Backend validation error:', error);
-      
+
       const errorResult: BackendValidationResult = {
         isValid: false,
         issues: [`Validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`],
@@ -147,11 +147,11 @@ export function useBackendIntegration(
           errors: [error instanceof Error ? error.message : 'Unknown error'],
         },
       };
-      
+
       setValidationResult(errorResult);
       setConnectionStatus(errorResult.status);
       setLastValidation(Date.now());
-      
+
       return errorResult;
     } finally {
       setIsValidating(false);
@@ -168,15 +168,15 @@ export function useBackendIntegration(
     }
 
     console.log(`🔄 Starting backend monitoring (${opts.monitoringInterval}ms interval)`);
-    
+
     // Start backend service health monitoring
     backendIntegrationService.startHealthMonitoring(opts.monitoringInterval);
-    
+
     // Set up local monitoring to sync status
     monitoringIntervalRef.current = setInterval(() => {
       const currentStatus = backendIntegrationService.getConnectionStatus();
       setConnectionStatus(currentStatus);
-      
+
       // Trigger re-validation if connection is lost
       if (currentStatus.api === 'error' || currentStatus.health === 'error') {
         console.warn('⚠️ Connection lost, triggering re-validation');
@@ -190,7 +190,7 @@ export function useBackendIntegration(
       clearInterval(monitoringIntervalRef.current);
       monitoringIntervalRef.current = undefined;
     }
-    
+
     backendIntegrationService.stopHealthMonitoring();
     console.log('🛑 Backend monitoring stopped');
   }, []);
@@ -229,12 +229,12 @@ export function useBackendIntegration(
   useEffect(() => {
     if (!isInitializedRef.current) {
       isInitializedRef.current = true;
-      
+
       if (opts.autoValidate) {
         console.log('🚀 Auto-validating backend integration on mount');
         validateIntegration();
       }
-      
+
       if (opts.autoMonitoring) {
         console.log('🔄 Auto-starting backend monitoring');
         startMonitoring();
@@ -268,22 +268,22 @@ export function useBackendIntegration(
     isConnected,
     isValidating,
     connectionStatus,
-    
+
     // Validation results
     validationResult,
     lastValidation,
-    
+
     // Control methods
     validateIntegration,
     startMonitoring,
     stopMonitoring,
     retryConnection,
-    
+
     // Utility methods
     getIntegrationReport,
     isBackendReady,
     getLatencyMetrics,
-    
+
     // Status helpers
     hasErrors,
     hasWarnings,
@@ -348,11 +348,11 @@ export function useBackendStatus() {
 
   const status = connectionStatus;
   const latency = status?.latency ?? { api: 0, websocket: 0 };
-  
+
   // Determine status color and message
   let statusColor: 'green' | 'yellow' | 'red' | 'gray' = 'gray';
   let statusMessage = 'Unknown';
-  
+
   if (isValidating) {
     statusColor = 'yellow';
     statusMessage = 'Validating...';

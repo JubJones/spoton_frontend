@@ -66,14 +66,14 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
 
   // Generate camera configurations based on environment
   const defaultCameraConfigs: CameraConfiguration[] = useMemo(() => {
-    return environmentConfig.cameras.map((cameraId, index) => ({
-      id: cameraId,
-      name: getCameraDisplayName(cameraId, environment),
+    return environmentConfig.cameras.map((camera, index) => ({
+      id: camera.id,
+      name: getCameraDisplayName(camera.id, environment),
       enabled: true,
       position: { x: index * 200 + 100, y: 150 },
       detectionZones: [
         {
-          id: `${cameraId}_zone_1`,
+          id: `${camera.id}_zone_1`,
           name: 'Main Detection Area',
           coordinates: [
             [50, 50],
@@ -85,7 +85,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
           sensitivity: 0.8,
         },
         {
-          id: `${cameraId}_zone_2`,
+          id: `${camera.id}_zone_2`,
           name: 'Secondary Area',
           coordinates: [
             [100, 100],
@@ -152,12 +152,12 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
         prev.map((config) =>
           config.id === cameraId
             ? {
-                ...config,
-                [section]:
-                  typeof config[section] === 'object' && config[section] !== null
-                    ? { ...config[section], [key]: value }
-                    : value,
-              }
+              ...config,
+              [section]:
+                typeof config[section] === 'object' && config[section] !== null
+                  ? { ...config[section], [key]: value }
+                  : value,
+            }
             : config
         )
       );
@@ -173,11 +173,11 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
         prev.map((config) =>
           config.id === cameraId
             ? {
-                ...config,
-                detectionZones: config.detectionZones.map((zone) =>
-                  zone.id === zoneId ? { ...zone, [key]: value } : zone
-                ),
-              }
+              ...config,
+              detectionZones: config.detectionZones.map((zone) =>
+                zone.id === zoneId ? { ...zone, [key]: value } : zone
+              ),
+            }
             : config
         )
       );
@@ -253,9 +253,9 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
         prev.map((config) =>
           config.id === cameraId
             ? {
-                ...config,
-                detectionZones: config.detectionZones.filter((zone) => zone.id !== zoneId),
-              }
+              ...config,
+              detectionZones: config.detectionZones.filter((zone) => zone.id !== zoneId),
+            }
             : config
         )
       );
@@ -319,9 +319,8 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
         <div className="bg-gray-800/30 rounded-lg p-3">
           <div className="flex items-center space-x-2">
             <div
-              className={`w-3 h-3 rounded-full ${
-                selectedCameraConfig.enabled ? 'bg-green-400' : 'bg-red-400'
-              }`}
+              className={`w-3 h-3 rounded-full ${selectedCameraConfig.enabled ? 'bg-green-400' : 'bg-red-400'
+                }`}
             />
             <span className="text-sm text-gray-300">
               {selectedCameraConfig.enabled ? 'Online' : 'Offline'}
@@ -357,11 +356,10 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
       {/* Test Results */}
       {testResults[selectedCamera] && (
         <div
-          className={`p-3 rounded ${
-            testResults[selectedCamera].success
-              ? 'bg-green-500/20 text-green-200 border border-green-500'
-              : 'bg-red-500/20 text-red-200 border border-red-500'
-          }`}
+          className={`p-3 rounded ${testResults[selectedCamera].success
+            ? 'bg-green-500/20 text-green-200 border border-green-500'
+            : 'bg-red-500/20 text-red-200 border border-red-500'
+            }`}
         >
           {testResults[selectedCamera].message}
         </div>
@@ -378,11 +376,10 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${
-              activeTab === tab.key
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${activeTab === tab.key
+              ? 'bg-orange-500 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
           >
             <span>{tab.icon}</span>
             <span>{tab.label}</span>
@@ -476,7 +473,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
                         id={`${selectedCamera}_${option.key}`}
                         checked={
                           selectedCameraConfig.settings[
-                            option.key as keyof typeof selectedCameraConfig.settings
+                          option.key as keyof typeof selectedCameraConfig.settings
                           ] as boolean
                         }
                         onChange={(e) =>
@@ -517,7 +514,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
                       {adjustment.label}:{' '}
                       {
                         selectedCameraConfig.settings[
-                          adjustment.key as keyof typeof selectedCameraConfig.settings
+                        adjustment.key as keyof typeof selectedCameraConfig.settings
                         ]
                       }
                     </label>
@@ -528,7 +525,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
                       step={adjustment.key === 'exposureCompensation' ? 0.1 : 1}
                       value={
                         selectedCameraConfig.settings[
-                          adjustment.key as keyof typeof selectedCameraConfig.settings
+                        adjustment.key as keyof typeof selectedCameraConfig.settings
                         ] as number
                       }
                       onChange={(e) =>
@@ -659,7 +656,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
                       id={`${selectedCamera}_${option.key}`}
                       checked={
                         selectedCameraConfig.detection[
-                          option.key as keyof typeof selectedCameraConfig.detection
+                        option.key as keyof typeof selectedCameraConfig.detection
                         ] as boolean
                       }
                       onChange={(e) =>
@@ -820,7 +817,7 @@ const CameraSettings: React.FC<CameraSettingsProps> = ({
                       id={`${selectedCamera}_${option.key}`}
                       checked={
                         selectedCameraConfig.privacy[
-                          option.key as keyof typeof selectedCameraConfig.privacy
+                        option.key as keyof typeof selectedCameraConfig.privacy
                         ] as boolean
                       }
                       onChange={(e) =>

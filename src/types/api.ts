@@ -72,8 +72,40 @@ export interface CameraTrackingData {
 export interface CameraFrame {
   image_source: string;
   frame_image_base64?: string;
+  original_frame_base64?: string; // Added for Phase 4
   cropped_persons?: Record<string, string>;
   tracks: PersonTrack[];
+  // Added optional fields for adapter compatibility
+  frame_width?: number;
+  frame_height?: number;
+  timestamp?: string;
+  metadata?: any;
+  detection_data?: any;
+  future_pipeline_data?: any;
+  raw_camera_data?: any;
+}
+
+export interface Phase4TrackingUpdateMessage {
+  type: string;
+  task_id: string;
+  camera_id: string;
+  global_frame_index: number;
+  timestamp_processed_utc: string;
+  camera_data: {
+    image_source?: string;
+    frame_image_base64?: string;
+    original_frame_base64?: string;
+    tracks: TrackedPerson[];
+    frame_width?: number;
+    frame_height?: number;
+    timestamp?: string;
+    metadata?: any;
+  };
+  detection_data?: any;
+  future_pipeline_data?: any;
+  scene_id?: string;
+  environment_id?: string;
+  focus_person_id?: string;
 }
 
 export interface PersonTrack {
@@ -95,6 +127,12 @@ export interface WebSocketTrackingMessagePayload {
   cameras: Record<string, CameraFrame>;
   person_count_per_camera: Record<string, number>;
   focus_person_id: string | null;
+  // Added optional fields for adapter compatibility
+  task_id?: string;
+  camera_id?: string;
+  detection_data_by_camera?: Record<string, any>;
+  future_pipeline_data_by_camera?: Record<string, any>;
+  raw_message?: any;
 }
 
 // ============================================================================
@@ -111,7 +149,10 @@ export type WebSocketMessageType =
   | 'subscribe_tracking'
   | 'unsubscribe_tracking'
   | 'request_status'
-  | 'ping';
+  | 'ping'
+  | 'queued_message';
+
+export type WebSocketConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
 export interface WebSocketMessage {
   type: WebSocketMessageType;
@@ -143,6 +184,12 @@ export interface StatusUpdatePayload {
 
 export interface PongPayload {
   timestamp: string;
+}
+
+export interface SystemStatusPayload {
+  status: 'healthy' | 'degraded' | 'error';
+  timestamp: string;
+  components: Record<string, string>;
 }
 
 // ============================================================================
@@ -354,6 +401,7 @@ export interface RealTimeMetrics {
   average_confidence: number;
   camera_loads: Record<string, number>;
   performance_metrics: RealTimePerformanceMetrics;
+  total_cameras?: number;
 }
 
 export interface RealTimeMetricsResponse {
@@ -396,6 +444,7 @@ export interface AnalyticsDashboardResponse {
       average_confidence_percent: number;
       system_uptime_percent: number;
       uptime_delta_percent: number;
+      total_cameras: number;
     };
     cameras: Array<{
       camera_id: string;
@@ -726,6 +775,16 @@ export const WEBSOCKET_ENDPOINTS = {
 } as const;
 
 // Default configuration values - Using port 3847 (OrbStack backend)
+
+export interface AppState {
+  currentEnvironment?: EnvironmentId;
+  currentTaskId?: string;
+  dateTimeRange?: DateRange;
+  connectionStatus: WebSocketConnectionState;
+  isLoading: boolean;
+  error?: string;
+}
+
 export const DEFAULT_CONFIG = {
   API_BASE_URL: 'http://localhost:3847',
   WS_BASE_URL: 'ws://localhost:3847',

@@ -7,6 +7,8 @@ import {
   CameraTrackingData,
   BackendCameraId,
   EnvironmentId,
+  CameraFrame,
+  PersonTrack,
 } from '../types/api';
 import {
   TrackedPersonDisplay,
@@ -104,7 +106,7 @@ export function processTrackingPayload(
   uniquePersons: Set<string>;
 } {
   const mergedConfig = { ...DEFAULT_PROCESSING_CONFIG, ...config };
-  const processedCameras: Record<BackendCameraId, CameraTrackingDisplayData> = {};
+  const processedCameras: Partial<Record<BackendCameraId, CameraTrackingDisplayData>> = {};
   const uniquePersons = new Set<string>();
   let totalPersons = 0;
 
@@ -119,8 +121,9 @@ export function processTrackingPayload(
     }
 
     // Process camera data
+    // cameraData is CameraFrame, which is compatible with CameraTrackingData due to structural typing
     const processedCamera = processCameraData(
-      cameraData,
+      cameraData as unknown as CameraTrackingData,
       backendCameraId,
       payload.scene_id,
       displaySize,
@@ -139,7 +142,7 @@ export function processTrackingPayload(
   });
 
   return {
-    processedCameras,
+    processedCameras: processedCameras as Record<BackendCameraId, CameraTrackingDisplayData>,
     totalPersons,
     uniquePersons,
   };
@@ -203,11 +206,11 @@ export function processPersonTrack(
   const originalBbox = coordinateUtils.convert.arrayToBbox(track.bbox_xyxy);
   const displayBbox = config.displayScaling
     ? {
-        x1: originalBbox.x1 * scaleFactors.x,
-        y1: originalBbox.y1 * scaleFactors.y,
-        x2: originalBbox.x2 * scaleFactors.x,
-        y2: originalBbox.y2 * scaleFactors.y,
-      }
+      x1: originalBbox.x1 * scaleFactors.x,
+      y1: originalBbox.y1 * scaleFactors.y,
+      x2: originalBbox.x2 * scaleFactors.x,
+      y2: originalBbox.y2 * scaleFactors.y,
+    }
     : originalBbox;
 
   // Get person color
@@ -494,7 +497,7 @@ export function sanitizeTrackingPayload(payload: any): WebSocketTrackingMessageP
     }
 
     // Sanitize camera data
-    const sanitizedCameras: Record<string, CameraTrackingData> = {};
+    const sanitizedCameras: Record<string, CameraFrame> = {};
 
     Object.entries(payload.cameras).forEach(([cameraId, cameraData]) => {
       const sanitizedData = sanitizeCameraData(cameraData);
@@ -508,6 +511,8 @@ export function sanitizeTrackingPayload(payload: any): WebSocketTrackingMessageP
       scene_id: payload.scene_id,
       timestamp_processed_utc: payload.timestamp_processed_utc,
       cameras: sanitizedCameras,
+      person_count_per_camera: payload.person_count_per_camera || {},
+      focus_person_id: payload.focus_person_id || null,
     };
   } catch (error) {
     console.error('Error sanitizing tracking payload:', error);
@@ -518,7 +523,7 @@ export function sanitizeTrackingPayload(payload: any): WebSocketTrackingMessageP
 /**
  * Sanitize camera data
  */
-export function sanitizeCameraData(data: any): CameraTrackingData | null {
+export function sanitizeCameraData(data: any): CameraFrame | null {
   if (!validateCameraData(data)) {
     return null;
   }
@@ -526,19 +531,20 @@ export function sanitizeCameraData(data: any): CameraTrackingData | null {
   // Sanitize tracks
   const sanitizedTracks = data.tracks
     .map(sanitizePersonTrack)
-    .filter((track): track is TrackedPerson => track !== null);
+    .filter((track): track is PersonTrack => track !== null);
 
   return {
     image_source: data.image_source,
     frame_image_base64: data.frame_image_base64 || undefined,
     tracks: sanitizedTracks,
+    cropped_persons: {}, // Default empty
   };
 }
 
 /**
  * Sanitize person track data
  */
-export function sanitizePersonTrack(track: any): TrackedPerson | null {
+export function sanitizePersonTrack(track: any): PersonTrack | null {
   if (!validatePersonTrack(track)) {
     return null;
   }
@@ -547,6 +553,8 @@ export function sanitizePersonTrack(track: any): TrackedPerson | null {
   let confidence = track.confidence;
   if (confidence !== undefined) {
     confidence = Math.max(0, Math.min(1, confidence));
+  } else {
+    confidence = 0; // Default
   }
 
   // Ensure bounding box coordinates are valid
@@ -554,11 +562,14 @@ export function sanitizePersonTrack(track: any): TrackedPerson | null {
 
   return {
     track_id: track.track_id,
-    global_id: track.global_id || undefined,
+    global_id: track.global_id || '', // Default empty if missing
     bbox_xyxy: bbox as [number, number, number, number],
     confidence,
     class_id: track.class_id || 1, // Default to person class
-    map_coords: track.map_coords || undefined,
+    map_coords: (track.map_coords || [0, 0]) as [number, number],
+    is_focused: false, // Default
+    detection_time: new Date().toISOString(), // Default
+    tracking_duration: 0, // Default
   };
 }
 
@@ -581,7 +592,7 @@ export function getTrackingStatistics(
   let confidenceSum = 0;
   let confidenceCount = 0;
   const uniquePersons = new Set<string>();
-  const cameraStats: Record<BackendCameraId, { detections: number; avgConfidence: number }> = {};
+  const cameraStats: Partial<Record<BackendCameraId, { detections: number; avgConfidence: number }>> = {};
 
   Object.entries(processedCameras).forEach(([cameraId, cameraData]) => {
     const backendCameraId = cameraId as BackendCameraId;
@@ -613,7 +624,7 @@ export function getTrackingStatistics(
     totalDetections,
     uniquePersons: uniquePersons.size,
     averageConfidence: confidenceCount > 0 ? confidenceSum / confidenceCount : 0,
-    cameraStats,
+    cameraStats: cameraStats as Record<BackendCameraId, { detections: number; avgConfidence: number }>,
   };
 }
 

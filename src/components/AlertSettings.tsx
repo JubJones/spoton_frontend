@@ -237,12 +237,12 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
         prev.map((rule) =>
           rule.id === ruleId
             ? {
-                ...rule,
-                [key]:
-                  typeof (rule as any)[key] === 'object'
-                    ? { ...(rule as any)[key], ...value }
-                    : value,
-              }
+              ...rule,
+              [key]:
+                typeof (rule as any)[key] === 'object'
+                  ? { ...(rule as any)[key], ...(value as any) }
+                  : value,
+            }
             : rule
         )
       );
@@ -258,12 +258,12 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
         prev.map((channel) =>
           channel.name === channelName
             ? {
-                ...channel,
-                [key]:
-                  typeof (channel as any)[key] === 'object'
-                    ? { ...(channel as any)[key], ...value }
-                    : value,
-              }
+              ...channel,
+              [key]:
+                typeof (channel as any)[key] === 'object'
+                  ? { ...(channel as any)[key], ...(value as any) }
+                  : value,
+            }
             : channel
         )
       );
@@ -282,9 +282,9 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
         prev.map((ch) =>
           ch.name === channelName
             ? {
-                ...ch,
-                testStatus: { success: false, message: 'Testing...', timestamp: new Date() },
-              }
+              ...ch,
+              testStatus: { success: false, message: 'Testing...', timestamp: new Date() },
+            }
             : ch
         )
       );
@@ -298,15 +298,15 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
           prev.map((ch) =>
             ch.name === channelName
               ? {
-                  ...ch,
-                  testStatus: {
-                    success,
-                    message: success
-                      ? 'Test notification sent successfully'
-                      : 'Test failed - check configuration',
-                    timestamp: new Date(),
-                  },
-                }
+                ...ch,
+                testStatus: {
+                  success,
+                  message: success
+                    ? 'Test notification sent successfully'
+                    : 'Test failed - check configuration',
+                  timestamp: new Date(),
+                },
+              }
               : ch
           )
         );
@@ -315,13 +315,13 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
           prev.map((ch) =>
             ch.name === channelName
               ? {
-                  ...ch,
-                  testStatus: {
-                    success: false,
-                    message: 'Test failed with error',
-                    timestamp: new Date(),
-                  },
-                }
+                ...ch,
+                testStatus: {
+                  success: false,
+                  message: 'Test failed with error',
+                  timestamp: new Date(),
+                },
+              }
               : ch
           )
         );
@@ -440,11 +440,10 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
           <button
             key={tab.key}
             onClick={() => setActiveTab(tab.key as any)}
-            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${
-              activeTab === tab.key
-                ? 'bg-orange-500 text-white'
-                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-            }`}
+            className={`px-4 py-2 text-sm rounded transition-colors flex items-center space-x-2 ${activeTab === tab.key
+              ? 'bg-orange-500 text-white'
+              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+              }`}
           >
             <span>{tab.icon}</span>
             <span>{tab.label}</span>
@@ -465,19 +464,17 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
                 {alertRules.map((rule) => (
                   <div
                     key={rule.id}
-                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                      selectedRule === rule.id
-                        ? 'border-orange-400 bg-orange-500/10'
-                        : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                    }`}
+                    className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedRule === rule.id
+                      ? 'border-orange-400 bg-orange-500/10'
+                      : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
+                      }`}
                     onClick={() => setSelectedRule(rule.id)}
                   >
                     <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center space-x-2">
                         <div
-                          className={`w-2 h-2 rounded-full ${
-                            rule.enabled ? 'bg-green-400' : 'bg-gray-400'
-                          }`}
+                          className={`w-2 h-2 rounded-full ${rule.enabled ? 'bg-green-400' : 'bg-gray-400'
+                            }`}
                         />
                         <span className="text-white font-medium text-sm">{rule.name}</span>
                       </div>
@@ -872,9 +869,8 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
                   <div className="flex items-center justify-between mb-3">
                     <div className="flex items-center space-x-3">
                       <div
-                        className={`w-3 h-3 rounded-full ${
-                          channel.enabled ? 'bg-green-400' : 'bg-gray-400'
-                        }`}
+                        className={`w-3 h-3 rounded-full ${channel.enabled ? 'bg-green-400' : 'bg-gray-400'
+                          }`}
                       />
                       <span className="text-white font-medium">{channel.name}</span>
                       <span className="text-xs text-gray-400 px-2 py-1 bg-gray-700 rounded">
@@ -933,11 +929,10 @@ const AlertSettings: React.FC<AlertSettingsProps> = ({
                     {/* Test results */}
                     {channel.testStatus && (
                       <div
-                        className={`text-xs p-2 rounded ${
-                          channel.testStatus.success
-                            ? 'bg-green-500/20 text-green-200'
-                            : 'bg-red-500/20 text-red-200'
-                        }`}
+                        className={`text-xs p-2 rounded ${channel.testStatus.success
+                          ? 'bg-green-500/20 text-green-200'
+                          : 'bg-red-500/20 text-red-200'
+                          }`}
                       >
                         {channel.testStatus.message}
                       </div>

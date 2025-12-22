@@ -244,7 +244,7 @@ export class TestRunner {
       // Test data processing speed
       const dataProcessingTest = await this.measureDataProcessingSpeed();
       performanceSuite.tests.push(dataProcessingTest);
-      if (dataProcessingTest.status === 'passed') dataProcessingTest.passedTests++;
+      if (dataProcessingTest.status === 'passed') performanceSuite.passedTests++;
       else if (dataProcessingTest.status === 'failed') performanceSuite.failedTests++;
 
       // Test WebSocket throughput
@@ -374,13 +374,13 @@ export class TestRunner {
   // Performance measurement methods
   private async measureRenderingPerformance(): Promise<TestResult> {
     const startTime = performance.now();
-    
+
     // Simulate component rendering benchmark
     await new Promise(resolve => setTimeout(resolve, 50));
-    
+
     const duration = performance.now() - startTime;
     const threshold = 100; // 100ms threshold
-    
+
     return {
       name: 'Component Rendering Performance',
       status: duration < threshold ? 'passed' : 'failed',
@@ -391,11 +391,11 @@ export class TestRunner {
 
   private async measureMemoryUsage(): Promise<TestResult> {
     const startTime = performance.now();
-    
+
     // Simulate memory usage test
     const memoryThreshold = 50 * 1024 * 1024; // 50MB
-    const currentMemory = performance.memory?.usedJSHeapSize || 0;
-    
+    const currentMemory = (performance as any).memory?.usedJSHeapSize || 0;
+
     return {
       name: 'Memory Usage Test',
       status: currentMemory < memoryThreshold ? 'passed' : 'failed',
@@ -406,7 +406,7 @@ export class TestRunner {
 
   private async measureDataProcessingSpeed(): Promise<TestResult> {
     const startTime = performance.now();
-    
+
     // Simulate data processing benchmark
     const testData = Array.from({ length: 1000 }, (_, i) => ({
       id: i,
@@ -520,7 +520,7 @@ export class TestRunner {
     console.log(`❌ Failed: ${testSuite.failedTests}`);
     console.log(`⏭️  Skipped: ${testSuite.skippedTests}`);
     console.log(`📈 Success Rate: ${successRate.toFixed(2)}%`);
-    
+
     if (testSuite.coverage) {
       console.log('\n📊 Coverage Summary');
       console.log('==================');
@@ -528,16 +528,16 @@ export class TestRunner {
       console.log(`Branches: ${testSuite.coverage.branches.pct}%`);
       console.log(`Functions: ${testSuite.coverage.functions.pct}%`);
       console.log(`Lines: ${testSuite.coverage.lines.pct}%`);
-      
+
       const avgCoverage = (
         testSuite.coverage.statements.pct +
         testSuite.coverage.branches.pct +
         testSuite.coverage.functions.pct +
         testSuite.coverage.lines.pct
       ) / 4;
-      
+
       console.log(`\n🎯 Average Coverage: ${avgCoverage.toFixed(2)}%`);
-      
+
       if (avgCoverage >= 80) {
         console.log('✅ Coverage target (80%+) achieved!');
       } else {
@@ -603,5 +603,3 @@ interface TestSuite {
   categories: TestCategory[];
   coverage: CoverageData | null;
 }
-
-export { TestRunner };

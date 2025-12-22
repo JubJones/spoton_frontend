@@ -143,7 +143,7 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({
         setPreferences((prev) => ({
           ...prev,
           [section]: {
-            ...prev[section],
+            ...(prev[section] as any),
             [key]: value,
           },
         }));
@@ -164,7 +164,7 @@ const UserPreferences: React.FC<UserPreferencesProps> = ({
       setPreferences((prev) => ({
         ...prev,
         [section]: {
-          ...prev[section],
+          ...(prev[section] as any),
           [parentKey]: {
             ...(prev[section] as any)[parentKey],
             [key]: value,

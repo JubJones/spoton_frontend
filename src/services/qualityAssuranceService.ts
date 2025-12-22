@@ -163,13 +163,13 @@ class QualityAssuranceService {
 
       // Calculate overall score and compliance
       this.finalizeQualityReport(report);
-      
+
       this.testHistory.push(report);
       console.log(`✅ Quality assurance completed: ${report.overallScore.toFixed(1)}/100`);
 
     } catch (error) {
       console.error('❌ Quality assurance validation failed:', error);
-      report.criticalIssues.push(`QA validation error: ${error.message}`);
+      report.criticalIssues.push(`QA validation error: ${(error as any).message}`);
     } finally {
       this.isRunning = false;
     }
@@ -186,17 +186,17 @@ class QualityAssuranceService {
    */
   private async runFunctionalTesting(): Promise<QualityTest[]> {
     console.log('🧪 Running functional testing...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: Feature completeness validation
     const featureTest = this.createTest('Feature Completeness', 'functional', 'critical');
     tests.push(featureTest);
-    
+
     try {
       featureTest.status = 'running';
       featureTest.startTime = Date.now();
-      
+
       const requiredFeatures = [
         'Environment Selection',
         'Multi-camera Display',
@@ -211,29 +211,29 @@ class QualityAssuranceService {
         'Error Handling',
         'Performance Monitoring',
       ];
-      
+
       // Simulate feature validation (in real scenario would test actual features)
       const implementedFeatures = requiredFeatures.length; // All implemented
       const completenessScore = (implementedFeatures / requiredFeatures.length) * 100;
-      
-      this.completeTest(featureTest, 'passed', completenessScore, 
+
+      this.completeTest(featureTest, 'passed', completenessScore,
         `Feature completeness: ${completenessScore}%`, {
-          implemented: implementedFeatures,
-          total: requiredFeatures.length,
-          features: requiredFeatures,
-        });
+        implemented: implementedFeatures,
+        total: requiredFeatures.length,
+        features: requiredFeatures,
+      });
     } catch (error) {
-      this.completeTest(featureTest, 'failed', 0, `Feature test failed: ${error.message}`);
+      this.completeTest(featureTest, 'failed', 0, `Feature test failed: ${(error as any).message}`);
     }
 
     // Test 2: Data flow validation
     const dataFlowTest = this.createTest('Data Flow Validation', 'functional', 'critical');
     tests.push(dataFlowTest);
-    
+
     try {
       dataFlowTest.status = 'running';
       dataFlowTest.startTime = Date.now();
-      
+
       // Test data flow components
       const dataFlowComponents = [
         'WebSocket → Store Integration',
@@ -243,29 +243,29 @@ class QualityAssuranceService {
         'Error Propagation',
         'Performance Monitoring',
       ];
-      
+
       // All components properly implemented in our architecture
       const workingComponents = dataFlowComponents.length;
       const dataFlowScore = (workingComponents / dataFlowComponents.length) * 100;
-      
+
       this.completeTest(dataFlowTest, 'passed', dataFlowScore,
         `Data flow validation: ${dataFlowScore}%`, {
-          working: workingComponents,
-          total: dataFlowComponents.length,
-          components: dataFlowComponents,
-        });
+        working: workingComponents,
+        total: dataFlowComponents.length,
+        components: dataFlowComponents,
+      });
     } catch (error) {
-      this.completeTest(dataFlowTest, 'failed', 0, `Data flow test failed: ${error.message}`);
+      this.completeTest(dataFlowTest, 'failed', 0, `Data flow test failed: ${(error as any).message}`);
     }
 
     // Test 3: Error handling validation
     const errorTest = this.createTest('Error Handling Validation', 'functional', 'high');
     tests.push(errorTest);
-    
+
     try {
       errorTest.status = 'running';
       errorTest.startTime = Date.now();
-      
+
       const errorScenarios = [
         'Network Connection Loss',
         'Invalid Backend Response',
@@ -274,19 +274,19 @@ class QualityAssuranceService {
         'API Rate Limiting',
         'Resource Exhaustion',
       ];
-      
+
       // All error scenarios have handling implemented
       const handledScenarios = errorScenarios.length;
       const errorHandlingScore = (handledScenarios / errorScenarios.length) * 100;
-      
+
       this.completeTest(errorTest, 'passed', errorHandlingScore,
         `Error handling: ${errorHandlingScore}%`, {
-          handled: handledScenarios,
-          total: errorScenarios.length,
-          scenarios: errorScenarios,
-        });
+        handled: handledScenarios,
+        total: errorScenarios.length,
+        scenarios: errorScenarios,
+      });
     } catch (error) {
-      this.completeTest(errorTest, 'failed', 0, `Error handling test failed: ${error.message}`);
+      this.completeTest(errorTest, 'failed', 0, `Error handling test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -301,17 +301,17 @@ class QualityAssuranceService {
    */
   private async runUIUXTesting(): Promise<QualityTest[]> {
     console.log('🎨 Running UI/UX testing...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: Responsive design validation
     const responsiveTest = this.createTest('Responsive Design', 'ui', 'high');
     tests.push(responsiveTest);
-    
+
     try {
       responsiveTest.status = 'running';
       responsiveTest.startTime = Date.now();
-      
+
       const breakpoints = [
         { name: 'Mobile (320px)', width: 320, supported: true },
         { name: 'Mobile Large (480px)', width: 480, supported: true },
@@ -319,28 +319,28 @@ class QualityAssuranceService {
         { name: 'Desktop (1024px)', width: 1024, supported: true },
         { name: 'Large Desktop (1440px)', width: 1440, supported: true },
       ];
-      
+
       const supportedBreakpoints = breakpoints.filter(bp => bp.supported).length;
       const responsiveScore = (supportedBreakpoints / breakpoints.length) * 100;
-      
+
       this.completeTest(responsiveTest, 'passed', responsiveScore,
         `Responsive design: ${responsiveScore}%`, {
-          supported: supportedBreakpoints,
-          total: breakpoints.length,
-          breakpoints,
-        });
+        supported: supportedBreakpoints,
+        total: breakpoints.length,
+        breakpoints,
+      });
     } catch (error) {
-      this.completeTest(responsiveTest, 'failed', 0, `Responsive test failed: ${error.message}`);
+      this.completeTest(responsiveTest, 'failed', 0, `Responsive test failed: ${(error as any).message}`);
     }
 
     // Test 2: User interaction validation
     const interactionTest = this.createTest('User Interaction', 'ui', 'medium');
     tests.push(interactionTest);
-    
+
     try {
       interactionTest.status = 'running';
       interactionTest.startTime = Date.now();
-      
+
       const interactions = [
         'Environment Selection',
         'Camera View Switching',
@@ -350,28 +350,28 @@ class QualityAssuranceService {
         'Real-time Data Monitoring',
         'Error Recovery Actions',
       ];
-      
+
       const workingInteractions = interactions.length; // All implemented
       const interactionScore = (workingInteractions / interactions.length) * 100;
-      
+
       this.completeTest(interactionTest, 'passed', interactionScore,
         `User interactions: ${interactionScore}%`, {
-          working: workingInteractions,
-          total: interactions.length,
-          interactions,
-        });
+        working: workingInteractions,
+        total: interactions.length,
+        interactions,
+      });
     } catch (error) {
-      this.completeTest(interactionTest, 'failed', 0, `Interaction test failed: ${error.message}`);
+      this.completeTest(interactionTest, 'failed', 0, `Interaction test failed: ${(error as any).message}`);
     }
 
     // Test 3: Visual consistency validation
     const visualTest = this.createTest('Visual Consistency', 'ui', 'medium');
     tests.push(visualTest);
-    
+
     try {
       visualTest.status = 'running';
       visualTest.startTime = Date.now();
-      
+
       const designElements = [
         'Color Scheme Consistency',
         'Typography Consistency',
@@ -381,18 +381,18 @@ class QualityAssuranceService {
         'Loading States',
         'Error States',
       ];
-      
+
       const consistentElements = designElements.length; // Tailwind ensures consistency
       const visualScore = (consistentElements / designElements.length) * 100;
-      
+
       this.completeTest(visualTest, 'passed', visualScore,
         `Visual consistency: ${visualScore}%`, {
-          consistent: consistentElements,
-          total: designElements.length,
-          elements: designElements,
-        });
+        consistent: consistentElements,
+        total: designElements.length,
+        elements: designElements,
+      });
     } catch (error) {
-      this.completeTest(visualTest, 'failed', 0, `Visual test failed: ${error.message}`);
+      this.completeTest(visualTest, 'failed', 0, `Visual test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -407,46 +407,46 @@ class QualityAssuranceService {
    */
   private async runSecurityTesting(): Promise<QualityTest[]> {
     console.log('🔒 Running security testing...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: Input validation and XSS protection
     const xssTest = this.createTest('XSS Protection', 'security', 'critical');
     tests.push(xssTest);
-    
+
     try {
       xssTest.status = 'running';
       xssTest.startTime = Date.now();
-      
+
       const xssVectors = [
         '<script>alert("xss")</script>',
         'javascript:alert("xss")',
         '<img src="x" onerror="alert(1)">',
         '"><script>alert("xss")</script>',
       ];
-      
+
       // Our input validation and React's built-in XSS protection should handle these
       const protectedVectors = xssVectors.length; // React handles XSS by default
       const xssScore = (protectedVectors / xssVectors.length) * 100;
-      
+
       this.completeTest(xssTest, 'passed', xssScore,
         `XSS protection: ${xssScore}%`, {
-          protected: protectedVectors,
-          total: xssVectors.length,
-          vectors: xssVectors,
-        });
+        protected: protectedVectors,
+        total: xssVectors.length,
+        vectors: xssVectors,
+      });
     } catch (error) {
-      this.completeTest(xssTest, 'failed', 0, `XSS test failed: ${error.message}`);
+      this.completeTest(xssTest, 'failed', 0, `XSS test failed: ${(error as any).message}`);
     }
 
     // Test 2: Data exposure validation
     const dataExposureTest = this.createTest('Data Exposure Prevention', 'security', 'high');
     tests.push(dataExposureTest);
-    
+
     try {
       dataExposureTest.status = 'running';
       dataExposureTest.startTime = Date.now();
-      
+
       const exposureChecks = [
         'No API keys in client code',
         'No database credentials exposed',
@@ -455,46 +455,46 @@ class QualityAssuranceService {
         'No sensitive data in localStorage',
         'Proper error message handling',
       ];
-      
+
       const secureChecks = exposureChecks.length; // All implemented in our architecture
       const exposureScore = (secureChecks / exposureChecks.length) * 100;
-      
+
       this.completeTest(dataExposureTest, 'passed', exposureScore,
         `Data exposure prevention: ${exposureScore}%`, {
-          secure: secureChecks,
-          total: exposureChecks.length,
-          checks: exposureChecks,
-        });
+        secure: secureChecks,
+        total: exposureChecks.length,
+        checks: exposureChecks,
+      });
     } catch (error) {
-      this.completeTest(dataExposureTest, 'failed', 0, `Data exposure test failed: ${error.message}`);
+      this.completeTest(dataExposureTest, 'failed', 0, `Data exposure test failed: ${(error as any).message}`);
     }
 
     // Test 3: Dependency vulnerability check
     const depTest = this.createTest('Dependency Security', 'security', 'high');
     tests.push(depTest);
-    
+
     try {
       depTest.status = 'running';
       depTest.startTime = Date.now();
-      
+
       // In real scenario would run npm audit or similar
       const criticalVulns = 0; // Assume no critical vulnerabilities
       const highVulns = 0;
       const mediumVulns = 0;
-      
-      const depScore = criticalVulns === 0 && highVulns === 0 ? 100 : 
-                       criticalVulns === 0 && highVulns <= 2 ? 80 : 60;
-      
+
+      const depScore = criticalVulns === 0 && highVulns === 0 ? 100 :
+        criticalVulns === 0 && highVulns <= 2 ? 80 : 60;
+
       const status = depScore >= 90 ? 'passed' : depScore >= 70 ? 'warning' : 'failed';
-      
+
       this.completeTest(depTest, status, depScore,
         `Dependency security: ${depScore}%`, {
-          critical: criticalVulns,
-          high: highVulns,
-          medium: mediumVulns,
-        });
+        critical: criticalVulns,
+        high: highVulns,
+        medium: mediumVulns,
+      });
     } catch (error) {
-      this.completeTest(depTest, 'failed', 0, `Dependency test failed: ${error.message}`);
+      this.completeTest(depTest, 'failed', 0, `Dependency test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -509,17 +509,17 @@ class QualityAssuranceService {
    */
   private async runAccessibilityTesting(): Promise<QualityTest[]> {
     console.log('♿ Running accessibility testing...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: WCAG 2.1 AA compliance
     const wcagTest = this.createTest('WCAG 2.1 AA Compliance', 'accessibility', 'high');
     tests.push(wcagTest);
-    
+
     try {
       wcagTest.status = 'running';
       wcagTest.startTime = Date.now();
-      
+
       const wcagCriteria = [
         'Perceivable: Alt text for images',
         'Perceivable: Color contrast ratios',
@@ -532,29 +532,29 @@ class QualityAssuranceService {
         'Robust: Valid HTML markup',
         'Robust: Compatible with assistive technologies',
       ];
-      
+
       // Our Tailwind-based implementation should meet most WCAG criteria
       const compliantCriteria = Math.floor(wcagCriteria.length * 0.9); // 90% compliance
       const wcagScore = (compliantCriteria / wcagCriteria.length) * 100;
-      
+
       this.completeTest(wcagTest, wcagScore >= 80 ? 'passed' : 'warning', wcagScore,
         `WCAG compliance: ${wcagScore}%`, {
-          compliant: compliantCriteria,
-          total: wcagCriteria.length,
-          criteria: wcagCriteria,
-        });
+        compliant: compliantCriteria,
+        total: wcagCriteria.length,
+        criteria: wcagCriteria,
+      });
     } catch (error) {
-      this.completeTest(wcagTest, 'failed', 0, `WCAG test failed: ${error.message}`);
+      this.completeTest(wcagTest, 'failed', 0, `WCAG test failed: ${(error as any).message}`);
     }
 
     // Test 2: Keyboard navigation
     const keyboardTest = this.createTest('Keyboard Navigation', 'accessibility', 'medium');
     tests.push(keyboardTest);
-    
+
     try {
       keyboardTest.status = 'running';
       keyboardTest.startTime = Date.now();
-      
+
       const keyboardFeatures = [
         'Tab navigation through interactive elements',
         'Enter/Space activation of buttons',
@@ -563,28 +563,28 @@ class QualityAssuranceService {
         'Focus visible indicators',
         'Logical tab order',
       ];
-      
+
       const workingFeatures = keyboardFeatures.length; // All implemented
       const keyboardScore = (workingFeatures / keyboardFeatures.length) * 100;
-      
+
       this.completeTest(keyboardTest, 'passed', keyboardScore,
         `Keyboard navigation: ${keyboardScore}%`, {
-          working: workingFeatures,
-          total: keyboardFeatures.length,
-          features: keyboardFeatures,
-        });
+        working: workingFeatures,
+        total: keyboardFeatures.length,
+        features: keyboardFeatures,
+      });
     } catch (error) {
-      this.completeTest(keyboardTest, 'failed', 0, `Keyboard test failed: ${error.message}`);
+      this.completeTest(keyboardTest, 'failed', 0, `Keyboard test failed: ${(error as any).message}`);
     }
 
     // Test 3: Screen reader compatibility
     const screenReaderTest = this.createTest('Screen Reader Compatibility', 'accessibility', 'medium');
     tests.push(screenReaderTest);
-    
+
     try {
       screenReaderTest.status = 'running';
       screenReaderTest.startTime = Date.now();
-      
+
       const srFeatures = [
         'Semantic HTML structure',
         'ARIA labels and descriptions',
@@ -593,18 +593,18 @@ class QualityAssuranceService {
         'Live region announcements',
         'Alternative text for images',
       ];
-      
+
       const compatibleFeatures = Math.floor(srFeatures.length * 0.85); // 85% compatibility
       const srScore = (compatibleFeatures / srFeatures.length) * 100;
-      
+
       this.completeTest(screenReaderTest, srScore >= 80 ? 'passed' : 'warning', srScore,
         `Screen reader compatibility: ${srScore}%`, {
-          compatible: compatibleFeatures,
-          total: srFeatures.length,
-          features: srFeatures,
-        });
+        compatible: compatibleFeatures,
+        total: srFeatures.length,
+        features: srFeatures,
+      });
     } catch (error) {
-      this.completeTest(screenReaderTest, 'failed', 0, `Screen reader test failed: ${error.message}`);
+      this.completeTest(screenReaderTest, 'failed', 0, `Screen reader test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -619,17 +619,17 @@ class QualityAssuranceService {
    */
   private async runCompatibilityTesting(): Promise<QualityTest[]> {
     console.log('🌐 Running cross-browser compatibility testing...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: Browser feature support
     const browserTest = this.createTest('Browser Feature Support', 'compatibility', 'high');
     tests.push(browserTest);
-    
+
     try {
       browserTest.status = 'running';
       browserTest.startTime = Date.now();
-      
+
       const browsers: BrowserCompatibility[] = [
         {
           browser: 'chrome',
@@ -680,26 +680,26 @@ class QualityAssuranceService {
           overallCompatibility: 100,
         },
       ];
-      
+
       const avgCompatibility = browsers.reduce((sum, b) => sum + b.overallCompatibility, 0) / browsers.length;
-      
+
       this.completeTest(browserTest, avgCompatibility >= 95 ? 'passed' : 'warning', avgCompatibility,
         `Browser compatibility: ${avgCompatibility}%`, {
-          browsers,
-          avgCompatibility,
-        });
+        browsers,
+        avgCompatibility,
+      });
     } catch (error) {
-      this.completeTest(browserTest, 'failed', 0, `Browser test failed: ${error.message}`);
+      this.completeTest(browserTest, 'failed', 0, `Browser test failed: ${(error as any).message}`);
     }
 
     // Test 2: Mobile device compatibility
     const mobileTest = this.createTest('Mobile Device Compatibility', 'compatibility', 'medium');
     tests.push(mobileTest);
-    
+
     try {
       mobileTest.status = 'running';
       mobileTest.startTime = Date.now();
-      
+
       const mobileFeatures = [
         'Touch gesture support',
         'Viewport meta tag',
@@ -708,18 +708,18 @@ class QualityAssuranceService {
         'Touch-friendly button sizes',
         'Proper font scaling',
       ];
-      
+
       const supportedFeatures = mobileFeatures.length; // All implemented with responsive design
       const mobileScore = (supportedFeatures / mobileFeatures.length) * 100;
-      
+
       this.completeTest(mobileTest, 'passed', mobileScore,
         `Mobile compatibility: ${mobileScore}%`, {
-          supported: supportedFeatures,
-          total: mobileFeatures.length,
-          features: mobileFeatures,
-        });
+        supported: supportedFeatures,
+        total: mobileFeatures.length,
+        features: mobileFeatures,
+      });
     } catch (error) {
-      this.completeTest(mobileTest, 'failed', 0, `Mobile test failed: ${error.message}`);
+      this.completeTest(mobileTest, 'failed', 0, `Mobile test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -734,50 +734,50 @@ class QualityAssuranceService {
    */
   private async runPerformanceBenchmarking(): Promise<QualityTest[]> {
     console.log('⚡ Running performance benchmarking...');
-    
+
     const tests: QualityTest[] = [];
 
     // Test 1: Core Web Vitals
     const webVitalsTest = this.createTest('Core Web Vitals', 'performance', 'high');
     tests.push(webVitalsTest);
-    
+
     try {
       webVitalsTest.status = 'running';
       webVitalsTest.startTime = Date.now();
-      
+
       // Simulate Core Web Vitals measurements
       const vitals = {
         LCP: 2.1, // Largest Contentful Paint (target: < 2.5s)
         FID: 85,  // First Input Delay (target: < 100ms)
         CLS: 0.08, // Cumulative Layout Shift (target: < 0.1)
       };
-      
+
       const lcpGood = vitals.LCP < 2.5;
       const fidGood = vitals.FID < 100;
       const clsGood = vitals.CLS < 0.1;
-      
+
       const goodVitals = [lcpGood, fidGood, clsGood].filter(Boolean).length;
       const vitalsScore = (goodVitals / 3) * 100;
-      
+
       this.completeTest(webVitalsTest, vitalsScore >= 90 ? 'passed' : 'warning', vitalsScore,
         `Core Web Vitals: ${vitalsScore}%`, {
-          LCP: `${vitals.LCP}s ${lcpGood ? '✅' : '❌'}`,
-          FID: `${vitals.FID}ms ${fidGood ? '✅' : '❌'}`,
-          CLS: `${vitals.CLS} ${clsGood ? '✅' : '❌'}`,
-          goodVitals,
-        });
+        LCP: `${vitals.LCP}s ${lcpGood ? '✅' : '❌'}`,
+        FID: `${vitals.FID}ms ${fidGood ? '✅' : '❌'}`,
+        CLS: `${vitals.CLS} ${clsGood ? '✅' : '❌'}`,
+        goodVitals,
+      });
     } catch (error) {
-      this.completeTest(webVitalsTest, 'failed', 0, `Web Vitals test failed: ${error.message}`);
+      this.completeTest(webVitalsTest, 'failed', 0, `Web Vitals test failed: ${(error as any).message}`);
     }
 
     // Test 2: Resource optimization
     const resourceTest = this.createTest('Resource Optimization', 'performance', 'medium');
     tests.push(resourceTest);
-    
+
     try {
       resourceTest.status = 'running';
       resourceTest.startTime = Date.now();
-      
+
       const optimizations = [
         'Code splitting implemented',
         'Tree shaking enabled',
@@ -786,18 +786,18 @@ class QualityAssuranceService {
         'Caching strategies implemented',
         'Bundle size optimization',
       ];
-      
+
       const implementedOptimizations = optimizations.length; // All implemented
       const resourceScore = (implementedOptimizations / optimizations.length) * 100;
-      
+
       this.completeTest(resourceTest, 'passed', resourceScore,
         `Resource optimization: ${resourceScore}%`, {
-          implemented: implementedOptimizations,
-          total: optimizations.length,
-          optimizations,
-        });
+        implemented: implementedOptimizations,
+        total: optimizations.length,
+        optimizations,
+      });
     } catch (error) {
-      this.completeTest(resourceTest, 'failed', 0, `Resource test failed: ${error.message}`);
+      this.completeTest(resourceTest, 'failed', 0, `Resource test failed: ${(error as any).message}`);
     }
 
     return tests;
@@ -831,7 +831,7 @@ class QualityAssuranceService {
     test.duration = test.endTime - (test.startTime || test.endTime);
     test.score = score;
     test.details = details;
-    
+
     if (message) {
       if (status === 'failed') {
         test.errors?.push(message);
@@ -846,7 +846,7 @@ class QualityAssuranceService {
     category.passed = tests.filter(t => t.status === 'passed').length;
     category.failed = tests.filter(t => t.status === 'failed').length;
     category.warnings = tests.filter(t => t.status === 'warning').length;
-    
+
     const totalScore = tests.reduce((sum, test) => sum + (test.score || 0), 0);
     category.score = tests.length > 0 ? totalScore / tests.length : 0;
   }
@@ -856,19 +856,19 @@ class QualityAssuranceService {
     const categoryScores = Object.values(report.categories);
     const totalScore = categoryScores.reduce((sum, cat) => sum + cat.score, 0);
     report.overallScore = categoryScores.length > 0 ? totalScore / categoryScores.length : 0;
-    
+
     // Check compliance status
     report.complianceStatus.wcagAA = report.categories.accessibility.score >= 80;
     report.complianceStatus.securityStandards = report.categories.security.score >= 90;
     report.complianceStatus.performanceTargets = report.categories.performance.score >= 85;
     report.complianceStatus.crossBrowserCompatibility = report.categories.compatibility.score >= 90;
-    
+
     // Collect critical issues
-    const criticalFailures = report.tests.filter(t => 
+    const criticalFailures = report.tests.filter(t =>
       t.status === 'failed' && t.priority === 'critical'
     );
     report.criticalIssues = criticalFailures.map(t => t.name);
-    
+
     // Generate recommendations
     if (report.categories.accessibility.score < 80) {
       report.recommendations.push('Improve accessibility compliance for WCAG AA standard');
@@ -894,7 +894,7 @@ class QualityAssuranceService {
   /**
    * Check if QA is running
    */
-  isRunning(): boolean {
+  public getIsRunning(): boolean {
     return this.isRunning;
   }
 
@@ -911,7 +911,7 @@ class QualityAssuranceService {
       '',
       '## Category Scores',
       '',
-      ...Object.entries(report.categories).map(([name, cat]) => 
+      ...Object.entries(report.categories).map(([name, cat]) =>
         `- **${name.charAt(0).toUpperCase() + name.slice(1)}**: ${cat.score.toFixed(1)}/100 (${cat.passed}/${cat.total} passed)`
       ),
       '',
@@ -949,27 +949,27 @@ class QualityAssuranceService {
     Object.entries(testsByCategory).forEach(([category, tests]) => {
       reportText.push(`### ${category.charAt(0).toUpperCase() + category.slice(1)} Tests`);
       reportText.push('');
-      
+
       tests.forEach(test => {
         const statusIcon = test.status === 'passed' ? '✅' : test.status === 'failed' ? '❌' : '⚠️';
         reportText.push(`#### ${statusIcon} ${test.name}`);
         reportText.push(`**Score**: ${test.score?.toFixed(1) || 0}/100`);
         reportText.push(`**Priority**: ${test.priority}`);
-        
+
         if (test.duration) {
           reportText.push(`**Duration**: ${test.duration}ms`);
         }
-        
+
         if (test.errors && test.errors.length > 0) {
           reportText.push('**Errors**:');
           test.errors.forEach(error => reportText.push(`- ${error}`));
         }
-        
+
         if (test.warnings && test.warnings.length > 0) {
           reportText.push('**Warnings**:');
           test.warnings.forEach(warning => reportText.push(`- ${warning}`));
         }
-        
+
         reportText.push('');
       });
     });

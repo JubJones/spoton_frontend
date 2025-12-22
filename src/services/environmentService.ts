@@ -2,18 +2,18 @@
 // src/services/environmentService.ts
 
 import { APIService } from './apiService';
-import { 
-  Environment, 
-  DateRange, 
-  Camera, 
-  Zone, 
+import {
+  Environment,
+  DateRange,
+  Camera,
+  Zone,
   AnalysisSession,
-  EnvironmentId 
+  EnvironmentId
 } from '../types/api';
-import { 
-  getEnvironmentConfig, 
+import {
+  getEnvironmentConfig,
   getAvailableEnvironments,
-  validateEnvironmentConfig 
+  validateEnvironmentConfig
 } from '../config/environments';
 import { MOCK_CONFIG } from '../config/mock';
 
@@ -63,7 +63,7 @@ export class EnvironmentService {
       return environments;
     } catch (error) {
       console.error('Failed to get environments from backend:', error);
-      
+
       // Fallback to local configuration
       console.log('Using fallback local environment configuration');
       return this.getFallbackEnvironments();
@@ -74,7 +74,7 @@ export class EnvironmentService {
    * Get specific environment details
    */
   async getEnvironmentDetails(
-    environmentId: string, 
+    environmentId: string,
     options: { includeValidation?: boolean; useCache?: boolean } = {}
   ): Promise<Environment> {
     const { includeValidation = true, useCache = false } = options;
@@ -85,7 +85,7 @@ export class EnvironmentService {
 
     try {
       const environment = await this.apiService.getEnvironmentDetails(
-        environmentId, 
+        environmentId,
         includeValidation
       );
 
@@ -95,7 +95,7 @@ export class EnvironmentService {
       return environment;
     } catch (error) {
       console.error(`Failed to get environment details for ${environmentId}:`, error);
-      
+
       // Fallback to local configuration
       return this.getFallbackEnvironmentDetails(environmentId as EnvironmentId);
     }
@@ -124,7 +124,7 @@ export class EnvironmentService {
       return cameras;
     } catch (error) {
       console.error(`Failed to get cameras for ${environmentId}:`, error);
-      
+
       // Fallback to local configuration
       return this.getFallbackCameras(environmentId as EnvironmentId);
     }
@@ -168,7 +168,7 @@ export class EnvironmentService {
       return dateRange;
     } catch (error) {
       console.error(`Failed to get date ranges for ${environmentId}:`, error);
-      
+
       // Fallback to default date range
       return this.getFallbackDateRange();
     }
@@ -283,7 +283,7 @@ export class EnvironmentService {
     for (const envId of environmentIds) {
       try {
         const validation = await this.validateEnvironment(envId);
-        
+
         let status: 'healthy' | 'degraded' | 'error' = 'healthy';
         if (validation.errors.length > 0) {
           status = 'error';
@@ -300,7 +300,7 @@ export class EnvironmentService {
         results.push({
           id: envId,
           status: 'error' as const,
-          details: { error: error.message },
+          details: { error: (error as any).message },
         });
       }
     }
@@ -336,12 +336,12 @@ export class EnvironmentService {
   clearEnvironmentCache(environmentId: string): void {
     // Clear environment cache
     this.environmentCache.delete(environmentId);
-    
+
     // Clear related caches
     Array.from(this.cameraCache.keys())
       .filter(key => key.startsWith(environmentId))
       .forEach(key => this.cameraCache.delete(key));
-    
+
     Array.from(this.dateRangeCache.keys())
       .filter(key => key.startsWith(environmentId))
       .forEach(key => this.dateRangeCache.delete(key));
@@ -356,7 +356,7 @@ export class EnvironmentService {
    */
   private getFallbackEnvironments(): Environment[] {
     const localEnvs = getAvailableEnvironments();
-    
+
     return localEnvs.map(config => ({
       environment_id: config.id,
       name: config.name,
@@ -375,7 +375,7 @@ export class EnvironmentService {
    */
   private getFallbackEnvironmentDetails(environmentId: EnvironmentId): Environment {
     const config = getEnvironmentConfig(environmentId);
-    
+
     return {
       environment_id: config.id,
       name: config.name,
@@ -394,7 +394,7 @@ export class EnvironmentService {
    */
   private getFallbackCameras(environmentId: EnvironmentId): Camera[] {
     const config = getEnvironmentConfig(environmentId);
-    
+
     return config.cameras.map(camera => ({
       camera_id: camera.id,
       name: camera.name,
@@ -412,7 +412,7 @@ export class EnvironmentService {
   private getFallbackDateRange(): DateRange {
     const now = new Date();
     const yesterday = new Date(now.getTime() - 24 * 60 * 60 * 1000);
-    
+
     return {
       earliest_date: yesterday.toISOString(),
       latest_date: now.toISOString(),
@@ -460,7 +460,7 @@ export async function getEnvironmentSummary(environmentId: string): Promise<{
   dataRange?: { start: string; end: string };
 }> {
   const service = createEnvironmentService();
-  
+
   try {
     const [environment, cameras, dateRange] = await Promise.all([
       service.getEnvironmentDetails(environmentId),
@@ -469,11 +469,11 @@ export async function getEnvironmentSummary(environmentId: string): Promise<{
     ]);
 
     let status: 'available' | 'degraded' | 'unavailable' = 'available';
-    
+
     if (!environment.is_active || cameras.length < 4) {
       status = 'degraded';
     }
-    
+
     if (!environment.has_data) {
       status = 'unavailable';
     }
@@ -491,7 +491,7 @@ export async function getEnvironmentSummary(environmentId: string): Promise<{
     };
   } catch (error) {
     console.error(`Failed to get environment summary for ${environmentId}:`, error);
-    
+
     return {
       id: environmentId,
       name: environmentId,

@@ -322,7 +322,7 @@ export class StatePersistenceService {
 
         // Save migrated data
         await this.saveState(key, migratedData, fullConfig);
-        return migratedData;
+        return migratedData as T | null;
       }
 
       return persistentState.data;

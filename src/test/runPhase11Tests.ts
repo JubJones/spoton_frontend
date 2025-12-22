@@ -1,7 +1,7 @@
 // Phase 11 Test Runner - Execute comprehensive validation tests
 // src/test/runPhase11Tests.ts
 
-import Phase11ValidationTests from './phase11ValidationTests';
+import { Phase11ValidationTests } from './phase11ValidationTests';
 import { performanceMonitoringService } from '../services/performanceMonitoringService';
 
 // ============================================================================
@@ -88,7 +88,7 @@ class Phase11TestRunner {
   private setupPerformanceMonitoring(): void {
     // Record test execution as a performance metric
     performanceMonitoringService.recordMetric({
-      category: 'test',
+      category: 'user-interaction',
       operation: 'phase11-validation',
       duration: 0, // Will be updated when tests complete
       success: true,
@@ -204,7 +204,7 @@ class Phase11TestRunner {
     }
 
     // Performance metrics
-    const testMetrics = performanceMonitoringService.getMetrics('test', 50);
+    const testMetrics = performanceMonitoringService.getMetrics('user-interaction', 50);
     if (testMetrics.length > 0) {
       const avgDuration = testMetrics.reduce((sum, m) => sum + m.duration, 0) / testMetrics.length;
       const slowestTest = testMetrics.reduce((slowest, current) =>
@@ -258,7 +258,7 @@ class Phase11TestRunner {
           recommendations: report.recommendations,
           performance: {
             memoryUsage: performanceMonitoringService.getCurrentMemoryUsage(),
-            metrics: performanceMonitoringService.getMetrics('test', 100),
+            metrics: performanceMonitoringService.getMetrics('user-interaction', 100),
           },
         };
 
@@ -329,13 +329,13 @@ class Phase11TestRunner {
       <div class="test-results">
         <h2>Test Results by Category</h2>
         ${Object.entries(this.groupTestsByCategory(report.testResults))
-          .map(
-            ([category, tests]) => `
+        .map(
+          ([category, tests]) => `
             <div class="test-category">
               <h3>${category}</h3>
               ${(tests as any[])
-                .map(
-                  (test) => `
+              .map(
+                (test) => `
                 <div class="test-item">
                   <span class="${test.passed ? 'passed' : 'failed'}">
                     ${test.passed ? '✅' : '❌'} ${test.testName}
@@ -343,23 +343,22 @@ class Phase11TestRunner {
                   ${test.error ? `<span style="color: #666;"> - ${test.error}</span>` : ''}
                 </div>
               `
-                )
-                .join('')}
+              )
+              .join('')}
             </div>
           `
-          )
-          .join('')}
+        )
+        .join('')}
       </div>
 
-      ${
-        report.recommendations && report.recommendations.length > 0
-          ? `
+      ${report.recommendations && report.recommendations.length > 0
+        ? `
         <div class="recommendations">
           <h2>Recommendations</h2>
           ${report.recommendations.map((rec: string) => `<p>${rec}</p>`).join('')}
         </div>
       `
-          : ''
+        : ''
       }
     </body>
     </html>

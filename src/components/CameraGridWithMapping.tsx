@@ -104,14 +104,14 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
   const actualIsTablet = isTablet ?? screenSize === 'tablet';
 
   // Initialize map visibility state
-  const [mapVisibility, setMapVisibility] = useState<Record<BackendCameraId, boolean>>(() => {
+  const [mapVisibility, setMapVisibility] = useState<Partial<Record<BackendCameraId, boolean>>>(() => {
     const availableCameras = Object.keys(cameraData) as BackendCameraId[];
-    const initialVisibility: Record<BackendCameraId, boolean> = {};
-    
+    const initialVisibility: Partial<Record<BackendCameraId, boolean>> = {};
+
     availableCameras.forEach(cameraId => {
       initialVisibility[cameraId] = defaultMapVisibility?.[cameraId] ?? true;
     });
-    
+
     return initialVisibility;
   });
 
@@ -121,7 +121,7 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
       ...prev,
       [cameraId]: visible
     }));
-    
+
     onMappingToggle?.(cameraId, visible);
   }, [onMappingToggle]);
 
@@ -130,7 +130,7 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
 
   // Memoized mapping data per camera
   const mappingByCamera = useMemo(() => {
-    const result: Record<BackendCameraId, MappingCoordinate[]> = {};
+    const result: Partial<Record<BackendCameraId, MappingCoordinate[]>> = {};
     availableCameras.forEach(cameraId => {
       result[cameraId] = mappingData[cameraId] || [];
     });
@@ -180,33 +180,32 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
           <h3 className="text-white font-semibold text-sm">
             2D Mapping 🗺️
           </h3>
-          
+
           <div className="flex items-center space-x-2">
             <span className="text-gray-300 text-xs">
               {Object.values(mappingByCamera).reduce((sum, coords) => sum + coords.length, 0)} person positions
             </span>
-            
+
             <button
               onClick={() => {
                 const newVisibility = !allMapsVisible;
                 const newState = Object.fromEntries(
                   availableCameras.map(id => [id, newVisibility])
                 ) as Record<BackendCameraId, boolean>;
-                
+
                 setMapVisibility(newState);
                 availableCameras.forEach(id => onMappingToggle?.(id, newVisibility));
               }}
-              className={`px-3 py-1 text-xs rounded transition-colors ${
-                anyMapsVisible
-                  ? 'bg-blue-500 text-white hover:bg-blue-600'
-                  : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
-              }`}
+              className={`px-3 py-1 text-xs rounded transition-colors ${anyMapsVisible
+                ? 'bg-blue-500 text-white hover:bg-blue-600'
+                : 'bg-gray-600 text-gray-300 hover:bg-gray-500'
+                }`}
             >
               {allMapsVisible ? 'Hide All Maps' : 'Show All Maps'}
             </button>
           </div>
         </div>
-        
+
         {anyMapsVisible && (
           <div className="mt-2 text-xs text-gray-400">
             Real-time person positions with 3-frame movement trails
@@ -220,7 +219,7 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
     <div className={`camera-grid-with-mapping ${className}`}>
       {/* Mapping Controls */}
       {renderMappingControls()}
-      
+
       {/* Original Camera Grid */}
       <CameraGrid
         environment={environment}
@@ -239,22 +238,21 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
         isTablet={actualIsTablet}
         className="mb-4"
       />
-      
+
       {/* Mapping Section */}
       {showMaps && hasMappingData && (
         <div className="mapping-section">
-          <div className={`grid gap-4 ${
-            actualIsMobile 
-              ? 'grid-cols-1' 
-              : actualIsTablet 
-                ? 'grid-cols-2' 
-                : 'grid-cols-2'
-          }`}>
+          <div className={`grid gap-4 ${actualIsMobile
+            ? 'grid-cols-1'
+            : actualIsTablet
+              ? 'grid-cols-2'
+              : 'grid-cols-2'
+            }`}>
             {availableCameras.map((cameraId) => {
               const data = cameraData[cameraId];
               const mappingCoordinates = mappingByCamera[cameraId] || [];
               const isMapVisible = mapVisibility[cameraId];
-              
+
               if (!data || !isMapVisible || mappingCoordinates.length === 0) {
                 return null;
               }
@@ -274,7 +272,7 @@ const CameraGridWithMapping: React.FC<CameraGridWithMappingProps> = ({
           </div>
         </div>
       )}
-      
+
       {/* No mapping data message */}
       {showMaps && !hasMappingData && (
         <div className="no-mapping-data bg-gray-800 rounded-lg p-4 text-center">

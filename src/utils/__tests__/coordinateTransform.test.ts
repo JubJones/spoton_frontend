@@ -1,7 +1,7 @@
 // Coordinate Transform Utilities Tests
 // src/utils/__tests__/coordinateTransform.test.ts
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
 import {
   transformImageCoordinates,
   transformBoundingBox,
@@ -356,7 +356,7 @@ describe('Coordinate Transform Utilities', () => {
 
       const mockEvent = {
         touches: [{ clientX: 150, clientY: 100 }],
-      } as TouchEvent;
+      } as unknown as TouchEvent;
 
       const position = getRelativePosition(mockEvent, mockElement);
       expect(position).toEqual({ x: 50, y: 50 });

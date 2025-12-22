@@ -21,7 +21,7 @@ interface ErrorFallbackProps {
   resetErrorBoundary?: () => void;
 }
 
-const DefaultErrorFallback: React.FC<ErrorFallbackProps> = ({
+export const ErrorFallback: React.FC<ErrorFallbackProps> = ({
   error,
   retry,
   resetErrorBoundary,
@@ -129,7 +129,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 
   render() {
     const { hasError, error } = this.state;
-    const { children, fallback: Fallback = DefaultErrorFallback } = this.props;
+    const { children, fallback: Fallback = ErrorFallback } = this.props;
 
     if (hasError) {
       return (

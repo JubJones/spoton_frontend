@@ -10,9 +10,12 @@ import {
   TrackedPersonDisplay,
   PersonTrajectoryData,
   BackendCameraId,
-  WebSocketTrackingMessagePayload,
 } from '../types/ui';
-import { EnvironmentId, WebSocketConnectionState } from '../types/api';
+import {
+  EnvironmentId,
+  WebSocketConnectionState,
+  WebSocketTrackingMessagePayload
+} from '../types/api';
 import { trajectoryProcessor, trackingDataUtils } from '../utils/trackingDataProcessor';
 import { WebSocketService, createTrackingWebSocket } from '../services/websocketService';
 import {
@@ -29,13 +32,30 @@ import { performanceMonitoringService } from '../services/performanceMonitoringS
 // Tracking Store Interface
 // ============================================================================
 
-interface TrackingStoreState extends TrackingState {
+interface TrackingStoreState extends Omit<TrackingState, 'selectedPersons'> {
+  // Overrides and Additions
+  cameras: Partial<Record<BackendCameraId, CameraTrackingDisplayData>>;
+  selectedPersonId?: string; // Simplify to single selection for now, or match Set if intended
+  highlightedPersonId?: string;
+
+  // Statistics
+  totalDetections: number;
+  uniquePersonCount: number;
+  averageConfidence: number;
+
+  // Display state
+  isTrackingActive: boolean;
+  lastUpdateTimestamp?: string;
+
   // WebSocket connection
   wsService?: WebSocketService;
   wsConnectionState: WebSocketConnectionState;
 
   // Display configuration
   displaySizes: Record<BackendCameraId, { width: number; height: number }>;
+  confidenceThreshold: number;
+  showPersonIds: boolean;
+  showTrajectories: boolean;
 
   // Actions
   actions: {
@@ -47,9 +67,9 @@ interface TrackingStoreState extends TrackingState {
     updateTrackingData: (payload: WebSocketTrackingMessagePayload) => void;
     processTrackingUpdate: (payload: WebSocketTrackingMessagePayload) => void;
     clearTrackingData: () => void;
-    
+
     // WebSocket state management
-    setWebSocketState: (state: Partial<{ 
+    setWebSocketState: (state: Partial<{
       isConnected: boolean;
       lastConnectedAt?: string;
       lastDisconnectedAt?: string;
@@ -114,6 +134,12 @@ const initialState: Omit<TrackingStoreState, 'actions'> = {
   // Display state
   isTrackingActive: false,
   lastUpdateTimestamp: undefined,
+  currentFrameIndex: 0,
+  totalFrames: 0,
+  isPlaying: true,
+  playbackSpeed: 1,
+  fps: 0,
+  latency: 0,
 
   // WebSocket state
   wsConnectionState: 'disconnected' as WebSocketConnectionState,
@@ -203,7 +229,7 @@ export const useTrackingStore = create<TrackingStoreState>()(
               {
                 wsService,
                 isTrackingActive: true,
-                wsConnectionState: connectionInfo.state,
+                wsConnectionState: connectionInfo.state as any,
               },
               false,
               'connectWebSocket'
@@ -231,7 +257,7 @@ export const useTrackingStore = create<TrackingStoreState>()(
             const cachedData = await dataCacheService.get('last-tracking-data');
             if (cachedData) {
               console.log('Using cached tracking data due to connection failure');
-              get().actions.updateTrackingData(cachedData);
+              get().actions.updateTrackingData(cachedData as any);
             }
 
             throw error;
@@ -243,9 +269,9 @@ export const useTrackingStore = create<TrackingStoreState>()(
 
           // Disconnect from WebSocket manager
           const cachedConnection = await dataCacheService.get('tracking-connection');
-          if (cachedConnection && cachedConnection.taskId) {
+          if (cachedConnection && (cachedConnection as any).taskId) {
             try {
-              await webSocketManagerService.closeConnection(`tracking-${cachedConnection.taskId}`);
+              await webSocketManagerService.closeConnection(`tracking-${(cachedConnection as any).taskId}`);
             } catch (error) {
               console.warn('Failed to close WebSocket connection:', error);
             }
@@ -307,12 +333,12 @@ export const useTrackingStore = create<TrackingStoreState>()(
                 const validatedPayload = validationResult.result.sanitized || payload;
 
                 // Monitor frame data validation performance
-                if (validatedPayload.frame_data) {
+                if (validatedPayload.cameras) {
                   await performanceMonitoringService.timeFunction(
                     'user-interaction',
                     'validate-frame-data',
                     async () => {
-                      Object.entries(validatedPayload.frame_data).forEach(
+                      Object.entries(validatedPayload.cameras).forEach(
                         ([cameraId, frameData]) => {
                           // Validate camera ID
                           const cameraIdValidation =
@@ -323,8 +349,9 @@ export const useTrackingStore = create<TrackingStoreState>()(
                           }
 
                           // Validate each track in frame data
-                          if (frameData.tracks && Array.isArray(frameData.tracks)) {
-                            frameData.tracks = frameData.tracks.filter((track: any) => {
+                          const frameDataAny = frameData as any;
+                          if (frameDataAny.tracks && Array.isArray(frameDataAny.tracks)) {
+                            frameDataAny.tracks = frameDataAny.tracks.filter((track: any) => {
                               const trackValidation =
                                 dataValidationService.validatePersonTrack(track);
                               if (!trackValidation.isValid) {
@@ -340,7 +367,7 @@ export const useTrackingStore = create<TrackingStoreState>()(
                         }
                       );
                     },
-                    { frameCount: Object.keys(validatedPayload.frame_data).length }
+                    { frameCount: Object.keys(validatedPayload.cameras).length }
                   );
                 }
 
@@ -356,8 +383,8 @@ export const useTrackingStore = create<TrackingStoreState>()(
                       displayScaling: true,
                     }),
                   {
-                    frameCount: validatedPayload.frame_data
-                      ? Object.keys(validatedPayload.frame_data).length
+                    frameCount: validatedPayload.cameras
+                      ? Object.keys(validatedPayload.cameras).length
                       : 0,
                     displaySizes: Object.keys(state.displaySizes).length,
                   }
@@ -366,27 +393,29 @@ export const useTrackingStore = create<TrackingStoreState>()(
                 const result = processingResult.result;
 
                 // Monitor frame caching performance
-                if (validatedPayload.frame_data) {
+                if (validatedPayload.cameras) {
                   await performanceMonitoringService.timeFunction(
                     'cache',
                     'cache-frame-data',
                     async () => {
                       await Promise.all(
-                        Object.entries(validatedPayload.frame_data).map(
+                        Object.entries(validatedPayload.cameras).map(
                           async ([cameraId, frameData]) => {
-                            if (frameData.image_url) {
-                              // Sanitize image URL
-                              const sanitizedUrl = dataValidationService.sanitizeUserInput(
-                                frameData.image_url
-                              );
+                            // Type assertion for frameData
+                            const frameDataAny = frameData as any;
+                            if (frameDataAny.frame_image_base64) {
+                              // Sanitize image Data
+                              // Use validation service if needed, but for base64 it's usually valid
 
-                              // Cache frame image URL with validation
+                              // Cache frame image data with validation
                               await frameCacheService.set(
                                 `frame-${cameraId}-${validatedPayload.timestamp_processed_utc}`,
                                 {
-                                  url: sanitizedUrl,
+                                  url: frameDataAny.frame_image_base64, // Assuming cache handles it
+                                  width: 1920,
+                                  height: 1080,
                                   timestamp: validatedPayload.timestamp_processed_utc,
-                                  tracks: frameData.tracks || [],
+                                  tracks: frameDataAny.tracks || [],
                                   cameraId: cameraId,
                                 },
                                 {
@@ -400,7 +429,7 @@ export const useTrackingStore = create<TrackingStoreState>()(
                         )
                       );
                     },
-                    { frameCount: Object.keys(validatedPayload.frame_data).length }
+                    { frameCount: Object.keys(validatedPayload.cameras).length }
                   );
                 }
 
@@ -539,7 +568,7 @@ export const useTrackingStore = create<TrackingStoreState>()(
             },
             {
               payloadSize: JSON.stringify(payload).length,
-              frameDataKeys: payload.frame_data ? Object.keys(payload.frame_data).length : 0,
+              frameDataKeys: payload.cameras ? Object.keys(payload.cameras).length : 0,
             }
           );
         },
@@ -666,11 +695,11 @@ export const useTrackingStore = create<TrackingStoreState>()(
         processTrackingUpdate: (payload: WebSocketTrackingMessagePayload) => {
           // Enhanced version of updateTrackingData with additional processing
           const startTime = Date.now();
-          
+
           try {
             // Call existing updateTrackingData method
             get().actions.updateTrackingData(payload);
-            
+
             // Additional processing for Phase 11 integration
             set(
               (state) => ({
@@ -747,15 +776,15 @@ export const useTrackingStore = create<TrackingStoreState>()(
           set(
             (state) => {
               if (!cameraIds.length) {
-                return {};
+                return { cameras: state.cameras };
               }
 
               let hasChanges = false;
 
-              const updatedCameras = { ...state.cameras } as Record<
+              const updatedCameras = { ...state.cameras } as Partial<Record<
                 BackendCameraId,
                 CameraTrackingDisplayData
-              >;
+              >>;
               const updatedDisplaySizes = { ...state.displaySizes };
 
               cameraIds.forEach((cameraId) => {
@@ -844,12 +873,12 @@ export const useTrackingStore = create<TrackingStoreState>()(
 
         getPersonStatistics: () => {
           const state = get();
-          return trackingDataUtils.analyze.statistics(state.cameras);
+          return trackingDataUtils.analyze.statistics(state.cameras as Record<BackendCameraId, CameraTrackingDisplayData>);
         },
 
         findPersonAcrossCameras: (globalPersonId: string) => {
           const state = get();
-          return trackingDataUtils.analyze.findPerson(globalPersonId, state.cameras);
+          return trackingDataUtils.analyze.findPerson(globalPersonId, state.cameras as Record<BackendCameraId, CameraTrackingDisplayData>);
         },
 
         // ================================================================
@@ -987,7 +1016,7 @@ export const useWebSocketState = () =>
     connectionState: state.wsConnectionState,
     isConnected: state.wsConnectionState === 'connected',
     service: state.wsService,
-  }), shallow);
+  }));
 
 /**
  * Get camera tracking data
@@ -1009,7 +1038,7 @@ export const usePersonTracking = () =>
     focusedPersonId: state.focusedPersonId,
     highlightedPersonId: state.highlightedPersonId,
     trajectories: state.personTrajectories,
-  }), shallow);
+  }));
 
 /**
  * Get tracking statistics
@@ -1021,7 +1050,7 @@ export const useTrackingStatistics = () =>
     averageConfidence: state.averageConfidence,
     lastUpdateTimestamp: state.lastUpdateTimestamp,
     isTrackingActive: state.isTrackingActive,
-  }), shallow);
+  }));
 
 /**
  * Get display configuration
@@ -1032,7 +1061,7 @@ export const useDisplayConfig = () =>
     showPersonIds: state.showPersonIds,
     showTrajectories: state.showTrajectories,
     displaySizes: state.displaySizes,
-  }), shallow);
+  }));
 
 // ============================================================================
 // Utility Functions
@@ -1126,11 +1155,16 @@ export async function initializeTrackingStore() {
     const cachedTrackingData = await dataCacheService.get('last-tracking-data');
     if (cachedTrackingData) {
       console.log('Restoring cached tracking data');
-      await useTrackingStore.getState().actions.updateTrackingData(cachedTrackingData);
+      await useTrackingStore.getState().actions.updateTrackingData(cachedTrackingData as any);
     }
 
     // Try to restore display preferences
-    const cachedDisplayConfig = await dataCacheService.get('display-config');
+    const cachedDisplayConfig = await dataCacheService.get<{
+      confidenceThreshold?: number;
+      showPersonIds?: boolean;
+      showTrajectories?: boolean;
+    }>('display-config');
+
     if (cachedDisplayConfig) {
       const { actions } = useTrackingStore.getState();
       if (cachedDisplayConfig.confidenceThreshold !== undefined) {

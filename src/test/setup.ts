@@ -1,6 +1,6 @@
 // Test setup file for Vitest + React Testing Library
 import '@testing-library/jest-dom';
-import { expect, afterEach, vi } from 'vitest';
+import { afterEach, beforeAll, afterAll, expect, vi } from 'vitest';
 import { cleanup } from '@testing-library/react';
 
 // Cleanup after each test case
@@ -38,13 +38,23 @@ global.IntersectionObserver = vi.fn().mockImplementation(() => ({
 }));
 
 // Mock WebSocket for testing
-global.WebSocket = vi.fn().mockImplementation(() => ({
+const MockWebSocket = vi.fn().mockImplementation(() => ({
   close: vi.fn(),
   send: vi.fn(),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
-  readyState: WebSocket.CONNECTING,
+  readyState: 0, // CONNECTING
 }));
+
+// Add static constants to the mock
+Object.assign(MockWebSocket, {
+  CONNECTING: 0,
+  OPEN: 1,
+  CLOSING: 2,
+  CLOSED: 3,
+});
+
+global.WebSocket = MockWebSocket as any;
 
 // Mock URL.createObjectURL for image testing
 global.URL.createObjectURL = vi.fn().mockReturnValue('mock-object-url');

@@ -3,7 +3,7 @@
 
 import { create } from 'zustand';
 import { devtools, persist } from 'zustand/middleware';
-import { shallow } from 'zustand/shallow';
+
 import { AppState, EnvironmentId, TaskStatus, SystemHealthResponse, API_ENDPOINTS } from '../types/api';
 import { apiService } from '../services/apiService';
 import { statePersistenceService } from '../services/statePersistenceService';
@@ -360,7 +360,7 @@ export const useSystemStore = create<SystemState>()(
                   API_ENDPOINTS.TASK_STATUS(sanitizedTaskId),
                   {},
                   {
-                    method: 'GET',
+                    method: 'GET' as any,
                     priority: 2,
                     maxRetries: 5,
                   }
@@ -453,7 +453,7 @@ export const useSystemStore = create<SystemState>()(
                   const cachedHealthResult = await performanceMonitoringService.timeFunction(
                     'cache',
                     'cache-health-read',
-                    () => dataCacheService.get('system-health')
+                    () => dataCacheService.get('system-health') as Promise<SystemHealthResponse | undefined>
                   );
 
                   let errorHealth = cachedHealthResult.result;
@@ -493,7 +493,7 @@ export const useSystemStore = create<SystemState>()(
                           '/health',
                           {},
                           {
-                            method: 'GET',
+                            method: 'GET' as any,
                             priority: 1, // Low priority for health checks
                             maxRetries: 3,
                           }
@@ -596,16 +596,16 @@ export const useSystemStore = create<SystemState>()(
         // Merge persisted state with initial state
         merge: (persistedState, currentState) => ({
           ...currentState,
-          ...persistedState,
+          ...(persistedState as object),
         }),
         version: 2,
         // Custom storage implementation using our enhanced service
         storage: {
-          getItem: async (name: string): Promise<string | null> => {
+          getItem: async (name: string): Promise<any> => {
             try {
               const data = await statePersistenceService.loadState(name);
               if (!data) return null;
-              
+
               // Ensure we return a proper JSON string, avoiding circular references
               return JSON.stringify(data, (key, value) => {
                 // Skip functions, undefined values, and circular references
@@ -623,7 +623,7 @@ export const useSystemStore = create<SystemState>()(
               return null;
             }
           },
-          setItem: async (name: string, value: string): Promise<void> => {
+          setItem: async (name: string, value: any): Promise<void> => {
             try {
               // Value should already be a JSON string from Zustand persist
               let parsedValue;
@@ -634,7 +634,7 @@ export const useSystemStore = create<SystemState>()(
                 console.warn('Skipping persistence for invalid JSON:', typeof value === 'string' ? value.substring(0, 100) + '...' : value);
                 return;
               }
-              
+
               return await statePersistenceService.saveState(name, parsedValue, {
                 version: 2,
                 compression: true,
@@ -697,7 +697,6 @@ export const useTaskInfo = () => {
       taskProgress: state.taskProgress,
       taskError: state.taskError,
     }),
-    shallow // Use Zustand's built-in shallow comparison
   );
 };
 
@@ -716,7 +715,7 @@ export const useSystemHealth = () =>
   useSystemStore((state) => ({
     health: state.systemHealth,
     lastCheck: state.lastHealthCheck,
-  }), shallow);
+  }));
 
 /**
  * Get UI state
@@ -726,7 +725,7 @@ export const useUIState = () =>
     isLoading: state.isLoading,
     error: state.error,
     connectionStatus: state.connectionStatus,
-  }), shallow);
+  }));
 
 /**
  * Get date/time range
@@ -810,14 +809,15 @@ export async function initializeSystemStore() {
     // Try to restore cached environment
     const cachedEnvironment = await dataCacheService.get('current-environment');
     if (cachedEnvironment && !useSystemStore.getState().currentEnvironment) {
-      actions.setEnvironment(cachedEnvironment);
+      actions.setEnvironment(cachedEnvironment as EnvironmentId);
     }
 
     // Try to restore active task data
     const cachedTask = await dataCacheService.get('active-task');
-    if (cachedTask && cachedTask.taskId) {
-      // Resume task monitoring if task is still active
-      actions.updateTaskStatus(cachedTask.taskId);
+    const cachedTaskAny = cachedTask as any;
+    if (cachedTaskAny && cachedTaskAny.taskId) {
+      // Don't auto-set taskId on load, just update status
+      actions.updateTaskStatus(cachedTaskAny.taskId);
     }
   } catch (error) {
     console.warn('Failed to restore cached system state:', error);

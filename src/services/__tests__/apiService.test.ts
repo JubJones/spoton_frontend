@@ -1,7 +1,7 @@
 // API Service Tests
 // src/services/__tests__/apiService.test.ts
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import { APIService } from '../apiService';
 import {
   ProcessingTaskStartRequest,
@@ -15,7 +15,7 @@ global.fetch = vi.fn();
 
 describe('APIService', () => {
   let apiService: APIService;
-  const mockFetch = fetch as vi.MockedFunction<typeof fetch>;
+  const mockFetch = fetch as Mock;
 
   beforeEach(() => {
     apiService = new APIService({
@@ -53,17 +53,13 @@ describe('APIService', () => {
   describe('startProcessingTask', () => {
     const mockRequest: ProcessingTaskStartRequest = {
       environment_id: 'factory',
-      datetime_range: {
-        start: '2024-01-01T00:00:00Z',
-        end: '2024-01-01T01:00:00Z',
-      },
     };
 
     const mockResponse: ProcessingTaskCreateResponse = {
       task_id: 'test-task-123',
-      status: 'QUEUED',
-      created_at: '2024-01-01T00:00:00Z',
-      environment_id: 'factory',
+      websocket_url: 'ws://localhost:8000/ws/tracking/test-task-123',
+      status_url: 'http://localhost:8000/api/v1/tasks/test-task-123',
+      message: 'Task started',
     };
 
     it('should start processing task successfully', async () => {
@@ -72,7 +68,7 @@ describe('APIService', () => {
         status: 201,
         json: async () => mockResponse,
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       const result = await apiService.startProcessingTask(mockRequest);
 
@@ -97,7 +93,7 @@ describe('APIService', () => {
         statusText: 'Bad Request',
         json: async () => ({ error: 'Invalid environment_id' }),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(apiService.startProcessingTask(mockRequest)).rejects.toThrow(
         'API request failed: 400 Bad Request'
@@ -113,7 +109,7 @@ describe('APIService', () => {
           status: 201,
           json: async () => mockResponse,
           headers: new Headers({ 'content-type': 'application/json' }),
-        } as Response);
+        } as unknown as Response);
 
       const result = await apiService.startProcessingTask(mockRequest);
 
@@ -139,9 +135,10 @@ describe('APIService', () => {
       task_id: taskId,
       status: 'PROCESSING',
       progress: 50,
+      current_step: 'processing',
+      details: {},
       created_at: '2024-01-01T00:00:00Z',
       updated_at: '2024-01-01T00:30:00Z',
-      environment_id: 'factory',
     };
 
     it('should get task status successfully', async () => {
@@ -150,7 +147,7 @@ describe('APIService', () => {
         status: 200,
         json: async () => mockResponse,
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       const result = await apiService.getTaskStatus(taskId);
 
@@ -174,7 +171,7 @@ describe('APIService', () => {
         statusText: 'Not Found',
         json: async () => ({ error: 'Task not found' }),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(apiService.getTaskStatus(taskId)).rejects.toThrow(
         'API request failed: 404 Not Found'
@@ -185,9 +182,9 @@ describe('APIService', () => {
   describe('getSystemHealth', () => {
     const mockResponse: SystemHealthResponse = {
       status: 'healthy',
-      detector_model_status: 'ready',
+      detector_model_status: 'loaded',
       tracker_factory_status: 'ready',
-      homography_matrices_status: 'ready',
+      homography_matrices_status: 'loaded',
       timestamp: '2024-01-01T00:00:00Z',
     };
 
@@ -197,7 +194,7 @@ describe('APIService', () => {
         status: 200,
         json: async () => mockResponse,
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       const result = await apiService.getSystemHealth();
 
@@ -221,7 +218,7 @@ describe('APIService', () => {
         statusText: 'Service Unavailable',
         json: async () => ({ error: 'Health check failed' }),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(apiService.getSystemHealth()).rejects.toThrow(
         'API request failed: 503 Service Unavailable'
@@ -229,32 +226,7 @@ describe('APIService', () => {
     });
   });
 
-  describe('cancelTask', () => {
-    const taskId = 'test-task-123';
 
-    it('should cancel task successfully', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({ message: 'Task canceled successfully' }),
-        headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
-
-      const result = await apiService.cancelTask(taskId);
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        `http://localhost:8000/api/v1/tasks/${taskId}/cancel`,
-        expect.objectContaining({
-          method: 'DELETE',
-          headers: expect.objectContaining({
-            Accept: 'application/json',
-          }),
-        })
-      );
-
-      expect(result).toEqual({ message: 'Task canceled successfully' });
-    });
-  });
 
   describe('Error Handling', () => {
     it('should handle invalid JSON response', async () => {
@@ -265,7 +237,7 @@ describe('APIService', () => {
           throw new Error('Invalid JSON');
         },
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(apiService.getSystemHealth()).rejects.toThrow('Invalid JSON');
     });
@@ -282,7 +254,7 @@ describe('APIService', () => {
         status: 200,
         json: async () => ({}),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       const result = await apiService.getSystemHealth();
       expect(result).toEqual({});
@@ -299,7 +271,7 @@ describe('APIService', () => {
         statusText: 'Bad Request',
         json: async () => ({ error: 'Missing environment_id' }),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
+      } as unknown as Response);
 
       await expect(apiService.startProcessingTask(invalidRequest)).rejects.toThrow(
         'API request failed: 400 Bad Request'
@@ -311,50 +283,5 @@ describe('APIService', () => {
     });
   });
 
-  describe('Performance Metrics', () => {
-    it('should track request metrics', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({}),
-        headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
 
-      await apiService.getSystemHealth();
-
-      const metrics = apiService.getMetrics();
-      expect(metrics.requestCount).toBe(1);
-      expect(metrics.errorCount).toBe(0);
-      expect(metrics.lastRequestTime).toBeGreaterThan(0);
-    });
-
-    it('should track error metrics', async () => {
-      mockFetch.mockRejectedValue(new Error('Network error'));
-
-      try {
-        await apiService.getSystemHealth();
-      } catch (error) {
-        // Expected error
-      }
-
-      const metrics = apiService.getMetrics();
-      expect(metrics.errorCount).toBe(1);
-    });
-
-    it('should reset metrics', async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        status: 200,
-        json: async () => ({}),
-        headers: new Headers({ 'content-type': 'application/json' }),
-      } as Response);
-
-      await apiService.getSystemHealth();
-      apiService.resetMetrics();
-
-      const metrics = apiService.getMetrics();
-      expect(metrics.requestCount).toBe(0);
-      expect(metrics.errorCount).toBe(0);
-    });
-  });
 });

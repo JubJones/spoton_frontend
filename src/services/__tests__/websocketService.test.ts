@@ -175,6 +175,8 @@ describe('WebSocketService', () => {
           scene_id: 'factory',
           timestamp_processed_utc: '2024-01-01T00:00:00Z',
           cameras: {},
+          person_count_per_camera: {},
+          focus_person_id: null,
         } as WebSocketTrackingMessagePayload,
       };
 
@@ -197,6 +199,8 @@ describe('WebSocketService', () => {
             tracks: [],
           },
         },
+        person_count_per_camera: {},
+        focus_person_id: null,
       };
 
       const message: WebSocketMessage = {
@@ -220,7 +224,7 @@ describe('WebSocketService', () => {
     });
 
     it('should handle invalid JSON gracefully', () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
       const messageHandler = vi.fn();
       wsService.addEventListener('message-received', messageHandler);
 
@@ -236,7 +240,7 @@ describe('WebSocketService', () => {
     });
 
     it('should validate message types', () => {
-      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      const consoleWarn = vi.spyOn(console, 'warn').mockImplementation(() => { });
       const messageHandler = vi.fn();
       wsService.addEventListener('message-received', messageHandler);
 
@@ -310,7 +314,7 @@ describe('WebSocketService', () => {
     });
 
     it('should handle send errors gracefully', () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
       const sendSpy = vi.spyOn(mockWs, 'send').mockImplementation(() => {
         throw new Error('Send failed');
       });
@@ -373,9 +377,16 @@ describe('WebSocketService', () => {
       wsService.addEventListener('connection-state-changed', errorHandler);
 
       // Mock failed connections
-      global.WebSocket = vi.fn().mockImplementation(() => {
+      const mockConnect = vi.fn().mockImplementation(() => {
         throw new Error('Connection failed');
       });
+      Object.assign(mockConnect, {
+        CONNECTING: 0,
+        OPEN: 1,
+        CLOSING: 2,
+        CLOSED: 3,
+      });
+      global.WebSocket = mockConnect as any;
 
       // Simulate unexpected close to trigger reconnection
       mockWs.simulateClose(1006, 'Connection lost');
@@ -403,9 +414,16 @@ describe('WebSocketService', () => {
       const mockWsShort = (wsServiceWithShortDelay as any).ws;
 
       // Mock failed connections for reconnection attempts
-      global.WebSocket = vi.fn().mockImplementation(() => {
+      const mockConnect = vi.fn().mockImplementation(() => {
         throw new Error('Connection failed');
       });
+      Object.assign(mockConnect, {
+        CONNECTING: 0,
+        OPEN: 1,
+        CLOSING: 2,
+        CLOSED: 3,
+      });
+      global.WebSocket = mockConnect as any;
 
       const reconnectHandler = vi.fn();
       wsServiceWithShortDelay.addEventListener('reconnect-attempt', reconnectHandler);
@@ -461,9 +479,16 @@ describe('WebSocketService', () => {
 
   describe('Error Handling', () => {
     it('should handle WebSocket construction errors', async () => {
-      global.WebSocket = vi.fn().mockImplementation(() => {
+      const mockConnect = vi.fn().mockImplementation(() => {
         throw new Error('WebSocket construction failed');
       });
+      Object.assign(mockConnect, {
+        CONNECTING: 0,
+        OPEN: 1,
+        CLOSING: 2,
+        CLOSED: 3,
+      });
+      global.WebSocket = mockConnect as any;
 
       await expect(wsService.connect('/tracking/test-task')).rejects.toThrow(
         'WebSocket construction failed'
@@ -522,7 +547,7 @@ describe('WebSocketService', () => {
     });
 
     it('should handle errors in event listeners', async () => {
-      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => { });
       const faultyHandler = vi.fn().mockImplementation(() => {
         throw new Error('Handler error');
       });

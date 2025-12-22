@@ -121,7 +121,7 @@ class PerformanceOptimizationService {
     try {
       this.performanceObserver = new PerformanceObserver((list) => {
         const entries = list.getEntries();
-        
+
         entries.forEach((entry) => {
           if (entry.entryType === 'navigation') {
             const navEntry = entry as PerformanceNavigationTiming;
@@ -159,7 +159,7 @@ class PerformanceOptimizationService {
   private startMemoryMonitoring(): void {
     setInterval(() => {
       this.updateMemoryMetrics();
-      
+
       if (this.metrics.memoryUsage.percentage > this.config.memoryThreshold) {
         console.warn(`🚨 High memory usage: ${this.metrics.memoryUsage.percentage.toFixed(1)}%`);
         this.performMemoryCleanup();
@@ -184,8 +184,8 @@ class PerformanceOptimizationService {
         used: memInfo.usedJSHeapSize || 0,
         total: memInfo.totalJSHeapSize || 0,
         jsHeapSizeLimit: memInfo.jsHeapSizeLimit || 0,
-        percentage: memInfo.totalJSHeapSize > 0 
-          ? (memInfo.usedJSHeapSize / memInfo.totalJSHeapSize) * 100 
+        percentage: memInfo.totalJSHeapSize > 0
+          ? (memInfo.usedJSHeapSize / memInfo.totalJSHeapSize) * 100
           : 0,
       };
     } else {
@@ -204,7 +204,7 @@ class PerformanceOptimizationService {
     // Rough estimation based on cache size and DOM nodes
     const cacheSize = Array.from(this.memoryCache.values())
       .reduce((total, item) => total + item.size, 0);
-    
+
     const domNodes = document.querySelectorAll('*').length;
     const estimatedDomSize = domNodes * 100; // Rough estimate: 100 bytes per DOM node
 
@@ -244,7 +244,7 @@ class PerformanceOptimizationService {
     }
 
     const jsonString = JSON.stringify(data);
-    
+
     // Only compress if data is larger than threshold
     if (jsonString.length < this.config.compressionThreshold) {
       return jsonString;
@@ -252,10 +252,10 @@ class PerformanceOptimizationService {
 
     try {
       // Use CompressionStream if available (modern browsers)
-      if (typeof CompressionStream !== 'undefined') {
-        return this.compressWithStream(jsonString);
-      }
-      
+      /* if (typeof CompressionStream !== 'undefined') {
+        // return this.compressWithStream(jsonString); // Async not supported in sync method
+      } */
+
       // Fallback: Simple string compression
       return this.compressString(jsonString);
     } catch (error) {
@@ -369,7 +369,7 @@ class PerformanceOptimizationService {
 
   public getCachedData(key: string): any | null {
     const cached = this.memoryCache.get(key);
-    
+
     if (!cached) {
       this.metrics.cacheMetrics.operations++;
       return null;
@@ -377,13 +377,13 @@ class PerformanceOptimizationService {
 
     // Update timestamp for LRU
     cached.timestamp = Date.now();
-    
+
     this.metrics.cacheMetrics.operations++;
     this.updateCacheMetrics();
 
     // Decompress if needed
-    if (this.config.enableDataCompression && 
-        (typeof cached.data === 'string' || cached.data instanceof ArrayBuffer)) {
+    if (this.config.enableDataCompression &&
+      (typeof cached.data === 'string' || cached.data instanceof ArrayBuffer)) {
       try {
         return this.decompressData(cached.data);
       } catch (error) {
@@ -397,7 +397,7 @@ class PerformanceOptimizationService {
   private evictLeastRecentlyUsed(): void {
     const entries = Array.from(this.memoryCache.entries());
     const sorted = entries.sort(([, a], [, b]) => a.timestamp - b.timestamp);
-    
+
     // Remove oldest 25% of entries
     const toRemove = Math.floor(sorted.length * 0.25);
     for (let i = 0; i < toRemove; i++) {
@@ -430,7 +430,7 @@ class PerformanceOptimizationService {
     if (data instanceof ArrayBuffer) {
       return data.byteLength;
     }
-    
+
     const jsonString = typeof data === 'string' ? data : JSON.stringify(data);
     return new Blob([jsonString]).size;
   }
@@ -438,7 +438,7 @@ class PerformanceOptimizationService {
   private updateCacheMetrics(): void {
     const total = this.metrics.cacheMetrics.operations;
     const hits = total > 0 ? this.memoryCache.size : 0;
-    
+
     this.metrics.cacheMetrics = {
       ...this.metrics.cacheMetrics,
       hitRate: total > 0 ? (hits / total) * 100 : 0,
@@ -467,7 +467,7 @@ class PerformanceOptimizationService {
       try {
         performance.mark(`${name}-end`);
         performance.measure(name, `${name}-start`, `${name}-end`);
-        
+
         const entries = performance.getEntriesByName(name);
         return entries.length > 0 ? entries[entries.length - 1].duration : 0;
       } catch (error) {
@@ -511,7 +511,7 @@ class PerformanceOptimizationService {
 
     return async (): Promise<T> => {
       const now = Date.now();
-      
+
       // Return cached if still valid
       if (cached && (now - lastLoaded) < ttl) {
         return cached;
@@ -574,7 +574,7 @@ export const performanceOptimizationService = new PerformanceOptimizationService
  */
 export function withPerformanceOptimization<T extends React.ComponentType<any>>(
   Component: T,
-  options: { 
+  options: {
     enableLazyLoading?: boolean;
     cacheProps?: boolean;
     measureRender?: boolean;
@@ -582,19 +582,19 @@ export function withPerformanceOptimization<T extends React.ComponentType<any>>(
 ): T {
   return React.memo(React.forwardRef<any, React.ComponentProps<T>>((props, ref) => {
     const measureName = `${Component.name || 'Component'}-render`;
-    
+
     React.useEffect(() => {
       if (options.measureRender) {
         performanceOptimizationService.startPerformanceMeasure(measureName);
-        
+
         return () => {
           performanceOptimizationService.endPerformanceMeasure(measureName);
         };
       }
     });
 
-    return React.createElement(Component, { ...props, ref });
-  })) as T;
+    return React.createElement(Component, { ...props, ref } as any);
+  })) as unknown as T;
 }
 
 /**

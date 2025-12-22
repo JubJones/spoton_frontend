@@ -133,7 +133,7 @@ export class WebSocketService {
    */
   private async connectMock(endpoint: string): Promise<void> {
     console.log('🎭 Using mock WebSocket service for endpoint:', endpoint);
-    
+
     // Extract task ID from endpoint for mock service
     const taskIdMatch = endpoint.match(/\/ws\/tracking\/(.+)$/);
     const taskId = taskIdMatch ? taskIdMatch[1] : 'mock-task';
@@ -154,7 +154,7 @@ export class WebSocketService {
 
     this.setConnectionState(WebSocketConnectionState.CONNECTED);
     this.startHeartbeat();
-    
+
     console.log('🎭 Mock WebSocket connected successfully');
   }
 
@@ -328,7 +328,7 @@ export class WebSocketService {
 
       case 'tracking_update':
         this.emit('tracking-update', message.payload as WebSocketTrackingMessagePayload);
-        
+
         // Also emit mapping data if present (for 2D mapping feature)
         const trackingPayload = message.payload as any;
         if (trackingPayload.future_pipeline_data?.mapping_coordinates) {
@@ -350,11 +350,11 @@ export class WebSocketService {
         break;
 
       case 'system_status':
-        this.emit('system-status', message.payload);
+        this.emit('system-status' as any, message.payload);
         break;
 
       case 'control_message':
-        this.emit('control-message', message.payload);
+        this.emit('control-message' as any, message.payload);
         break;
 
       default:
