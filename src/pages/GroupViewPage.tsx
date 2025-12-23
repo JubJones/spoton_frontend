@@ -1491,7 +1491,7 @@ const GroupViewPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-gray-200 p-4 sm:p-6">
+    <div className="flex flex-col min-h-screen text-gray-200 p-4 sm:p-6" style={{ backgroundColor: '#101827' }}>
       {/* Header Section (Keep as before) */}
       <header className="flex items-center justify-between mb-4 flex-shrink-0">
         <Link to="/" className="flex items-center text-lg hover:text-orange-400">
