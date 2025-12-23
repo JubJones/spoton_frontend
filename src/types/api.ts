@@ -430,9 +430,94 @@ export interface CameraLoads {
   cameras: Record<string, number>;
 }
 
+export interface AnalyticsEngineStats {
+  total_behavior_analyses: number;
+  total_path_predictions: number;
+  cached_behavior_profiles: number;
+  reports_generated: number;
+  total_queries_processed: number;
+  average_query_time_ms: number;
+  cache_hit_rate: number;
+  last_analysis_timestamp: string | null;
+  analytics_stats: {
+    total_analyses: number;
+    behavior_profiles_created: number;
+    anomalies_detected: number;
+    predictions_made: number;
+    reports_generated: number;
+  };
+  real_time_metrics_count: number;
+  prediction_models: string[];
+}
+
+export interface DatabaseServiceStats {
+  status: string;
+  redis_status: string;
+  postgres_status: string;
+  total_cached_persons: number;
+  total_active_sessions: number;
+  sync_operations: number;
+  sync_failures: number;
+  last_sync_time: string | null;
+  db_writes: number;
+  redis_writes: number;
+  integration_layer: {
+    total_operations: number;
+    successful_operations: number;
+    failed_operations: number;
+    cache_hits: number;
+    cache_misses: number;
+    success_rate: number;
+    cache_hit_rate: number;
+  };
+  integrated_service: {
+    cache_stats: {
+      cache_stats: {
+        hits: number;
+        misses: number;
+        writes: number;
+        deletes: number;
+        errors: number;
+      };
+      key_counts: {
+        person_state: number;
+        embedding: number;
+        session: number;
+        trajectory: number;
+      };
+      redis_info: {
+        used_memory: string;
+        connected_clients: number;
+        commands_processed: number;
+        keyspace_hits: number;
+        keyspace_misses: number;
+      };
+    };
+    sync_stats: {
+      redis_writes: number;
+      db_writes: number;
+      sync_operations: number;
+      sync_failures: number;
+      last_sync_time: string | null;
+    };
+    database_status: {
+      connected: boolean;
+      sync_enabled: boolean;
+      sync_interval: number;
+    };
+  };
+}
+
 export interface SystemStatistics {
-  total_processed: number;
-  uptime: number;
+  // Legacy fields for compatibility
+  total_processed?: number;
+  uptime?: number;
+  // New comprehensive fields
+  analytics_engine?: AnalyticsEngineStats;
+  database_service?: DatabaseServiceStats;
+  system_uptime?: string;
+  last_updated?: string;
+  _is_mock?: boolean;
 }
 
 export interface AnalyticsDashboardResponse {

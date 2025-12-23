@@ -183,9 +183,53 @@ const CameraStreamView: React.FC<{
   tracks: Track[];
   onTrackClick: (track: Track) => void;
   focusedPerson: FocusedPersonState | null;
-}> = ({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson }) => {
+  onFrameCapture?: (cameraId: string, frameBase64: string) => void;
+}> = ({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement>(null);
+  const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+
+  // Frame capture effect - captures from img every 500ms
+  useEffect(() => {
+    if (!isStreaming || !taskId || !onFrameCapture) return;
+
+    const captureFrame = () => {
+      const img = imgRef.current;
+      const captureCanvas = captureCanvasRef.current;
+      if (!img || !captureCanvas || img.naturalWidth === 0) return;
+
+      const ctx = captureCanvas.getContext('2d');
+      if (!ctx) return;
+
+      // Set canvas to match image natural dimensions
+      captureCanvas.width = img.naturalWidth;
+      captureCanvas.height = img.naturalHeight;
+
+      try {
+        // Draw the current MJPEG frame to canvas
+        ctx.drawImage(img, 0, 0);
+
+        // Convert to base64
+        const frameBase64 = captureCanvas.toDataURL('image/jpeg', 0.7);
+        onFrameCapture(cameraId, frameBase64);
+      } catch (e) {
+        // Cross-origin or security error - ignore silently
+        console.debug('Frame capture failed for', cameraId, e);
+      }
+    };
+
+    // Initial capture after a short delay for image to load
+    const initialTimeout = setTimeout(captureFrame, 1000);
+
+    // Capture every 500ms
+    const interval = setInterval(captureFrame, 500);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [isStreaming, taskId, cameraId, onFrameCapture]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -289,10 +333,15 @@ const CameraStreamView: React.FC<{
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+      {/* Hidden canvas for frame capture */}
+      <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
+
       {isStreaming && taskId ? (
         <img
+          ref={imgRef}
           src={`${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}`}
           className="w-full h-full object-contain"
+          crossOrigin="anonymous"
         />
       ) : (
         <div className="text-gray-500">Waiting for stream...</div>
@@ -339,6 +388,10 @@ const GroupViewPage: React.FC = () => {
 
   // State to store detection data for PersonList component
   const [detectionData, setDetectionData] = useState<{ [camera_id: string]: DetectionStoreEntry }>({});
+
+  // State to store captured frames from MJPEG streams for person cropping
+  const [capturedFrames, setCapturedFrames] = useState<{ [camera_id: string]: string }>({});
+
   const videoAreaRef = useRef<HTMLDivElement | null>(null);
   const [videoAreaHeight, setVideoAreaHeight] = useState<number>();
 
@@ -933,6 +986,14 @@ const GroupViewPage: React.FC = () => {
     },
     [clearBackendFocus, findTrackMatchingDetection, focusOnBackend, getTrackKey]
   );
+
+  // Handle frame capture from CameraStreamView for person thumbnail cropping
+  const handleFrameCapture = useCallback((cameraId: string, frameBase64: string) => {
+    setCapturedFrames(prev => ({
+      ...prev,
+      [cameraId]: frameBase64
+    }));
+  }, []);
 
   const handleTrackFocus = useCallback(
     (cameraId: BackendCameraId, track: Track) => {
@@ -1585,7 +1646,8 @@ const GroupViewPage: React.FC = () => {
                         isStreaming={isStreaming}
                         tracks={tracks}
                         focusedPerson={focusedPerson}
-                        onTrackClick={(track) => handleTrackFocus(cameraId, track)} // Simplified handler usage
+                        onTrackClick={(track) => handleTrackFocus(cameraId, track)}
+                        onFrameCapture={handleFrameCapture}
                       />
                       <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                         {displayName} ({cameraId})
@@ -1610,6 +1672,7 @@ const GroupViewPage: React.FC = () => {
                         tracks={tracks}
                         focusedPerson={focusedPerson}
                         onTrackClick={(track) => handleTrackFocus(cameraId, track)}
+                        onFrameCapture={handleFrameCapture}
                       />
                       <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                         {displayName} ({cameraId})
@@ -1751,7 +1814,18 @@ const GroupViewPage: React.FC = () => {
       {/* Detection Person List - full width beneath video & panels */}
       <div className="bg-gray-800 rounded-md p-3 mt-4">
         <DetectionPersonList
-          cameraDetections={detectionData}
+          cameraDetections={
+            // Merge detection data with captured frames for person cropping
+            Object.fromEntries(
+              Object.entries(detectionData).map(([camera_id, data]) => [
+                camera_id,
+                {
+                  ...data,
+                  frame_image_base64: capturedFrames[camera_id] || undefined
+                }
+              ])
+            )
+          }
           className="h-full"
           selectedPersonKey={focusedPerson?.detectionKey ?? null}
           onPersonClick={(detection, camera_id, isSelecting) => {

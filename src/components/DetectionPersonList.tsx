@@ -226,7 +226,7 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                     : 'hover:bg-gray-600 hover:shadow-lg'
                     }`}
                 >
-                  {/* Cropped Person Image */}
+                  {/* Cropped Person Image or Placeholder */}
                   <div className="aspect-[3/4] relative">
                     {croppedImage ? (
                       <img
@@ -235,8 +235,16 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                         className="w-full h-full object-cover"
                       />
                     ) : (
-                      <div className="w-full h-full bg-gray-600 flex items-center justify-center">
-                        <div className="text-gray-400 text-sm">Loading...</div>
+                      <div className={`w-full h-full flex flex-col items-center justify-center ${detection.confidence >= 0.8
+                          ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
+                          : detection.confidence >= 0.6
+                            ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
+                            : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
+                        }`}>
+                        <div className="text-4xl mb-1">👤</div>
+                        <div className="text-xs text-gray-400 font-mono">
+                          {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                        </div>
                       </div>
                     )}
 
