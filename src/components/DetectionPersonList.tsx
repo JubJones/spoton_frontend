@@ -74,9 +74,27 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
 
     const img = new Image();
     img.onload = () => {
-      // Set canvas size to match the crop area
-      const cropWidth = Math.max(bbox.width, 64); // Minimum width
-      const cropHeight = Math.max(bbox.height, 96); // Minimum height
+      // Source dimensions from backend (detection coordinates are in this space)
+      const SRC_WIDTH = 1920;
+      const SRC_HEIGHT = 1080;
+
+      // Actual image dimensions
+      const imgWidth = img.naturalWidth;
+      const imgHeight = img.naturalHeight;
+
+      // Calculate scale factors
+      const scaleX = imgWidth / SRC_WIDTH;
+      const scaleY = imgHeight / SRC_HEIGHT;
+
+      // Scale bbox coordinates to actual image dimensions
+      const scaledX1 = bbox.x1 * scaleX;
+      const scaledY1 = bbox.y1 * scaleY;
+      const scaledWidth = bbox.width * scaleX;
+      const scaledHeight = bbox.height * scaleY;
+
+      // Set canvas size to match the crop area (use scaled dimensions)
+      const cropWidth = Math.max(Math.round(scaledWidth), 64);
+      const cropHeight = Math.max(Math.round(scaledHeight), 96);
 
       canvas.width = cropWidth;
       canvas.height = cropHeight;
@@ -84,10 +102,10 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       // Clear canvas
       ctx.clearRect(0, 0, cropWidth, cropHeight);
 
-      // Draw the cropped portion of the image
+      // Draw the cropped portion of the image using scaled coordinates
       ctx.drawImage(
         img,
-        bbox.x1, bbox.y1, bbox.width, bbox.height, // Source rectangle
+        scaledX1, scaledY1, scaledWidth, scaledHeight, // Source rectangle (scaled)
         0, 0, cropWidth, cropHeight // Destination rectangle
       );
 
@@ -236,10 +254,10 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
                       />
                     ) : (
                       <div className={`w-full h-full flex flex-col items-center justify-center ${detection.confidence >= 0.8
-                          ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
-                          : detection.confidence >= 0.6
-                            ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
-                            : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
+                        ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
+                        : detection.confidence >= 0.6
+                          ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
+                          : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
                         }`}>
                         <div className="text-4xl mb-1">👤</div>
                         <div className="text-xs text-gray-400 font-mono">
