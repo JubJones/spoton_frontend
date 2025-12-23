@@ -288,22 +288,22 @@ const CameraStreamView: React.FC<{
         const w = dx2 - dx1;
         const h = dy2 - dy1;
 
-        // Check focus
-        // Logic copied from existing map
+        // Check focus - highlight by global_id across ALL cameras
         let isFocused = false;
         if (focusedPerson) {
-          const trackKey = `${cameraId}:${track.track_id}`; // simplified key check needs proper context but passing pure props is cleaner
-          // Replicating specific check:
           const globalId = track.global_id !== undefined ? String(track.global_id) : undefined;
           const personGlobalId = focusedPerson.globalId;
 
-          // Just doing simple check here for visual feedback
-          // Real check uses helper functions from parent, but let's pass isFocused as a specific prop? 
-          // Too complex to pass isFocused for each track. Re-implementing simplified logic.
-          if (focusedPerson.cameraId === cameraId) {
-            // Approx check
-            if (focusedPerson.trackKey && focusedPerson.trackKey.includes(String(track.track_id))) isFocused = true;
-            if (personGlobalId && globalId === personGlobalId) isFocused = true;
+          // Cross-camera highlighting: if global_id matches, highlight regardless of camera
+          if (personGlobalId && globalId && globalId === personGlobalId) {
+            isFocused = true;
+          }
+
+          // Fallback: if same camera and track matches (for tracks without global_id)
+          if (!isFocused && focusedPerson.cameraId === cameraId) {
+            if (focusedPerson.trackKey && focusedPerson.trackKey.includes(String(track.track_id))) {
+              isFocused = true;
+            }
           }
         }
 
@@ -783,6 +783,59 @@ const GroupViewPage: React.FC = () => {
       return;
     }
 
+    // If we have a globalId, search across ALL cameras for matching tracks
+    if (focusedPerson.globalId && currentFrameData?.cameras) {
+      let foundInAnyCamera = false;
+
+      for (const [camId, camData] of Object.entries(currentFrameData.cameras)) {
+        const cameraTracks = camData.tracks ?? [];
+        for (const track of cameraTracks) {
+          const globalId = track.global_id !== undefined && track.global_id !== null
+            ? String(track.global_id)
+            : undefined;
+
+          if (globalId === focusedPerson.globalId) {
+            foundInAnyCamera = true;
+
+            // Update the focused person with the latest bbox from the first matching camera
+            // This keeps the focus state valid but allows cross-camera highlighting
+            const nextTrackKey = getTrackKey(camId as BackendCameraId, track);
+            const nextBbox = track.bbox_xyxy;
+
+            setFocusedPerson((prev) => {
+              if (!prev) return prev;
+
+              // Only update if something changed
+              const bboxChanged = !areBboxesClose(prev.bbox, nextBbox, 2);
+              const trackChanged = prev.trackKey !== nextTrackKey;
+
+              if (!bboxChanged && !trackChanged && prev.cameraId === camId) {
+                return prev;
+              }
+
+              return {
+                ...prev,
+                cameraId: camId as BackendCameraId,
+                trackKey: nextTrackKey,
+                bbox: nextBbox,
+              };
+            });
+            break; // Found in at least one camera, that's enough
+          }
+        }
+        if (foundInAnyCamera) break;
+      }
+
+      // If person with globalId not found in any camera, don't clear focus immediately
+      // They might reappear in a subsequent frame - only clear after extended absence
+      // For now, we just keep the last known state
+      if (foundInAnyCamera) {
+        return; // Successfully found and updated
+      }
+      // Fall through to original camera check as fallback
+    }
+
+    // Fallback: Check original camera for tracks without globalId
     const cameraId = focusedPerson.cameraId;
     const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
 
@@ -881,8 +934,12 @@ const GroupViewPage: React.FC = () => {
       return;
     }
 
-    setFocusedPerson(null);
-    clearBackendFocus();
+    // Only clear focus if no globalId (for tracks without global tracking)
+    // If we have globalId, keep focus - person may reappear
+    if (!focusedPerson.globalId) {
+      setFocusedPerson(null);
+      clearBackendFocus();
+    }
   }, [areBboxesClose, clearBackendFocus, currentFrameData, detectionData, focusedPerson, getTrackKey]);
 
   // Get zone name based on environment
