@@ -1063,7 +1063,7 @@ const GroupViewPage: React.FC = () => {
 
       if (alreadyFocused) {
         setFocusedPerson(null);
-        clearBackendFocus();
+        // Don't call clearBackendFocus - we're doing frontend-only highlighting
         return;
       }
 
@@ -1077,16 +1077,12 @@ const GroupViewPage: React.FC = () => {
         bbox: track.bbox_xyxy,
         globalId: normalizedGlobalId,
       });
-      focusOnBackend({
-        personId: normalizedGlobalId ?? trackKey,
-        cameraId,
-        trackId: track.track_id,
-        detectionId: matchingDetection?.detection_id,
-        bbox: track.bbox_xyxy,
-        confidence: track.confidence,
-      });
+
+      // NOTE: Removed focusOnBackend call - it was causing backend to filter tracks
+      // Now using purely frontend-based highlighting for cross-camera tracking
+      // This keeps all tracks visible while highlighting the focused person
     },
-    [clearBackendFocus, findDetectionForTrack, focusOnBackend, focusedPerson, getTrackKey]
+    [findDetectionForTrack, focusedPerson, getTrackKey]
   );
 
   const clearFocus = useCallback(() => {
