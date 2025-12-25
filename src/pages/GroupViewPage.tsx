@@ -172,38 +172,7 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
   // Ref for tracking RAF to prevent memory leaks
   const rafRef = useRef<number | null>(null);
 
-  // State for stream reload - use a key to force img remount on errors
-  const [streamKey, setStreamKey] = useState(() => Date.now());
-  const [streamError, setStreamError] = useState(false);
-  const [streamLoaded, setStreamLoaded] = useState(false);
 
-  // Reset stream state when taskId or cameraId changes
-  useEffect(() => {
-    setStreamKey(Date.now());
-    setStreamError(false);
-    setStreamLoaded(false);
-  }, [taskId, cameraId]);
-
-  // Handle stream error - retry after delay
-  const handleStreamError = useCallback(() => {
-    console.warn(`Stream error for camera ${cameraId}, will retry...`);
-    setStreamError(true);
-    setStreamLoaded(false);
-
-    // Retry after 2 seconds
-    const retryTimeout = setTimeout(() => {
-      setStreamKey(Date.now());
-      setStreamError(false);
-    }, 2000);
-
-    return () => clearTimeout(retryTimeout);
-  }, [cameraId]);
-
-  // Handle stream loaded
-  const handleStreamLoad = useCallback(() => {
-    setStreamLoaded(true);
-    setStreamError(false);
-  }, []);
 
   // Frame capture - interval-based for MJPEG (load event doesn't fire per frame)
   // Throttled to 2fps (500ms) for performance
@@ -366,41 +335,22 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
     };
   }, [tracks, isStreaming, taskId, focusedPerson, cameraId]);
 
-  // Generate stream URL with cache-busting key
-  const streamUrl = isStreaming && taskId
-    ? `${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}?t=${streamKey}`
-    : null;
+  // Stable stream URL - no cache busting (breaks MJPEG)
+  const streamUrl = `${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}`;
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
       {/* Hidden canvas for frame capture */}
       <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
 
-      {isStreaming && taskId && streamUrl ? (
-        <>
-          <img
-            key={`stream-${cameraId}-${streamKey}`}
-            ref={imgRef}
-            src={streamUrl}
-            alt={`Camera ${cameraId} stream`}
-            className="w-full h-full object-contain"
-            crossOrigin="anonymous"
-            onError={handleStreamError}
-            onLoad={handleStreamLoad}
-          />
-          {/* Loading indicator */}
-          {!streamLoaded && !streamError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
-              <div className="text-gray-400 text-sm">Loading stream...</div>
-            </div>
-          )}
-          {/* Error indicator */}
-          {streamError && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75">
-              <div className="text-red-400 text-sm">Reconnecting...</div>
-            </div>
-          )}
-        </>
+      {isStreaming && taskId ? (
+        <img
+          ref={imgRef}
+          src={streamUrl}
+          alt={`Camera ${cameraId} stream`}
+          className="w-full h-full object-contain"
+          crossOrigin="anonymous"
+        />
       ) : (
         <div className="text-gray-500">Waiting for stream...</div>
       )}
@@ -1738,14 +1688,19 @@ const GroupViewPage: React.FC = () => {
                 })}
               </div>
             ) : (
-              (() => {
-                const cameraId = activeTab as BackendCameraId;
-                const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
-                const displayName = getCameraDisplayNameById(cameraId);
+              /* Single camera view - render all cameras but show only the selected one */
+              <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center min-h-[320px]">
+                {cameraIds.map((cameraId) => {
+                  const isActive = activeTab === cameraId;
+                  const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
+                  const displayName = getCameraDisplayNameById(cameraId);
 
-                return (
-                  <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center min-h-[320px]">
-                    <div className="relative w-full h-full">
+                  return (
+                    <div
+                      key={`single-${cameraId}`}
+                      className="relative w-full h-full"
+                      style={{ display: isActive ? 'block' : 'none' }}
+                    >
                       <CameraStreamView
                         taskId={taskId}
                         cameraId={cameraId}
@@ -1759,9 +1714,9 @@ const GroupViewPage: React.FC = () => {
                         {displayName} ({cameraId})
                       </div>
                     </div>
-                  </div>
-                );
-              })()
+                  );
+                })}
+              </div>
             )}
           </div>
 
@@ -1939,10 +1894,10 @@ const GroupViewPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
+      </div >
 
       {/* Detection Person List - full width beneath video & panels */}
-      <div className="bg-gray-800 rounded-md p-3 mt-4">
+      < div className="bg-gray-800 rounded-md p-3 mt-4" >
         <DetectionPersonList
           cameraDetections={
             // Merge detection data with captured frames for person cropping
@@ -1966,8 +1921,8 @@ const GroupViewPage: React.FC = () => {
             );
           }}
         />
-      </div>
-    </div>
+      </div >
+    </div >
   );
 };
 
