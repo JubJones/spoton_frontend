@@ -1663,8 +1663,8 @@ const GroupViewPage: React.FC = () => {
                */
               <div
                 className={`w-full h-full ${activeTab === "all"
-                    ? `grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`
-                    : ''
+                  ? `grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`
+                  : 'relative'
                   }`}
               >
                 {cameraIds.map((cameraId) => {
@@ -1677,15 +1677,13 @@ const GroupViewPage: React.FC = () => {
                   return (
                     <div
                       key={cameraId}
-                      className={`relative bg-black rounded overflow-hidden flex items-center justify-center transition-all ${isViewAll
-                          ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer'
-                          : 'w-full h-full min-h-[320px]'
+                      className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
+                          ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer transition-colors'
+                          : isSingleActive
+                            ? 'w-full h-full min-h-[320px]'
+                            : ''
                         }`}
-                      style={{
-                        display: isVisible ? (isViewAll ? 'flex' : 'flex') : 'none',
-                        // In single view, only the active camera takes full space
-                        ...((!isViewAll && isSingleActive) ? { position: 'absolute', inset: 0 } : {})
-                      }}
+                      style={{ display: isVisible ? 'flex' : 'none' }}
                       onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
                     >
                       <CameraStreamView
