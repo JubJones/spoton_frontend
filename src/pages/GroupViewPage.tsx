@@ -1060,13 +1060,13 @@ const GroupViewPage: React.FC = () => {
     }
   }, []);
 
-  // Check for existing detection tasks or create new one
-  const checkExistingDetectionTask = useCallback(async () => {
+  // Check for existing active detection tasks (does NOT create new ones)
+  const checkForExistingTask = useCallback(async (): Promise<boolean> => {
     try {
       const environment = getEnvironmentFromUrl();
       console.log('Checking for existing detection task for environment:', environment);
 
-      // First, check if there are existing active detection tasks for this environment
+      // Check if there are existing active detection tasks for this environment
       const tasksResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks`);
       if (tasksResponse.ok) {
         const tasksData = await tasksResponse.json();
@@ -1083,7 +1083,19 @@ const GroupViewPage: React.FC = () => {
         }
       }
 
-      console.log('No existing active task found, creating new one...');
+      console.log('No existing active task found.');
+      return false;
+    } catch (error) {
+      console.error('Error checking for existing task:', error);
+      return false;
+    }
+  }, [getEnvironmentFromUrl]);
+
+  // Create and start a new detection task
+  const createAndStartDetectionTask = useCallback(async (): Promise<boolean> => {
+    try {
+      const environment = getEnvironmentFromUrl();
+      console.log('Creating new detection task for environment:', environment);
 
       const response = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/start`, {
         method: 'POST',
@@ -1096,46 +1108,45 @@ const GroupViewPage: React.FC = () => {
         console.log('Response not OK:', response.status, errorText);
 
         if (response.status === 400 && errorText.includes('already has an active')) {
-          // This shouldn't happen now since we check above, but keep as fallback
           setError('An active detection session already exists for this environment. Please refresh the page or wait for it to complete.');
           return false;
         } else {
           throw new Error(`Failed to start detection: ${response.status} - ${errorText}`);
         }
-      } else {
-        // New task created successfully
-        const task: DetectionTask = await response.json();
-        console.log('New task created:', task.task_id);
-        setTaskId(task.task_id);
-
-        // Monitor until PROCESSING
-        let attempts = 0;
-        const maxAttempts = 30; // 60 seconds max
-        while (attempts < maxAttempts) {
-          const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/${task.task_id}/status`);
-          const status = await statusResponse.json();
-          console.log('Task status:', status.status, 'attempts:', attempts);
-
-          if (status.status === 'PROCESSING') {
-            console.log('Task is processing, connecting WebSocket');
-            connectWebSocket(task.task_id);
-            return true;
-          }
-          if (status.status === 'FAILED') {
-            throw new Error(status.details || 'Task failed');
-          }
-
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          attempts++;
-        }
-
-        if (attempts >= maxAttempts) {
-          throw new Error('Timeout waiting for detection processing to start');
-        }
-        return true;
       }
+
+      // New task created successfully
+      const task: DetectionTask = await response.json();
+      console.log('New task created:', task.task_id);
+      setTaskId(task.task_id);
+
+      // Monitor until PROCESSING
+      let attempts = 0;
+      const maxAttempts = 30; // 60 seconds max
+      while (attempts < maxAttempts) {
+        const statusResponse = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/${task.task_id}/status`);
+        const status = await statusResponse.json();
+        console.log('Task status:', status.status, 'attempts:', attempts);
+
+        if (status.status === 'PROCESSING') {
+          console.log('Task is processing, connecting WebSocket');
+          connectWebSocket(task.task_id);
+          return true;
+        }
+        if (status.status === 'FAILED') {
+          throw new Error(status.details || 'Task failed');
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        attempts++;
+      }
+
+      if (attempts >= maxAttempts) {
+        throw new Error('Timeout waiting for detection processing to start');
+      }
+      return true;
     } catch (error) {
-      console.error('Error checking/starting streaming task:', error);
+      console.error('Error creating/starting detection task:', error);
       setError(`Failed to start detection: ${(error as Error).message}`);
       return false;
     }
@@ -1159,14 +1170,21 @@ const GroupViewPage: React.FC = () => {
         return;
       }
 
-      // Otherwise, check for existing tasks or create new one
-      await checkExistingDetectionTask();
+      // First, check for existing active tasks
+      const foundExisting = await checkForExistingTask();
+      if (foundExisting) {
+        console.log('Connected to existing active task');
+        return;
+      }
+
+      // No existing task found, create a new one
+      await createAndStartDetectionTask();
 
     } catch (error) {
       console.error('Error starting detection processing:', error);
       setError(`Failed to start detection: ${(error as Error).message}`);
     }
-  }, [isStreaming, taskId, checkExistingDetectionTask]);
+  }, [isStreaming, taskId, checkForExistingTask, createAndStartDetectionTask]);
 
   // Connect to WebSocket for detection tracking frames
   const connectWebSocket = useCallback((taskId: string) => {
@@ -1317,14 +1335,15 @@ const GroupViewPage: React.FC = () => {
     };
   }, [connectFocusWebSocket, disconnectFocusWebSocket]);
 
-  // Initialize detection processing on component mount
+  // Initialize on component mount - check health and reconnect to existing tasks only
+  // Does NOT automatically start new pipeline - user must click "Start Stream"
   useEffect(() => {
-    const initializeDetectionProcessing = async () => {
-      console.log('Initializing detection processing, current taskId:', taskId, 'isStreaming:', isStreaming);
+    const initializeOnMount = async () => {
+      console.log('Initializing page, current taskId:', taskId, 'isStreaming:', isStreaming);
 
       const isHealthy = await checkSystemHealth();
       if (!isHealthy) {
-        console.log('System not healthy, skipping initialization');
+        console.log('System not healthy, waiting for user action');
         return;
       }
 
@@ -1342,7 +1361,7 @@ const GroupViewPage: React.FC = () => {
             connectWebSocket(taskId);
             return;
           } else {
-            console.log('Existing task not processing, clearing taskId and checking for other active tasks');
+            console.log('Existing task not processing, clearing taskId');
             setTaskId(null);
           }
         } catch (error) {
@@ -1351,14 +1370,14 @@ const GroupViewPage: React.FC = () => {
         }
       }
 
-      // If no taskId or existing task not active, try to create/find new task
+      // Check for any existing active tasks for this environment (but don't create new ones)
       if (!taskId) {
-        console.log('No taskId, checking for existing detection task');
-        await checkExistingDetectionTask();
+        console.log('No taskId, checking for existing active tasks only (not creating new)');
+        await checkForExistingTask();
       }
     };
 
-    initializeDetectionProcessing();
+    initializeOnMount();
 
     // Cleanup on unmount
     return () => {
@@ -1366,7 +1385,7 @@ const GroupViewPage: React.FC = () => {
         wsRef.current.close();
       }
     };
-  }, [checkSystemHealth, checkExistingDetectionTask]);
+  }, [checkSystemHealth, checkForExistingTask]);
 
 
   // --- Effect to measure Overall Map Container Size ---
