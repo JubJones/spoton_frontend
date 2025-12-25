@@ -33,17 +33,27 @@ interface MiniMapComponentProps {
   className?: string;
 }
 
+// Color palette for professional appearance
+const COLORS = {
+  bgGradientStart: '#0f172a',
+  bgGradientEnd: '#1e293b',
+  gridMajor: 'rgba(100, 116, 139, 0.3)',
+  gridText: 'rgba(148, 163, 184, 0.6)',
+  personPrimary: '#22d3ee',
+  textPrimary: '#f1f5f9',
+  textSecondary: '#94a3b8',
+  accents: [
+    { primary: '#22d3ee', glow: 'rgba(34, 211, 238, 0.4)' },
+    { primary: '#a78bfa', glow: 'rgba(167, 139, 250, 0.4)' },
+    { primary: '#34d399', glow: 'rgba(52, 211, 153, 0.4)' },
+    { primary: '#fb923c', glow: 'rgba(251, 146, 60, 0.4)' },
+    { primary: '#f472b6', glow: 'rgba(244, 114, 182, 0.4)' },
+    { primary: '#60a5fa', glow: 'rgba(96, 165, 250, 0.4)' },
+  ],
+};
+
 /**
- * MiniMapComponent - Renders a 2D map showing person positions and movement trails
- * 
- * This component integrates with the detection endpoint WebSocket stream to display
- * real-time person positions as dots on a 2D coordinate system. It shows:
- * - Current person positions as blue dots
- * - Movement trails (last 3 positions) as connected lines with fading points
- * - Grid coordinate system with meter-based scaling
- * - Camera identifier label
- * 
- * @param props - Component props
+ * MiniMapComponent - Renders a professional 2D map showing person positions
  */
 export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
   cameraId,
@@ -53,11 +63,11 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
   className = ''
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [mapBounds, setMapBounds] = useState({ 
-    minX: -10, 
-    maxX: 10, 
-    minY: -10, 
-    maxY: 10 
+  const [mapBounds, setMapBounds] = useState({
+    minX: -10,
+    maxX: 10,
+    minY: -10,
+    maxY: 10
   });
 
   // Calculate dynamic map bounds based on current coordinates
@@ -65,35 +75,45 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     if (mappingCoordinates.length > 0) {
       const validCoords = mappingCoordinates.filter(coord => coord.projection_successful);
       if (validCoords.length > 0) {
-        // Get all coordinates including trail points
         const allCoords: { x: number; y: number }[] = [];
-        
+
         validCoords.forEach(coord => {
           allCoords.push({ x: coord.map_x, y: coord.map_y });
-          
-          // Include trail points for bounds calculation
           if (coord.trail && coord.trail.length > 0) {
             coord.trail.forEach(point => {
               allCoords.push({ x: point.x, y: point.y });
             });
           }
         });
-        
+
         const xs = allCoords.map(c => c.x);
         const ys = allCoords.map(c => c.y);
-        
-        const padding = 2; // meters
-        setMapBounds({
-          minX: Math.min(...xs) - padding,
-          maxX: Math.max(...xs) + padding,
-          minY: Math.min(...ys) - padding,
-          maxY: Math.max(...ys) + padding
-        });
+
+        const padding = 3;
+        const minBoundSize = 8;
+
+        let minX = Math.min(...xs) - padding;
+        let maxX = Math.max(...xs) + padding;
+        let minY = Math.min(...ys) - padding;
+        let maxY = Math.max(...ys) + padding;
+
+        if (maxX - minX < minBoundSize) {
+          const center = (maxX + minX) / 2;
+          minX = center - minBoundSize / 2;
+          maxX = center + minBoundSize / 2;
+        }
+        if (maxY - minY < minBoundSize) {
+          const center = (maxY + minY) / 2;
+          minY = center - minBoundSize / 2;
+          maxY = center + minBoundSize / 2;
+        }
+
+        setMapBounds({ minX, maxX, minY, maxY });
       }
     }
   }, [mappingCoordinates]);
 
-  // Render the map on canvas
+  // Draw on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -101,47 +121,63 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas size
+    // Clear and set canvas size
     canvas.width = width;
     canvas.height = height;
 
-    // Clear canvas and paint a uniform light background (consistent look across cams)
-    ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#f5f5f5';
+    // Draw dark gradient background
+    const bgGradient = ctx.createLinearGradient(0, 0, 0, height);
+    bgGradient.addColorStop(0, COLORS.bgGradientStart);
+    bgGradient.addColorStop(1, COLORS.bgGradientEnd);
+    ctx.fillStyle = bgGradient;
     ctx.fillRect(0, 0, width, height);
 
     const { minX, maxX, minY, maxY } = mapBounds;
     const scaleX = width / (maxX - minX);
     const scaleY = height / (maxY - minY);
 
-    // Helper function to convert map coordinates to canvas coordinates
-    // Map coordinates directly to canvas without vertical flip so that
-    // increasing Y in map corresponds to moving down on canvas. This fixes
-    // the visual reversal seen previously.
     const mapToCanvas = (mapX: number, mapY: number) => ({
       x: (mapX - minX) * scaleX,
       y: (mapY - minY) * scaleY
     });
 
-    // Optional grid (disabled for clean, consistent look like c02)
-    const showGrid = false;
-    if (showGrid) {
-      ctx.strokeStyle = '#eaeaea';
-      ctx.lineWidth = 1;
-      const gridSize = 2;
-      for (let x = Math.ceil(minX / gridSize) * gridSize; x <= maxX; x += gridSize) {
-        const canvasX = mapToCanvas(x, 0).x;
-        ctx.beginPath();
-        ctx.moveTo(canvasX, 0);
-        ctx.lineTo(canvasX, height);
-        ctx.stroke();
+    // Draw grid
+    ctx.lineWidth = 1;
+    ctx.strokeStyle = COLORS.gridMajor;
+    const gridSize = 2;
+
+    for (let x = Math.ceil(minX / gridSize) * gridSize; x <= maxX; x += gridSize) {
+      const canvasX = mapToCanvas(x, 0).x;
+      ctx.beginPath();
+      ctx.moveTo(canvasX, 0);
+      ctx.lineTo(canvasX, height);
+      ctx.stroke();
+    }
+    for (let y = Math.ceil(minY / gridSize) * gridSize; y <= maxY; y += gridSize) {
+      const canvasY = mapToCanvas(0, y).y;
+      ctx.beginPath();
+      ctx.moveTo(0, canvasY);
+      ctx.lineTo(width, canvasY);
+      ctx.stroke();
+    }
+
+    // Draw coordinate labels
+    ctx.fillStyle = COLORS.gridText;
+    ctx.font = '9px Arial, sans-serif';
+    ctx.textAlign = 'center';
+
+    for (let x = Math.ceil(minX / (gridSize * 2)) * gridSize * 2; x <= maxX; x += gridSize * 2) {
+      const canvasX = mapToCanvas(x, 0).x;
+      if (canvasX > 20 && canvasX < width - 20) {
+        ctx.fillText(`${x.toFixed(0)}m`, canvasX, height - 4);
       }
-      for (let y = Math.ceil(minY / gridSize) * gridSize; y <= maxY; y += gridSize) {
-        const canvasY = mapToCanvas(0, y).y;
-        ctx.beginPath();
-        ctx.moveTo(0, canvasY);
-        ctx.lineTo(width, canvasY);
-        ctx.stroke();
+    }
+
+    ctx.textAlign = 'left';
+    for (let y = Math.ceil(minY / (gridSize * 2)) * gridSize * 2; y <= maxY; y += gridSize * 2) {
+      const canvasY = mapToCanvas(0, y).y;
+      if (canvasY > 15 && canvasY < height - 15) {
+        ctx.fillText(`${y.toFixed(0)}m`, 4, canvasY + 3);
       }
     }
 
@@ -149,18 +185,18 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     mappingCoordinates.forEach((coord, index) => {
       if (!coord.projection_successful) return;
 
+      const colorSet = COLORS.accents[index % COLORS.accents.length];
       const currentPos = mapToCanvas(coord.map_x, coord.map_y);
 
       // Draw trail if available
       if (coord.trail && coord.trail.length > 1) {
-        // Draw trail lines
-        ctx.strokeStyle = 'rgba(100, 150, 255, 0.6)';
+        ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
         ctx.lineWidth = 2;
+        ctx.lineCap = 'round';
         ctx.beginPath();
-        
+
         coord.trail.forEach((point, pointIndex) => {
           const trailPos = mapToCanvas(point.x, point.y);
-          
           if (pointIndex === 0) {
             ctx.moveTo(trailPos.x, trailPos.y);
           } else {
@@ -169,58 +205,114 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
         });
         ctx.stroke();
 
-        // Draw trail points with fading effect
+        // Trail dots
         coord.trail.forEach((point, pointIndex) => {
           const trailPos = mapToCanvas(point.x, point.y);
-          const alpha = 1 - (pointIndex * 0.3); // Fade older points
-          
-          ctx.fillStyle = `rgba(100, 150, 255, ${Math.max(alpha, 0.2)})`;
+          const alpha = 0.3 + (pointIndex / coord.trail!.length) * 0.5;
+          ctx.fillStyle = `rgba(251, 191, 36, ${alpha})`;
           ctx.beginPath();
           ctx.arc(trailPos.x, trailPos.y, 3, 0, 2 * Math.PI);
           ctx.fill();
         });
       }
 
-      // Draw current position (larger dot)
-      ctx.fillStyle = '#007bff';
+      // Draw glow
+      const gradient = ctx.createRadialGradient(
+        currentPos.x, currentPos.y, 0,
+        currentPos.x, currentPos.y, 18
+      );
+      gradient.addColorStop(0, colorSet.glow);
+      gradient.addColorStop(1, 'transparent');
+      ctx.fillStyle = gradient;
       ctx.beginPath();
-      ctx.arc(currentPos.x, currentPos.y, 6, 0, 2 * Math.PI);
+      ctx.arc(currentPos.x, currentPos.y, 18, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Draw detection ID (last 3 characters for brevity)
-      ctx.fillStyle = '#333';
-      ctx.font = '10px Arial';
-      ctx.fillText(
-        coord.detection_id.slice(-3), 
-        currentPos.x + 8, 
-        currentPos.y - 8
-      );
+      // Draw main dot
+      ctx.fillStyle = colorSet.primary;
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 8, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // White center
+      ctx.fillStyle = '#ffffff';
+      ctx.beginPath();
+      ctx.arc(currentPos.x, currentPos.y, 3, 0, 2 * Math.PI);
+      ctx.fill();
+
+      // Detection ID label
+      ctx.fillStyle = COLORS.textSecondary;
+      ctx.font = 'bold 9px Arial, sans-serif';
+      ctx.textAlign = 'left';
+      ctx.fillText(`#${coord.detection_id.slice(-4)}`, currentPos.x + 12, currentPos.y + 3);
     });
 
-    // Draw camera label (keep minimal)
-    ctx.fillStyle = '#333';
-    ctx.font = 'bold 12px Arial';
-    ctx.fillText(`Camera ${cameraId}`, 10, 20);
+    // Camera badge in top-left
+    ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+    ctx.fillRect(0, 0, 80, 26);
+
+    ctx.fillStyle = COLORS.personPrimary;
+    ctx.font = 'bold 11px Arial, sans-serif';
+    ctx.textAlign = 'left';
+    ctx.fillText(`📍 ${cameraId.toUpperCase()}`, 8, 17);
+
+    // Person count in top-right
+    const validCount = mappingCoordinates.filter(c => c.projection_successful).length;
+    if (validCount > 0) {
+      const countText = `${validCount} 👤`;
+      const textWidth = ctx.measureText(countText).width + 16;
+      ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+      ctx.fillRect(width - textWidth - 4, 0, textWidth + 4, 26);
+
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 11px Arial, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.fillText(countText, width - 8, 17);
+    }
 
   }, [mappingCoordinates, mapBounds, width, height, cameraId]);
 
   const validPersonCount = mappingCoordinates.filter(c => c.projection_successful).length;
 
   return (
-    <div className={`mini-map-container ${className}`}>
+    <div className={`mini-map-container ${className}`} style={{ position: 'relative' }}>
       <canvas
         ref={canvasRef}
         width={width}
         height={height}
-        style={{ 
-          border: '1px solid #ccc', 
-          borderRadius: '4px',
-          display: 'block'
+        style={{
+          width: `${width}px`,
+          height: `${height}px`,
+          borderRadius: '12px',
+          display: 'block',
+          boxShadow: '0 4px 20px rgba(0, 0, 0, 0.3)',
+          border: '1px solid rgba(100, 116, 139, 0.2)',
         }}
         aria-label={`2D map for camera ${cameraId} showing ${validPersonCount} persons`}
       />
-      <div className="map-info text-xs text-gray-600 mt-1">
-        Map Coordinates ({validPersonCount} person{validPersonCount !== 1 ? 's' : ''})
+      {/* Status bar overlay */}
+      <div
+        style={{
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '8px 12px',
+          background: 'linear-gradient(to top, rgba(15, 23, 42, 0.95), transparent)',
+          borderBottomLeftRadius: '12px',
+          borderBottomRightRadius: '12px',
+          fontSize: '11px',
+        }}
+      >
+        <span style={{ color: '#94a3b8', fontWeight: 500 }}>
+          BEV Coordinates
+        </span>
+        <span style={{ color: '#34d399', fontWeight: 600 }}>
+          {validPersonCount > 0 ? `${validPersonCount} tracked` : 'No detections'}
+        </span>
       </div>
     </div>
   );

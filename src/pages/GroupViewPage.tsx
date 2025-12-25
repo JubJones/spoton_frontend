@@ -172,6 +172,39 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
   // Ref for tracking RAF to prevent memory leaks
   const rafRef = useRef<number | null>(null);
 
+  // State for stream reload - use a key to force img remount on errors
+  const [streamKey, setStreamKey] = useState(() => Date.now());
+  const [streamError, setStreamError] = useState(false);
+  const [streamLoaded, setStreamLoaded] = useState(false);
+
+  // Reset stream state when taskId or cameraId changes
+  useEffect(() => {
+    setStreamKey(Date.now());
+    setStreamError(false);
+    setStreamLoaded(false);
+  }, [taskId, cameraId]);
+
+  // Handle stream error - retry after delay
+  const handleStreamError = useCallback(() => {
+    console.warn(`Stream error for camera ${cameraId}, will retry...`);
+    setStreamError(true);
+    setStreamLoaded(false);
+
+    // Retry after 2 seconds
+    const retryTimeout = setTimeout(() => {
+      setStreamKey(Date.now());
+      setStreamError(false);
+    }, 2000);
+
+    return () => clearTimeout(retryTimeout);
+  }, [cameraId]);
+
+  // Handle stream loaded
+  const handleStreamLoad = useCallback(() => {
+    setStreamLoaded(true);
+    setStreamError(false);
+  }, []);
+
   // Frame capture - interval-based for MJPEG (load event doesn't fire per frame)
   // Throttled to 2fps (500ms) for performance
   useEffect(() => {
@@ -333,18 +366,41 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
     };
   }, [tracks, isStreaming, taskId, focusedPerson, cameraId]);
 
+  // Generate stream URL with cache-busting key
+  const streamUrl = isStreaming && taskId
+    ? `${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}?t=${streamKey}`
+    : null;
+
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
       {/* Hidden canvas for frame capture */}
       <canvas ref={captureCanvasRef} style={{ display: 'none' }} />
 
-      {isStreaming && taskId ? (
-        <img
-          ref={imgRef}
-          src={`${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}`}
-          className="w-full h-full object-contain"
-          crossOrigin="anonymous"
-        />
+      {isStreaming && taskId && streamUrl ? (
+        <>
+          <img
+            key={`stream-${cameraId}-${streamKey}`}
+            ref={imgRef}
+            src={streamUrl}
+            alt={`Camera ${cameraId} stream`}
+            className="w-full h-full object-contain"
+            crossOrigin="anonymous"
+            onError={handleStreamError}
+            onLoad={handleStreamLoad}
+          />
+          {/* Loading indicator */}
+          {!streamLoaded && !streamError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-50">
+              <div className="text-gray-400 text-sm">Loading stream...</div>
+            </div>
+          )}
+          {/* Error indicator */}
+          {streamError && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75">
+              <div className="text-red-400 text-sm">Reconnecting...</div>
+            </div>
+          )}
+        </>
       ) : (
         <div className="text-gray-500">Waiting for stream...</div>
       )}
@@ -1711,46 +1767,95 @@ const GroupViewPage: React.FC = () => {
 
           {/* Right Side Panels */}
           <div
-            className="flex flex-col gap-4 h-full"
-            style={{ maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : undefined, overflowY: videoAreaHeight ? 'auto' : undefined }}
+            className="flex flex-col gap-4"
+            style={{
+              maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : '600px',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+            }}
           >
             {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
             <div
               ref={overallMapContainerRef}
-              className="bg-gray-700 rounded-md p-2 overflow-visible"
+              className="rounded-xl"
+              style={{
+                background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+                border: '1px solid rgba(100, 116, 139, 0.2)',
+                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
+                overflow: 'visible',
+              }}
             >
-              {(() => {
-                const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
+              {/* Panel Header */}
+              <div
+                className="flex items-center justify-between px-4 py-3"
+                style={{
+                  borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                  background: 'linear-gradient(90deg, rgba(34, 211, 238, 0.05), transparent)',
+                }}
+              >
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-400">🗺️</span>
+                  <h3 className="text-sm font-semibold text-slate-200">Live 2D Mapping</h3>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="relative flex h-2 w-2">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                  </span>
+                  <span className="text-xs text-emerald-400 font-medium">Live</span>
+                </div>
+              </div>
 
-                if (availableMappingCameras.length === 0) {
+              {/* Panel Content */}
+              <div className="p-3">
+                {(() => {
+                  const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
+
+                  if (availableMappingCameras.length === 0) {
+                    return (
+                      <div
+                        className="w-full flex flex-col items-center justify-center py-12 text-center"
+                        style={{ minHeight: '200px' }}
+                      >
+                        <div
+                          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                          style={{
+                            background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))',
+                            border: '1px solid rgba(34, 211, 238, 0.2)',
+                          }}
+                        >
+                          <span className="text-3xl">📍</span>
+                        </div>
+                        <p className="text-slate-300 text-sm font-medium mb-1">No Active Positions</p>
+                        <p className="text-slate-500 text-xs max-w-[200px]">
+                          2D mapping will appear when person positions are detected
+                        </p>
+                      </div>
+                    );
+                  }
+
                   return (
-                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">
-                      🗺️ 2D mapping will display when person positions are detected
+                    <div className="grid gap-4 grid-cols-1">
+                      {availableMappingCameras.map((backendCameraId) => {
+                        const coords = getMappingForCamera(backendCameraId);
+                        if (!coords || coords.length === 0) return null;
+                        return (
+                          <div key={`map-${backendCameraId}`}>
+                            <CameraMapPair
+                              cameraId={backendCameraId}
+                              mappingCoordinates={coords}
+                              mapVisible={true}
+                              className="w-full"
+                              mapWidth={Math.max(280, overallMapDimensions.width > 0 ? Math.floor(overallMapDimensions.width - 32) : 350)}
+                              mapHeight={Math.max(180, overallMapDimensions.width > 0 ? Math.floor((overallMapDimensions.width - 32) * 0.45) : 200)}
+                            />
+                          </div>
+                        );
+                      })}
                     </div>
                   );
-                }
-
-                return (
-                  <div className="grid gap-3 grid-cols-1">
-                    {availableMappingCameras.map((backendCameraId) => {
-                      const coords = getMappingForCamera(backendCameraId);
-                      if (!coords || coords.length === 0) return null;
-                      return (
-                        <div key={`map-${backendCameraId}`} className="bg-gray-800 rounded p-2">
-                          <CameraMapPair
-                            cameraId={backendCameraId}
-                            mappingCoordinates={coords}
-                            mapVisible={true}
-                            className="w-full"
-                            mapWidth={Math.max(320, Math.floor((overallMapDimensions.width || 0) - 32))}
-                            mapHeight={Math.max(220, Math.floor(((overallMapDimensions.width || 0) - 32) * 0.66))}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })()}
+                })()}
+              </div>
             </div>
 
 

@@ -38,14 +38,10 @@ interface CameraMapPairProps {
 /**
  * CameraMapPair - Combines a camera view with its corresponding 2D map
  * 
- * This component creates a synchronized pair of camera video feed and 2D map visualization.
- * It provides:
- * - Side-by-side layout of camera and map
- * - Toggle functionality for showing/hiding the map
- * - Data synchronization between camera detections and map positions
- * - Responsive design that adapts to available space
- * 
- * @param props - Component props
+ * Professional design with:
+ * - Clean dark theme matching the detection pipeline
+ * - Elegant badge and status indicators
+ * - Responsive layout
  */
 export const CameraMapPair: React.FC<CameraMapPairProps> = ({
   cameraId,
@@ -63,46 +59,105 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
   };
 
   const validPersonCount = mappingCoordinates.filter(c => c.projection_successful).length;
+  const hasTrails = mappingCoordinates.some(c => c.trail && c.trail.length > 1);
 
   return (
     <div className={`camera-map-pair ${className}`}>
       {/* Camera Section */}
-      <div className="camera-section">
-        {/* Render camera component (typically ImageSequencePlayer) */}
-        {children && (
+      {children && (
+        <div className="camera-section">
           <div className="camera-view">
             {children}
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Camera Controls */}
-        <div className="camera-controls mt-2 flex items-center justify-between">
-          <div className="camera-info text-sm text-gray-600">
-            Camera {cameraId}
-            {validPersonCount > 0 && (
-              <span className="ml-2 text-blue-600">
-                • {validPersonCount} person{validPersonCount !== 1 ? 's' : ''}
-              </span>
-            )}
+      {/* Controls & Info Bar */}
+      <div
+        className="flex items-center justify-between py-2 px-1"
+        style={{ minHeight: '36px' }}
+      >
+        {/* Camera Info with Status */}
+        <div className="flex items-center gap-3">
+          {/* Camera ID Badge */}
+          <div
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg"
+            style={{
+              background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.15), rgba(34, 211, 238, 0.05))',
+              border: '1px solid rgba(34, 211, 238, 0.3)',
+            }}
+          >
+            <span className="text-cyan-400 text-xs">📍</span>
+            <span className="text-cyan-300 font-semibold text-sm">{cameraId.toUpperCase()}</span>
           </div>
 
+          {/* Person Count Badge */}
+          {validPersonCount > 0 && (
+            <div
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-full"
+              style={{
+                background: 'linear-gradient(135deg, rgba(52, 211, 153, 0.2), rgba(52, 211, 153, 0.1))',
+                border: '1px solid rgba(52, 211, 153, 0.3)',
+              }}
+            >
+              <span className="text-emerald-400 font-bold text-xs">
+                {validPersonCount}
+              </span>
+              <span className="text-emerald-300 text-xs">
+                person{validPersonCount !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+
+          {/* Trails Badge */}
+          {hasTrails && (
+            <div
+              className="flex items-center gap-1 px-2 py-1 rounded-full"
+              style={{
+                background: 'rgba(251, 191, 36, 0.1)',
+                border: '1px solid rgba(251, 191, 36, 0.2)',
+              }}
+            >
+              <span className="text-amber-400 text-xs">🛤️</span>
+              <span className="text-amber-300 text-xs font-medium">
+                {mappingCoordinates.filter(c => c.trail && c.trail.length > 1).length} trails
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Toggle Button (only if handler provided) */}
+        {onToggleMap && (
           <button
             onClick={handleToggleMap}
-            className={`toggle-map-btn px-3 py-1 text-sm rounded transition-colors ${mapVisible
-              ? 'bg-blue-500 text-white hover:bg-blue-600'
-              : 'bg-gray-300 text-gray-700 hover:bg-gray-400'
-              }`}
+            className={`
+              flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium
+              transition-all duration-200 ease-out
+              ${mapVisible
+                ? 'text-cyan-300 hover:text-cyan-200'
+                : 'text-slate-400 hover:text-slate-300'
+              }
+            `}
+            style={{
+              background: mapVisible
+                ? 'linear-gradient(135deg, rgba(34, 211, 238, 0.2), rgba(34, 211, 238, 0.1))'
+                : 'rgba(100, 116, 139, 0.1)',
+              border: mapVisible
+                ? '1px solid rgba(34, 211, 238, 0.4)'
+                : '1px solid rgba(100, 116, 139, 0.2)',
+            }}
             aria-label={`${mapVisible ? 'Hide' : 'Show'} map for camera ${cameraId}`}
             data-testid={`toggle-map-${cameraId}`}
           >
-            {mapVisible ? '📍 Hide Map' : '🗺️ Show Map'}
+            <span>{mapVisible ? '🗺️' : '📍'}</span>
+            <span>{mapVisible ? 'Hide Map' : 'Show Map'}</span>
           </button>
-        </div>
+        )}
       </div>
 
-      {/* Map Section */}
+      {/* Map Section - Always render when mapVisible is true */}
       {mapVisible && (
-        <div className="map-section mt-3">
+        <div className="mt-2">
           <MiniMapComponent
             cameraId={cameraId}
             mappingCoordinates={mappingCoordinates}
@@ -113,18 +168,40 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
         </div>
       )}
 
-      {/* Status Information */}
+      {/* Status Bar */}
       {mapVisible && mappingCoordinates.length > 0 && (
-        <div className="status-info mt-2 text-xs text-gray-500">
-          <div className="flex items-center space-x-4">
-            <span>
-              🎯 Tracking: {validPersonCount}/{mappingCoordinates.length}
-            </span>
-            {mappingCoordinates.some(c => c.trail && c.trail.length > 1) && (
-              <span>
-                🛤️ Trails: {mappingCoordinates.filter(c => c.trail && c.trail.length > 1).length}
+        <div
+          className="flex items-center justify-between mt-3 px-3 py-2 rounded-lg"
+          style={{
+            background: 'rgba(15, 23, 42, 0.6)',
+            border: '1px solid rgba(100, 116, 139, 0.15)',
+          }}
+        >
+          <div className="flex items-center gap-4">
+            {/* Tracking Status */}
+            <div className="flex items-center gap-2">
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
               </span>
-            )}
+              <span className="text-slate-400 text-xs">
+                Tracking <span className="text-emerald-400 font-semibold">{validPersonCount}</span>/{mappingCoordinates.length}
+              </span>
+            </div>
+          </div>
+
+          {/* Coordinate System */}
+          <div className="flex items-center gap-2">
+            <span className="text-slate-500 text-xs">BEV Projection</span>
+            <span
+              className="px-1.5 py-0.5 rounded text-xs font-medium"
+              style={{
+                background: 'rgba(34, 211, 238, 0.1)',
+                color: '#22d3ee',
+              }}
+            >
+              Active
+            </span>
           </div>
         </div>
       )}
