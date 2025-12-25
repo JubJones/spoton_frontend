@@ -13,13 +13,13 @@ import { useCameraConfig } from "../context/CameraConfigContext";
 // --- Type Definitions ---
 interface Track {
   track_id: number;
-  global_id?: string; // Optional for detection mode (no tracking yet)
+  global_id?: string; // Global ID for cross-camera tracking
+  detection_id?: string; // Pre-matched detection ID from backend
   bbox_xyxy: [number, number, number, number];
   confidence: number;
   class_id: number;
-  map_coords?: [number, number]; // Optional for detection mode
-  detection_class?: string; // Detection-specific field
-  detection_score?: number; // Detection-specific field
+  map_coords?: [number, number];
+  is_focused?: boolean; // Backend sets this when focus filtering is active
 }
 
 interface CameraData {
@@ -141,30 +141,7 @@ interface SingleCameraMapPoint {
 
 const defaultDotColor = 'bg-gray-500';
 
-const BBOX_MATCH_TOLERANCE = 36;
-
-const calculateIoU = (a: [number, number, number, number], b: [number, number, number, number]): number => {
-  const [ax1, ay1, ax2, ay2] = a;
-  const [bx1, by1, bx2, by2] = b;
-  if ([ax1, ay1, ax2, ay2, bx1, by1, bx2, by2].some((value) => typeof value !== 'number' || Number.isNaN(value))) {
-    return 0;
-  }
-  const interX1 = Math.max(ax1, bx1);
-  const interY1 = Math.max(ay1, by1);
-  const interX2 = Math.min(ax2, bx2);
-  const interY2 = Math.min(ay2, by2);
-  const interW = Math.max(0, interX2 - interX1);
-  const interH = Math.max(0, interY2 - interY1);
-  const interArea = interW * interH;
-  const areaA = Math.max(0, ax2 - ax1) * Math.max(0, ay2 - ay1);
-  const areaB = Math.max(0, bx2 - bx1) * Math.max(0, by2 - by1);
-  const denom = areaA + areaB - interArea;
-  if (!Number.isFinite(denom) || denom <= 0) {
-    return 0;
-  }
-  const iou = interArea / denom;
-  return Number.isFinite(iou) ? iou : 0;
-};
+// Note: calculateIoU and BBOX_MATCH_TOLERANCE removed - backend now sends pre-matched data
 
 interface FocusedPersonState {
   cameraId: BackendCameraId;
@@ -298,20 +275,17 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
         const w = dx2 - dx1;
         const h = dy2 - dy1;
 
-        // Check focus - highlight by global_id across ALL cameras
-        let isFocused = false;
-        if (focusedPerson) {
+        // Check focus - backend sends is_focused flag when focus filtering is active
+        // Fallback to global_id matching for frontend-initiated focus
+        let isFocused = track.is_focused ?? false;
+
+        // Fallback: frontend focus state matching by global_id
+        if (!isFocused && focusedPerson) {
           const globalId = track.global_id !== undefined ? String(track.global_id) : undefined;
           const personGlobalId = focusedPerson.globalId;
 
           if (personGlobalId && globalId && globalId === personGlobalId) {
             isFocused = true;
-          }
-
-          if (!isFocused && focusedPerson.cameraId === cameraId) {
-            if (focusedPerson.trackKey && focusedPerson.trackKey.includes(String(track.track_id))) {
-              isFocused = true;
-            }
           }
         }
 
@@ -459,7 +433,7 @@ const GroupViewPage: React.FC = () => {
   const areBboxesClose = useCallback((
     bboxA: [number, number, number, number],
     bboxB: [number, number, number, number],
-    tolerance: number = BBOX_MATCH_TOLERANCE
+    tolerance: number = 36 // Default tolerance for bbox proximity check
   ) => {
     return (
       Math.abs(bboxA[0] - bboxB[0]) <= tolerance &&
@@ -469,12 +443,22 @@ const GroupViewPage: React.FC = () => {
     );
   }, []);
 
+  // Simplified: Backend now sends pre-matched detection_id in tracks
   const findTrackMatchingDetection = useCallback((cameraId: BackendCameraId, detection: DetectionListItem) => {
     const cameraTracks = currentFrameData?.cameras?.[cameraId]?.tracks ?? [];
     if (cameraTracks.length === 0) {
       return undefined;
     }
 
+    // Primary: Match by detection_id (backend pre-matched)
+    if (detection.detection_id) {
+      const detectionMatch = cameraTracks.find((track) => track.detection_id === detection.detection_id);
+      if (detectionMatch) {
+        return detectionMatch;
+      }
+    }
+
+    // Secondary: Match by track_id
     if (typeof detection.track_id === 'number') {
       const directMatch = cameraTracks.find((track) => track.track_id === detection.track_id);
       if (directMatch) {
@@ -482,80 +466,36 @@ const GroupViewPage: React.FC = () => {
       }
     }
 
-    if (detection.tracking_key) {
-      const keyMatch = cameraTracks.find((track) => getTrackKey(cameraId, track) === detection.tracking_key);
-      if (keyMatch) {
-        return keyMatch;
+    // Tertiary: Match by global_id
+    if (detection.global_id) {
+      const globalMatch = cameraTracks.find((track) => track.global_id === detection.global_id);
+      if (globalMatch) {
+        return globalMatch;
       }
     }
 
-    const detectionBbox: [number, number, number, number] = [
-      detection.bbox.x1,
-      detection.bbox.y1,
-      detection.bbox.x2,
-      detection.bbox.y2,
-    ];
+    // Fallback: first track if no match found
+    return cameraTracks[0];
+  }, [currentFrameData]);
 
-    let bestTrack: Track | undefined;
-    let bestIoU = -1;
-    let bestCenterDist = Number.POSITIVE_INFINITY;
-    const [dx1, dy1, dx2, dy2] = detectionBbox;
-    const detectionCenter: [number, number] = [(dx1 + dx2) / 2, (dy1 + dy2) / 2];
-    const trackDiagnostics: Array<{
-      trackKey: string;
-      trackId: number | undefined;
-      globalId: string | number | undefined | null;
-      iou: number;
-      centerDistance: number;
-      bbox: [number, number, number, number];
-    }> = [];
-
-    for (const track of cameraTracks) {
-      const iou = calculateIoU(track.bbox_xyxy, detectionBbox);
-      const [tx1, ty1, tx2, ty2] = track.bbox_xyxy;
-      const trackCenter: [number, number] = [(tx1 + tx2) / 2, (ty1 + ty2) / 2];
-      const dist = Math.hypot(trackCenter[0] - detectionCenter[0], trackCenter[1] - detectionCenter[1]);
-
-      if (cameraId === 'c12') {
-        trackDiagnostics.push({
-          trackKey: getTrackKey(cameraId, track),
-          trackId: track.track_id,
-          globalId: track.global_id,
-          iou: Number.isFinite(iou) ? Number(iou.toFixed(4)) : iou,
-          centerDistance: Number.isFinite(dist) ? Number(dist.toFixed(2)) : dist,
-          bbox: [tx1, ty1, tx2, ty2],
-        });
-      }
-
-      if (iou > bestIoU || (Math.abs(iou - bestIoU) < 1e-6 && dist < bestCenterDist)) {
-        bestIoU = iou;
-        bestCenterDist = dist;
-        bestTrack = track;
-      }
-    }
-
-    if (cameraId === 'c12') {
-      const bestTrackKey = bestTrack ? getTrackKey(cameraId, bestTrack) : null;
-      console.debug('🧪 c12 detection↔track matching', {
-        detectionBbox,
-        detectionCenter,
-        bestTrackKey,
-        bestIoU: Number.isFinite(bestIoU) ? Number(bestIoU.toFixed(4)) : bestIoU,
-        bestCenterDist: Number.isFinite(bestCenterDist) ? Number(bestCenterDist.toFixed(2)) : bestCenterDist,
-        trackDiagnostics,
-      });
-    }
-
-    return bestTrack ?? cameraTracks[0];
-  }, [currentFrameData, getTrackKey]);
-
+  // Simplified: Backend now sends detection_id pre-matched in tracks
   const findDetectionForTrack = useCallback((cameraId: BackendCameraId, track: Track) => {
     const cameraDetections = detectionData[cameraId];
     if (!cameraDetections?.detections) {
       return undefined;
     }
 
-    const trackBbox = track.bbox_xyxy;
+    // Primary: Match by detection_id (backend pre-matched)
+    if (track.detection_id) {
+      const detectionMatch = cameraDetections.detections.find(
+        (detection: DetectionListItem) => detection.detection_id === track.detection_id
+      );
+      if (detectionMatch) {
+        return detectionMatch;
+      }
+    }
+
+    // Secondary: Match by track_id
     const directMatch = cameraDetections.detections.find(
       (detection: DetectionListItem) => typeof detection.track_id === 'number' && detection.track_id === track.track_id
     );
@@ -563,42 +503,19 @@ const GroupViewPage: React.FC = () => {
       return directMatch;
     }
 
-    const trackingKeyMatch = cameraDetections.detections.find(
-      (detection: DetectionListItem) => detection.tracking_key && detection.tracking_key === getTrackKey(cameraId, track)
-    );
-    if (trackingKeyMatch) {
-      return trackingKeyMatch;
+    // Tertiary: Match by global_id
+    if (track.global_id) {
+      const globalMatch = cameraDetections.detections.find(
+        (detection: DetectionListItem) => detection.global_id === track.global_id
+      );
+      if (globalMatch) {
+        return globalMatch;
+      }
     }
 
-    let bestDetection: DetectionListItem | undefined;
-    let bestIoU = -1;
-    let bestCenterDist = Number.POSITIVE_INFINITY;
-    const [tx1, ty1, tx2, ty2] = trackBbox;
-    const trackCenter: [number, number] = [(tx1 + tx2) / 2, (ty1 + ty2) / 2];
-
-    cameraDetections.detections.forEach((detection: DetectionListItem) => {
-      const detectionBbox: [number, number, number, number] = [
-        detection.bbox.x1,
-        detection.bbox.y1,
-        detection.bbox.x2,
-        detection.bbox.y2,
-      ];
-      const iou = calculateIoU(trackBbox, detectionBbox);
-      const detectionCenter: [number, number] = [
-        (detectionBbox[0] + detectionBbox[2]) / 2,
-        (detectionBbox[1] + detectionBbox[3]) / 2,
-      ];
-      const dist = Math.hypot(trackCenter[0] - detectionCenter[0], trackCenter[1] - detectionCenter[1]);
-
-      if (iou > bestIoU || (Math.abs(iou - bestIoU) < 1e-6 && dist < bestCenterDist)) {
-        bestIoU = iou;
-        bestCenterDist = dist;
-        bestDetection = detection;
-      }
-    });
-
-    return bestDetection ?? cameraDetections.detections[0];
-  }, [detectionData, getTrackKey]);
+    // Fallback
+    return cameraDetections.detections[0];
+  }, [detectionData]);
 
   const sendFocusMessage = useCallback((message: Record<string, unknown>) => {
     const socket = focusWsRef.current;
