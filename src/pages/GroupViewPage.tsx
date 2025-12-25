@@ -1,5 +1,5 @@
 // src/pages/GroupViewPage.tsx
-import React, { useState, useEffect, useRef, useCallback, memo } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import DetectionPersonList from "../components/DetectionPersonList";
 // import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
@@ -420,7 +420,12 @@ const GroupViewPage: React.FC = () => {
   }, []);
 
   const environment = getEnvironmentFromUrl();
-  const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
+
+  // Memoize cameraIds to prevent recalculation on every render
+  const cameraIds = useMemo<BackendCameraId[]>(
+    () => environmentCameras[environment] ?? [],
+    [environmentCameras, environment]
+  );
 
   const getTrackKey = useCallback((cameraId: BackendCameraId, track: Track) => {
     const globalId = track.global_id;

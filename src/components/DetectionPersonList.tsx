@@ -1,5 +1,5 @@
 // src/components/DetectionPersonList.tsx
-import React, { useState, useCallback, useRef, useEffect } from 'react';
+import React, { useState, useCallback, useRef, useEffect, memo, useMemo } from 'react';
 import { useCameraConfig } from '../context/CameraConfigContext';
 import type { BackendCameraId } from '../types/api';
 
@@ -44,7 +44,8 @@ interface DetectionPersonListProps {
   selectedPersonKey?: string | null;
 }
 
-const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
+// Memoized to prevent re-renders when props haven't changed
+const DetectionPersonList = memo<DetectionPersonListProps>(({
   cameraDetections,
   className = '',
   onPersonClick,
@@ -151,17 +152,18 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
     onPersonClick?.(detection, camera_id, willSelect);
   }, [selectedPerson, onPersonClick]);
 
-  // Get all detections across all cameras
-  const allDetections = Object.entries(cameraDetections).flatMap(([camera_id, cameraData]) =>
-    (cameraData.detections || []).map(detection => ({
-      ...detection,
-      camera_id,
-      processing_time: cameraData.processing_time_ms
-    }))
-  );
-
-  // Sort by confidence (highest first)
-  const sortedDetections = allDetections.sort((a, b) => b.confidence - a.confidence);
+  // Memoized: Get all detections across all cameras, sorted by confidence
+  const sortedDetections = useMemo(() => {
+    const allDetections = Object.entries(cameraDetections).flatMap(([camera_id, cameraData]) =>
+      (cameraData.detections || []).map(detection => ({
+        ...detection,
+        camera_id,
+        processing_time: cameraData.processing_time_ms
+      }))
+    );
+    // Sort by confidence (highest first)
+    return allDetections.sort((a, b) => b.confidence - a.confidence);
+  }, [cameraDetections]);
 
   // Get camera display name
   const getCameraName = (camera_id: string) => {
@@ -348,6 +350,9 @@ const DetectionPersonList: React.FC<DetectionPersonListProps> = ({
       )}
     </div>
   );
-};
+});
+
+// Display name for React DevTools
+DetectionPersonList.displayName = 'DetectionPersonList';
 
 export default DetectionPersonList;
