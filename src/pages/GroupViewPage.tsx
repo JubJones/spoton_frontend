@@ -1655,51 +1655,38 @@ const GroupViewPage: React.FC = () => {
               <div className="text-gray-400 text-sm">Loading camera configuration...</div>
             ) : cameraIds.length === 0 ? (
               <div className="text-gray-400 text-sm">No cameras available for this environment.</div>
-            ) : activeTab === "all" ? (
+            ) : (
+              /* 
+               * UNIFIED RENDERING: All cameras rendered ONCE, never unmounted.
+               * Layout controlled by CSS based on activeTab.
+               * This preserves MJPEG stream connections when switching views.
+               */
               <div
-                className={`w-full h-full grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`}
+                className={`w-full h-full ${activeTab === "all"
+                    ? `grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`
+                    : ''
+                  }`}
               >
                 {cameraIds.map((cameraId) => {
-                  // const frameData = cameraFrames[cameraId]; // REMOVED
                   const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
                   const displayName = getCameraDisplayNameById(cameraId);
-                  // const loadingState = imageLoadingStates[cameraId] ?? (frameData ? 'loading' : 'none'); // REMOVED
+                  const isViewAll = activeTab === "all";
+                  const isSingleActive = activeTab === cameraId;
+                  const isVisible = isViewAll || isSingleActive;
 
                   return (
                     <div
                       key={cameraId}
-                      className="relative bg-black rounded overflow-hidden min-h-0 flex items-center justify-center border border-gray-800 hover:border-blue-500 transition-colors cursor-pointer"
-                      onClick={() => setActiveTab(cameraId)}
-                    >
-                      <CameraStreamView
-                        taskId={taskId}
-                        cameraId={cameraId}
-                        isStreaming={isStreaming}
-                        tracks={tracks}
-                        focusedPerson={focusedPerson}
-                        onTrackClick={(track) => handleTrackFocus(cameraId, track)}
-                        onFrameCapture={handleFrameCapture}
-                      />
-                      <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                        {displayName} ({cameraId})
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              /* Single camera view - render all cameras but show only the selected one */
-              <div className="relative bg-black rounded overflow-hidden w-full h-full flex items-center justify-center min-h-[320px]">
-                {cameraIds.map((cameraId) => {
-                  const isActive = activeTab === cameraId;
-                  const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
-                  const displayName = getCameraDisplayNameById(cameraId);
-
-                  return (
-                    <div
-                      key={`single-${cameraId}`}
-                      className="relative w-full h-full"
-                      style={{ display: isActive ? 'block' : 'none' }}
+                      className={`relative bg-black rounded overflow-hidden flex items-center justify-center transition-all ${isViewAll
+                          ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer'
+                          : 'w-full h-full min-h-[320px]'
+                        }`}
+                      style={{
+                        display: isVisible ? (isViewAll ? 'flex' : 'flex') : 'none',
+                        // In single view, only the active camera takes full space
+                        ...((!isViewAll && isSingleActive) ? { position: 'absolute', inset: 0 } : {})
+                      }}
+                      onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
                     >
                       <CameraStreamView
                         taskId={taskId}
