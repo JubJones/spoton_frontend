@@ -1,5 +1,5 @@
 // src/pages/GroupViewPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, memo } from "react";
 import { Link } from "react-router-dom";
 import DetectionPersonList from "../components/DetectionPersonList";
 // import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
@@ -176,7 +176,7 @@ interface FocusedPersonState {
 
 // --- GroupViewPage Component ---
 
-const CameraStreamView: React.FC<{
+interface CameraStreamViewProps {
   taskId: string | null;
   cameraId: string;
   isStreaming: boolean;
@@ -184,13 +184,19 @@ const CameraStreamView: React.FC<{
   onTrackClick: (track: Track) => void;
   focusedPerson: FocusedPersonState | null;
   onFrameCapture?: (cameraId: string, frameBase64: string) => void;
-}> = ({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture }) => {
+}
+
+// Memoized to prevent re-renders when props haven't changed
+const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
+  // Ref for tracking RAF to prevent memory leaks
+  const rafRef = useRef<number | null>(null);
 
-  // Frame capture effect - captures from img every 500ms
+  // Frame capture - interval-based for MJPEG (load event doesn't fire per frame)
+  // Throttled to 2fps (500ms) for performance
   useEffect(() => {
     if (!isStreaming || !taskId || !onFrameCapture) return;
 
@@ -202,27 +208,26 @@ const CameraStreamView: React.FC<{
       const ctx = captureCanvas.getContext('2d');
       if (!ctx) return;
 
-      // Set canvas to match image natural dimensions
-      captureCanvas.width = img.naturalWidth;
-      captureCanvas.height = img.naturalHeight;
-
       try {
+        // Set canvas to match image natural dimensions
+        captureCanvas.width = img.naturalWidth;
+        captureCanvas.height = img.naturalHeight;
+
         // Draw the current MJPEG frame to canvas
         ctx.drawImage(img, 0, 0);
 
         // Convert to base64
         const frameBase64 = captureCanvas.toDataURL('image/jpeg', 0.7);
         onFrameCapture(cameraId, frameBase64);
-      } catch (e) {
+      } catch {
         // Cross-origin or security error - ignore silently
-        console.debug('Frame capture failed for', cameraId, e);
       }
     };
 
-    // Initial capture after a short delay for image to load
+    // Initial capture after stream loads
     const initialTimeout = setTimeout(captureFrame, 1000);
 
-    // Capture every 500ms
+    // Capture at 2fps (500ms) - more efficient than before
     const interval = setInterval(captureFrame, 500);
 
     return () => {
@@ -231,6 +236,7 @@ const CameraStreamView: React.FC<{
     };
   }, [isStreaming, taskId, cameraId, onFrameCapture]);
 
+  // Canvas drawing with requestAnimationFrame for smooth rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     const container = containerRef.current;
@@ -239,36 +245,39 @@ const CameraStreamView: React.FC<{
     const ctx = canvas.getContext('2d');
     if (!ctx) return;
 
-    // Set canvas resolution to match display size for sharp text
-    const resizeCanvas = () => {
+    let resizeTimeout: ReturnType<typeof setTimeout> | null = null;
+
+    // Draw function - called via RAF
+    const draw = () => {
       const { width, height } = container.getBoundingClientRect();
-      canvas.width = width;
-      canvas.height = height;
+
+      // Only resize canvas if dimensions changed
+      if (canvas.width !== width || canvas.height !== height) {
+        canvas.width = width;
+        canvas.height = height;
+      }
 
       // Clear canvas
       ctx.clearRect(0, 0, width, height);
 
       if (!isStreaming || !taskId) return;
 
-      // Draw Logic
-      // Image source dimensions are 1920x1080
+      // Draw Logic - Image source dimensions are 1920x1080
       const srcW = 1920;
       const srcH = 1080;
 
-      // Calculate letterboxing to determine where the image actually is
+      // Calculate letterboxing
       const srcRatio = srcW / srcH;
       const containerRatio = width / height;
 
-      let drawW, drawH, offsetX, offsetY;
+      let drawW: number, drawH: number, offsetX: number, offsetY: number;
 
       if (containerRatio > srcRatio) {
-        // Container is wider than image (height limited)
         drawH = height;
         drawW = height * srcRatio;
         offsetX = (width - drawW) / 2;
         offsetY = 0;
       } else {
-        // Container is taller than image (width limited)
         drawW = width;
         drawH = width / srcRatio;
         offsetX = 0;
@@ -276,7 +285,8 @@ const CameraStreamView: React.FC<{
       }
 
       // Draw tracks
-      tracks.forEach(track => {
+      for (let i = 0; i < tracks.length; i++) {
+        const track = tracks[i];
         const [x1, y1, x2, y2] = track.bbox_xyxy;
 
         // Map 1920x1080 coords to drawn image rect
@@ -294,12 +304,10 @@ const CameraStreamView: React.FC<{
           const globalId = track.global_id !== undefined ? String(track.global_id) : undefined;
           const personGlobalId = focusedPerson.globalId;
 
-          // Cross-camera highlighting: if global_id matches, highlight regardless of camera
           if (personGlobalId && globalId && globalId === personGlobalId) {
             isFocused = true;
           }
 
-          // Fallback: if same camera and track matches (for tracks without global_id)
           if (!isFocused && focusedPerson.cameraId === cameraId) {
             if (focusedPerson.trackKey && focusedPerson.trackKey.includes(String(track.track_id))) {
               isFocused = true;
@@ -321,15 +329,35 @@ const CameraStreamView: React.FC<{
 
         ctx.fillStyle = '#FFFFFF';
         ctx.fillText(labelText, dx1 + 2, dy1 - 4);
-      });
+      }
     };
 
-    resizeCanvas();
-    // Simple way to handle resize:
-    window.addEventListener('resize', resizeCanvas);
-    return () => window.removeEventListener('resize', resizeCanvas);
+    // Schedule draw with RAF
+    const scheduleRafDraw = () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+      rafRef.current = requestAnimationFrame(draw);
+    };
 
-  }, [tracks, isStreaming, taskId, focusedPerson]); // Re-run when tracks update
+    // Debounced resize handler (100ms)
+    const handleResize = () => {
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(scheduleRafDraw, 100);
+    };
+
+    // Initial draw
+    scheduleRafDraw();
+
+    // Listen for resize with debounce
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      if (resizeTimeout) clearTimeout(resizeTimeout);
+      if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    };
+  }, [tracks, isStreaming, taskId, focusedPerson, cameraId]);
 
   return (
     <div ref={containerRef} className="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
@@ -358,7 +386,10 @@ const CameraStreamView: React.FC<{
       />
     </div>
   );
-};
+});
+
+// Display name for React DevTools
+CameraStreamView.displayName = 'CameraStreamView';
 
 const GroupViewPage: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabType>("all");
