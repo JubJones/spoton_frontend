@@ -138,17 +138,35 @@ const HelpPage: React.FC = () => {
             <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6">
               <div className="flex items-center gap-3 mb-4">
                 <MousePointer className="w-6 h-6 text-orange-500" />
-                <h3 className="text-xl font-bold text-white">Focus Mode</h3>
+                <h3 className="text-xl font-bold text-white">Cross-Camera Tracking</h3>
               </div>
               <p className="text-gray-400 leading-relaxed mb-4">
-                To track a specific individual across the facility:
+                Track a specific individual across multiple cameras using their unique Global ID:
               </p>
               <ol className="list-decimal list-inside text-gray-400 space-y-2 ml-2">
-                <li>Locate the person in any camera feed.</li>
-                <li><strong>Click directly on their bounding box.</strong></li>
-                <li>The system will lock onto this person. Their bounding box will turn <span className="text-orange-400 font-bold">Orange</span>.</li>
-                <li>The system will now highlight this same person in <strong>all other cameras</strong> automatically.</li>
+                <li>Locate the person in any camera feed (shown with <span className="text-green-400 font-bold">green</span> bounding box).</li>
+                <li><strong>Click directly on their bounding box</strong> to select them.</li>
+                <li>The selected person's bounding box turns <span className="text-yellow-400 font-bold">gold</span> in all cameras where they appear.</li>
+                <li>The system automatically matches by Global ID across all camera feeds.</li>
+                <li>Click again to deselect and return to normal view.</li>
               </ol>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Users className="w-6 h-6 text-orange-500" />
+                <h3 className="text-xl font-bold text-white">Detected People Panel</h3>
+              </div>
+              <p className="text-gray-400 leading-relaxed mb-4">
+                Below the camera feeds, you'll find the Detected People panel showing:
+              </p>
+              <ul className="list-disc list-inside text-gray-400 space-y-2 ml-2">
+                <li><strong>Person Thumbnails:</strong> Cropped images of each detected person</li>
+                <li><strong>Confidence Score:</strong> Detection confidence percentage (green ≥80%, yellow 60-79%, red &lt;60%)</li>
+                <li><strong>Track ID:</strong> Unique identifier for tracking continuity</li>
+                <li><strong>Camera Source:</strong> Which camera the detection came from</li>
+                <li><strong>Map Coordinates:</strong> Position on the facility map (if available)</li>
+              </ul>
             </div>
 
             <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6">
@@ -157,17 +175,32 @@ const HelpPage: React.FC = () => {
                 <h3 className="text-xl font-bold text-white">Interactive Map</h3>
               </div>
               <p className="text-gray-400 leading-relaxed">
-                The map on the right side of your screen shows a bird's-eye view of the facility.
+                The map panel shows a bird's-eye view of the facility with real-time person positions.
               </p>
               <ul className="mt-4 space-y-3">
                 <li className="flex items-center gap-3 text-sm text-gray-300">
-                  <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                  <span><strong>Orange Dot:</strong> The person you are currently tracking.</span>
+                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
+                  <span><strong>Gold Dot:</strong> The person you are currently tracking.</span>
                 </li>
                 <li className="flex items-center gap-3 text-sm text-gray-300">
-                  <span className="w-3 h-3 rounded-full bg-gray-500"></span>
-                  <span><strong>Gray Dot:</strong> Other detected individuals.</span>
+                  <span className="w-3 h-3 rounded-full bg-green-500"></span>
+                  <span><strong>Green Dot:</strong> Other detected individuals.</span>
                 </li>
+              </ul>
+            </div>
+
+            <div className="bg-gradient-to-br from-gray-900 to-black border border-gray-800 rounded-xl p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Camera className="w-6 h-6 text-orange-500" />
+                <h3 className="text-xl font-bold text-white">Stream Controls</h3>
+              </div>
+              <p className="text-gray-400 leading-relaxed mb-4">
+                Control the video streaming and detection processing:
+              </p>
+              <ul className="list-disc list-inside text-gray-400 space-y-2 ml-2">
+                <li><strong>Start Stream:</strong> Begin receiving live camera feeds with detection overlays</li>
+                <li><strong>Stop Stream:</strong> Stop streaming and cleanup detection tasks</li>
+                <li><strong>Tab Navigation:</strong> Switch between "View All" (grid) or individual camera views</li>
               </ul>
             </div>
           </div>
@@ -180,32 +213,68 @@ const HelpPage: React.FC = () => {
       content: (
         <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
           <div>
-            <h2 className="text-3xl font-bold text-white mb-6">Understanding Reports</h2>
+            <h2 className="text-3xl font-bold text-white mb-6">Analytics Dashboard</h2>
             <p className="text-gray-400 mb-8">
-              Navigate to the <strong>Analytics</strong> page via the header to view long-term trends.
+              Navigate to the <strong>Analytics</strong> page via the header to view real-time metrics, trends, and system health information.
             </p>
 
             <div className="grid grid-cols-1 gap-6">
               <div className="flex gap-6 p-6 bg-white/5 border border-white/10 rounded-xl">
                 <div className="shrink-0 pt-1">
-                  <Users className="w-8 h-8 text-blue-400" />
+                  <Activity className="w-8 h-8 text-orange-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white mb-2">Peak Occupancy</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">Time Range Filtering</h3>
                   <p className="text-gray-400 text-sm">
-                    Understand when your facility is busiest. Use this data to schedule cleaning or security shifts efficiently.
+                    Use the time range buttons (1h, 6h, 24h, 7d) to filter analytics data by different periods. The dashboard automatically refreshes with new data based on your selection.
                   </p>
                 </div>
               </div>
 
               <div className="flex gap-6 p-6 bg-white/5 border border-white/10 rounded-xl">
                 <div className="shrink-0 pt-1">
-                  <Activity className="w-8 h-8 text-green-400" />
+                  <BarChart2 className="w-8 h-8 text-blue-400" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-white mb-2">Traffic Heatmaps</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">System Statistics</h3>
                   <p className="text-gray-400 text-sm">
-                    Visualizes "hot spots" where people tend to congregate. Warmer colors (Red/Orange) indicate high traffic areas, while cooler colors (Blue) indicate low usage.
+                    Monitor analytics engine performance (queries processed, cache hit rate) and database service health (Redis/PostgreSQL status, sync operations).
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6 p-6 bg-white/5 border border-white/10 rounded-xl">
+                <div className="shrink-0 pt-1">
+                  <Users className="w-8 h-8 text-green-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-2">Camera Health & Load</h3>
+                  <p className="text-gray-400 text-sm">
+                    View per-camera metrics including detection counts, unique entities, average confidence, and uptime status for each active camera.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6 p-6 bg-white/5 border border-white/10 rounded-xl">
+                <div className="shrink-0 pt-1">
+                  <HelpCircle className="w-8 h-8 text-yellow-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-2">System Events</h3>
+                  <p className="text-gray-400 text-sm">
+                    Real-time status events generated from system metrics including database health, cache performance, sync status, and confidence alerts. Click "View All" to see the complete event list.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex gap-6 p-6 bg-white/5 border border-white/10 rounded-xl">
+                <div className="shrink-0 pt-1">
+                  <BookOpen className="w-8 h-8 text-purple-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-white mb-2">Export Reports</h3>
+                  <p className="text-gray-400 text-sm">
+                    Click the "Export Report" button to generate a CSV export of analytics data. The system will create an export job and provide a job ID for tracking.
                   </p>
                 </div>
               </div>
@@ -225,21 +294,35 @@ const HelpPage: React.FC = () => {
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-white mb-2">Why did the tracking box disappear?</h3>
               <p className="text-sm text-gray-400">
-                If a person walks behind a large obstacle (like a pillar or machine) or leaves the camera's view, the tracking box may briefly disappear. The system will attempt to picking them up again once they reappear.
+                If a person walks behind an obstacle or leaves the camera's view, the tracking box may briefly disappear. The system uses a Global ID to re-identify them when they reappear in the same or a different camera.
               </p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">Can I export the video?</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">How does cross-camera tracking work?</h3>
               <p className="text-sm text-gray-400">
-                Currently, SpotOn is a <strong>live monitoring tool</strong>. Video export functionality is scheduled for a future update. However, you can export <em>Analytics reports</em> as PDFs.
+                Each detected person is assigned a <strong>Global ID</strong> that persists across cameras. When you click to focus on someone, the system matches their Global ID across all camera feeds and highlights them with a gold border wherever they appear.
               </p>
             </div>
 
             <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-white mb-2">My screen says "Disconnected"</h3>
+              <h3 className="text-lg font-semibold text-white mb-2">Can I export analytics data?</h3>
               <p className="text-sm text-gray-400">
-                This usually means the connection to the processing server was lost. Please verify your internet connection. If the problem persists, contact your IT administrator.
+                Yes! On the Analytics page, click the <strong>"Export Report"</strong> button. The system will create a CSV export job and provide a job ID. The export includes detection counts, confidence metrics, and time-series data for the selected time range.
+              </p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-2">My screen says "Backend Disconnected"</h3>
+              <p className="text-sm text-gray-400">
+                This means the frontend cannot reach the processing backend. Check that the backend server is running and accessible. The connection status is shown in the header. Once connected, you can start streaming.
+              </p>
+            </div>
+
+            <div className="bg-gray-900 border border-gray-800 rounded-lg p-6">
+              <h3 className="text-lg font-semibold text-white mb-2">Why are person thumbnails showing a placeholder icon?</h3>
+              <p className="text-sm text-gray-400">
+                Thumbnails are cropped from the live MJPEG stream. If the stream hasn't loaded yet or there's a cross-origin issue, a placeholder with the person's dimensions and confidence color is shown instead.
               </p>
             </div>
           </div>
