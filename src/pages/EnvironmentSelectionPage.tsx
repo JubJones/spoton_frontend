@@ -206,8 +206,10 @@ const EnvironmentSelectionPage: React.FC = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold mb-4 text-white">Select Your Environment</h1>
           <p className="text-xl text-gray-300 max-w-4xl mx-auto">
-            Choose from our pre-configured monitoring environments. Each environment includes
-            multiple camera feeds with specialized tracking capabilities.
+            Choose from our pre-configured monitoring environments.
+            <span className="block">
+              Each environment includes multiple camera feeds with specialized tracking capabilities.
+            </span>
           </p>
         </div>
 
