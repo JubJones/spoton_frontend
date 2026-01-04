@@ -5,21 +5,10 @@ import Header from '../components/common/Header';
 import StatusCard from '../components/common/StatusCard';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import { apiService } from '../services/apiService';
-import type { EnvironmentId, BackendCameraId, ExportFormat, RealTimeMetrics } from '../types/api';
+import type { EnvironmentId, BackendCameraId, RealTimeMetrics } from '../types/api';
 import { useCameraConfig } from '../context/CameraConfigContext';
 
 type TimeRangeKey = '5m' | '1h' | '6h' | 'today' | '24h' | '3d' | '7d' | '30d' | '1m';
-
-const TIME_RANGE_TO_DURATION_MS: Partial<Record<TimeRangeKey, number>> = {
-  '5m': 5 * 60 * 1000,
-  '1h': 60 * 60 * 1000,
-  '6h': 6 * 60 * 60 * 1000,
-  '24h': 24 * 60 * 60 * 1000,
-  '3d': 3 * 24 * 60 * 60 * 1000,
-  '7d': 7 * 24 * 60 * 60 * 1000,
-  '30d': 30 * 24 * 60 * 60 * 1000,
-  '1m': 30 * 24 * 60 * 60 * 1000,
-};
 
 interface TimeRangeProfile {
   activePersons: number;
@@ -59,7 +48,7 @@ const TIME_RANGE_PROFILES: Record<TimeRangeKey, TimeRangeProfile> = {
     processingLatency: 0.23,
     cameraLoads: { c09: 28, c12: 24, c13: 18, c16: 24 },
   },
-  'today': {
+  today: {
     activePersons: 132,
     detectionRatePerSecond: 0.062,
     averageConfidence: 0.87,
@@ -127,21 +116,6 @@ const TIME_RANGE_FILTERS: Array<{ key: TimeRangeKey; label: string; helper: stri
   { key: '1m', label: 'Last Month', helper: 'Previous cycle' },
 ];
 
-
-const computeTimeRangeWindow = (range: TimeRangeKey): { start: Date; end: Date } => {
-  const end = new Date();
-
-  if (range === 'today') {
-    const start = new Date(end);
-    start.setHours(0, 0, 0, 0);
-    return { start, end };
-  }
-
-  const durationMs = (TIME_RANGE_TO_DURATION_MS[range] ?? TIME_RANGE_TO_DURATION_MS['24h'] ?? 24 * 60 * 60 * 1000);
-  const start = new Date(end.getTime() - durationMs);
-  return { start, end };
-};
-
 const AnalyticsPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const environment = (searchParams.get('environment') || 'factory') as EnvironmentId;
@@ -150,13 +124,15 @@ const AnalyticsPage: React.FC = () => {
   const [selectedCameras, setSelectedCameras] = useState<Set<BackendCameraId>>(new Set());
   const [refreshInterval, setRefreshInterval] = useState<number>(30);
   const [isAutoRefresh, setIsAutoRefresh] = useState(true);
-  const [isExporting, setIsExporting] = useState(false);
 
   const { isConnected, backendStatus } = useSpotOnBackend();
-  const connectionStatus = useMemo(() => ({
-    isConnected,
-    statusText: isConnected ? backendStatus.status : 'Disconnected',
-  }), [backendStatus.status, isConnected]);
+  const connectionStatus = useMemo(
+    () => ({
+      isConnected,
+      statusText: isConnected ? backendStatus.status : 'Disconnected',
+    }),
+    [backendStatus.status, isConnected]
+  );
 
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
@@ -173,13 +149,11 @@ const AnalyticsPage: React.FC = () => {
 
     const profileCameraLoads = profile?.cameraLoads ?? {};
     let chosenCameraLoads: Record<string, number> =
-      Object.keys(profileCameraLoads).length > 0
-        ? profileCameraLoads
-        : base?.camera_loads ?? {};
+      Object.keys(profileCameraLoads).length > 0 ? profileCameraLoads : (base?.camera_loads ?? {});
 
     if (cameraIds.length > 0) {
       const matchesConfigured = Object.keys(chosenCameraLoads).every((key) =>
-        cameraIds.includes(key as BackendCameraId),
+        cameraIds.includes(key as BackendCameraId)
       );
 
       if (!matchesConfigured) {
@@ -211,10 +185,8 @@ const AnalyticsPage: React.FC = () => {
       average_confidence: profile?.averageConfidence ?? base?.average_confidence ?? 0,
       camera_loads: chosenCameraLoads,
       performance_metrics: {
-        cache_hit_rate:
-          profile?.cacheHitRate ?? base?.performance_metrics?.cache_hit_rate ?? 0,
-        error_rate:
-          profile?.errorRate ?? base?.performance_metrics?.error_rate ?? 0,
+        cache_hit_rate: profile?.cacheHitRate ?? base?.performance_metrics?.cache_hit_rate ?? 0,
+        error_rate: profile?.errorRate ?? base?.performance_metrics?.error_rate ?? 0,
         processing_latency:
           profile?.processingLatency ?? base?.performance_metrics?.processing_latency ?? 0,
         memory_usage: base?.performance_metrics?.memory_usage ?? 0,
@@ -222,33 +194,30 @@ const AnalyticsPage: React.FC = () => {
     };
   }, [metrics, selectedTimeRange, cameraIds]);
 
-  const fetchMetrics = useCallback(
-    async (options: { showSpinner?: boolean } = {}) => {
-      const { showSpinner = false } = options;
-      try {
-        if (showSpinner) {
-          setIsLoadingMetrics(true);
-        } else {
-          setIsRefreshingMetrics(true);
-        }
-
-        const data = await apiService.getRealTimeMetrics();
-        setMetrics(data);
-        setMetricsError(null);
-        setLastUpdated(data.timestamp);
-      } catch (error) {
-        console.error('Failed to fetch real-time metrics:', error);
-        setMetricsError(error instanceof Error ? error.message : 'Unknown error');
-      } finally {
-        if (showSpinner) {
-          setIsLoadingMetrics(false);
-        } else {
-          setIsRefreshingMetrics(false);
-        }
+  const fetchMetrics = useCallback(async (options: { showSpinner?: boolean } = {}) => {
+    const { showSpinner = false } = options;
+    try {
+      if (showSpinner) {
+        setIsLoadingMetrics(true);
+      } else {
+        setIsRefreshingMetrics(true);
       }
-    },
-    [],
-  );
+
+      const data = await apiService.getRealTimeMetrics();
+      setMetrics(data);
+      setMetricsError(null);
+      setLastUpdated(data.timestamp);
+    } catch (error) {
+      console.error('Failed to fetch real-time metrics:', error);
+      setMetricsError(error instanceof Error ? error.message : 'Unknown error');
+    } finally {
+      if (showSpinner) {
+        setIsLoadingMetrics(false);
+      } else {
+        setIsRefreshingMetrics(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     fetchMetrics({ showSpinner: true });
@@ -294,15 +263,15 @@ const AnalyticsPage: React.FC = () => {
   }, [cameraLoadEntries]);
 
   const detectionRatePerSecond = displayMetrics?.detection_rate ?? null;
-  const averageConfidencePercent = displayMetrics
-    ? displayMetrics.average_confidence * 100
-    : null;
-  const cacheHitRatePercent = displayMetrics?.performance_metrics?.cache_hit_rate != null
-    ? displayMetrics.performance_metrics.cache_hit_rate * 100
-    : null;
-  const errorRatePercent = displayMetrics?.performance_metrics?.error_rate != null
-    ? displayMetrics.performance_metrics.error_rate * 100
-    : null;
+  const averageConfidencePercent = displayMetrics ? displayMetrics.average_confidence * 100 : null;
+  const cacheHitRatePercent =
+    displayMetrics?.performance_metrics?.cache_hit_rate != null
+      ? displayMetrics.performance_metrics.cache_hit_rate * 100
+      : null;
+  const errorRatePercent =
+    displayMetrics?.performance_metrics?.error_rate != null
+      ? displayMetrics.performance_metrics.error_rate * 100
+      : null;
   const processingLatency = displayMetrics?.performance_metrics?.processing_latency ?? null;
   const memoryUsage = displayMetrics?.performance_metrics?.memory_usage ?? null;
   const reportingCameraCount = cameraLoadEntries.length;
@@ -347,9 +316,7 @@ const AnalyticsPage: React.FC = () => {
       {
         label: 'Average Confidence',
         value:
-          averageConfidencePercent !== null
-            ? `${formatNumber(averageConfidencePercent, 1)}%`
-            : '—',
+          averageConfidencePercent !== null ? `${formatNumber(averageConfidencePercent, 1)}%` : '—',
         status: 'success' as const,
       },
       {
@@ -359,10 +326,7 @@ const AnalyticsPage: React.FC = () => {
       },
       {
         label: 'Cache Hit Rate',
-        value:
-          cacheHitRatePercent !== null
-            ? `${formatNumber(cacheHitRatePercent, 1)}%`
-            : '—',
+        value: cacheHitRatePercent !== null ? `${formatNumber(cacheHitRatePercent, 1)}%` : '—',
         status: 'success' as const,
       },
       {
@@ -370,7 +334,8 @@ const AnalyticsPage: React.FC = () => {
         value: errorRatePercent !== null ? `${formatNumber(errorRatePercent, 2)}%` : '—',
         status: 'warning' as const,
       },
-    ], [
+    ],
+    [
       averageConfidencePercent,
       cacheHitRatePercent,
       detectionRatePerSecond,
@@ -378,7 +343,7 @@ const AnalyticsPage: React.FC = () => {
       displayMetrics?.active_persons,
       reportingCameraCount,
       cameraIds.length,
-    ],
+    ]
   );
 
   const handleCameraToggle = useCallback((cameraId: BackendCameraId) => {
@@ -393,91 +358,12 @@ const AnalyticsPage: React.FC = () => {
     });
   }, []);
 
-  const handleExportData = useCallback(
-    async (format: 'csv' | 'json' | 'pdf' | 'excel') => {
-      try {
-        setIsExporting(true);
-
-        const { start, end } = computeTimeRangeWindow(selectedTimeRange);
-
-    const exportRequest: ExportAnalyticsReportRequest = {
-          environment_id: environment,
-          start_time: start.toISOString(),
-          end_time: end.toISOString(),
-          format: format as ExportFormat,
-          include_zones: true,
-          include_heatmaps: true,
-          include_trajectories: true,
-          include_reports: true,
-          include_snapshots: true,
-          camera_ids: selectedCameras.size > 0 ? Array.from(selectedCameras) : undefined,
-        };
-
-        const exportJob = await apiService.createAnalyticsExport(exportRequest);
-        const jobId = exportJob.job_id;
-        setExportProgress((prev) => ({ ...prev, [jobId]: 0 }));
-
-        const pollInterval = window.setInterval(async () => {
-          try {
-            const status = await apiService.getExportJobStatus(jobId);
-            setExportProgress((prev) => ({ ...prev, [jobId]: status.progress }));
-
-            if (status.status === 'completed') {
-              window.clearInterval(pollInterval);
-
-              if (status.download_url) {
-                const blob = await apiService.downloadExport(jobId);
-                const url = window.URL.createObjectURL(blob);
-                const anchor = document.createElement('a');
-                anchor.href = url;
-                anchor.download = `analytics-${environment}-${format}-${new Date()
-                  .toISOString()
-                  .split('T')[0]}.${format}`;
-                document.body.appendChild(anchor);
-                anchor.click();
-                document.body.removeChild(anchor);
-                window.URL.revokeObjectURL(url);
-              }
-
-              setExportProgress((prev) => {
-                const next = { ...prev };
-                delete next[jobId];
-                return next;
-              });
-            } else if (status.status === 'failed') {
-              window.clearInterval(pollInterval);
-              console.error('Export failed:', status.error_message);
-              setExportProgress((prev) => {
-                const next = { ...prev };
-                delete next[jobId];
-                return next;
-              });
-            }
-          } catch (error) {
-            console.error('Error polling export status:', error);
-            window.clearInterval(pollInterval);
-            setExportProgress((prev) => {
-              const next = { ...prev };
-              delete next[jobId];
-              return next;
-            });
-          }
-        }, 2000);
-      } catch (error) {
-        console.error('Export failed:', error);
-      } finally {
-        setIsExporting(false);
-      }
-    },
-    [environment, selectedCameras, selectedTimeRange],
-  );
-
   const getTimeRangeLabel = (range: TimeRangeKey) => {
     const labels: Record<TimeRangeKey, string> = {
       '5m': 'Last 5 Minutes',
       '1h': 'Last Hour',
       '6h': 'Last 6 Hours',
-      'today': 'Today',
+      today: 'Today',
       '24h': 'Last 24 Hours',
       '3d': 'Last 3 Days',
       '7d': 'Last 7 Days',
@@ -490,12 +376,15 @@ const AnalyticsPage: React.FC = () => {
   const environmentLabel = environment === 'factory' ? 'Factory Floor' : 'Campus Network';
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-950 to-black text-white">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Header environment={environment} connectionStatus={connectionStatus} showBackButton={true} />
 
       <main className="container mx-auto px-6 py-10 space-y-10">
         <section className="relative overflow-hidden rounded-3xl border border-white/10 bg-gradient-to-r from-blue-600/20 via-purple-500/10 to-transparent p-8 shadow-2xl">
-          <div className="absolute inset-y-0 right-0 w-64 bg-gradient-to-l from-purple-500/30 to-transparent blur-3xl" aria-hidden="true" />
+          <div
+            className="absolute inset-y-0 right-0 w-64 bg-gradient-to-l from-purple-500/30 to-transparent blur-3xl"
+            aria-hidden="true"
+          />
           <div className="relative flex flex-col gap-10 lg:flex-row lg:items-start">
             <div className="flex-1 space-y-6">
               <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-sm text-blue-100">
@@ -503,17 +392,28 @@ const AnalyticsPage: React.FC = () => {
                 Analytics Control Center
               </div>
               <div>
-                <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">Actionable Insights</h1>
+                <h1 className="text-4xl sm:text-5xl font-bold text-white mb-3">
+                  Actionable Insights
+                </h1>
                 <p className="text-lg text-gray-200 max-w-2xl">
-                  Track performance, spot anomalies, and guide on-site teams with confident, data-backed decisions.
-                  These metrics update automatically, or refresh on demand whenever you need a fresh snapshot.
+                  Track performance, spot anomalies, and guide on-site teams with confident,
+                  data-backed decisions. These metrics update automatically, or refresh on demand
+                  whenever you need a fresh snapshot.
                 </p>
               </div>
               <div className="flex flex-wrap gap-3 text-sm text-gray-200">
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Environment: <span className="text-white font-semibold">{environmentLabel}</span></span>
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Time Range: {getTimeRangeLabel(selectedTimeRange)}</span>
-                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">Last updated: {lastUpdatedDisplay ?? '—'}</span>
-                <span className={`px-3 py-1 rounded-full border ${isConnected ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-red-400/30 bg-red-400/10 text-red-200'}`}>
+                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">
+                  Environment: <span className="text-white font-semibold">{environmentLabel}</span>
+                </span>
+                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">
+                  Time Range: {getTimeRangeLabel(selectedTimeRange)}
+                </span>
+                <span className="px-3 py-1 rounded-full border border-white/10 bg-white/5">
+                  Last updated: {lastUpdatedDisplay ?? '—'}
+                </span>
+                <span
+                  className={`px-3 py-1 rounded-full border ${isConnected ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200' : 'border-red-400/30 bg-red-400/10 text-red-200'}`}
+                >
                   {isConnected ? 'Live connection' : 'Offline snapshot'}
                 </span>
               </div>
@@ -535,7 +435,9 @@ const AnalyticsPage: React.FC = () => {
                         ${isActive ? 'border-orange-400/60 bg-orange-500/10 text-orange-100 shadow-lg shadow-orange-500/20' : 'border-white/10 bg-white/5 hover:border-orange-400/30 hover:bg-white/10 text-gray-200'}`}
                     >
                       <span className="text-sm font-semibold">{filter.label}</span>
-                      <span className="text-xs text-gray-300/80 group-hover:text-gray-200">{filter.helper}</span>
+                      <span className="text-xs text-gray-300/80 group-hover:text-gray-200">
+                        {filter.helper}
+                      </span>
                     </button>
                   );
                 })}
@@ -546,15 +448,26 @@ const AnalyticsPage: React.FC = () => {
               <div className="rounded-2xl border border-white/10 bg-black/40 p-4 shadow-lg space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm text-gray-300">Auto refresh</span>
-                  <label className="inline-flex items-center gap-2 text-sm text-gray-200">
-                    <input
-                      type="checkbox"
-                      checked={isAutoRefresh}
-                      onChange={(event) => setIsAutoRefresh(event.target.checked)}
-                      className="rounded border-gray-600 bg-gray-800 text-blue-500 focus:ring-blue-400"
-                    />
-                    <span>{isAutoRefresh ? 'On' : 'Off'}</span>
-                  </label>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setIsAutoRefresh((prev) => !prev)}
+                      className={`relative inline-flex max-h-2 w-16 items-center rounded-full px-1 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-blue-400 focus-visible:ring-offset-black/60 ${
+                        isAutoRefresh ? 'bg-emerald-500/80' : 'bg-gray-600'
+                      }`}
+                      aria-pressed={isAutoRefresh}
+                    >
+                      <span
+                        className="inline-block h-4 w-4 rounded-full bg-white shadow transition-transform duration-200 ease-out"
+                        style={{
+                          transform: isAutoRefresh ? 'translateX(2.4rem)' : 'translateX(0)',
+                        }}
+                      />
+                    </button>
+                    <span className="text-xs font-semibold tracking-wide uppercase text-gray-200">
+                      {isAutoRefresh ? 'On' : 'Off'}
+                    </span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <select
@@ -591,40 +504,6 @@ const AnalyticsPage: React.FC = () => {
                 </p>
               </div>
 
-              <div className="rounded-2xl border border-white/10 bg-black/40 p-4 shadow-lg space-y-3">
-                <div className="text-xs uppercase tracking-widest text-gray-400">Quick Export</div>
-                <div className="flex flex-wrap gap-2">
-                  <button
-                    onClick={() => handleExportData('csv')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-green-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-green-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    {isExporting ? (
-                      <span className="h-3 w-3 animate-spin rounded-full border border-white border-t-transparent" />
-                    ) : (
-                      <span>📊</span>
-                    )}
-                    CSV
-                  </button>
-                  <button
-                    onClick={() => handleExportData('excel')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-blue-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    📗 Excel
-                  </button>
-                  <button
-                    onClick={() => handleExportData('pdf')}
-                    disabled={isExporting}
-                    className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-purple-600 px-3 py-2 text-sm font-medium text-white transition hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-gray-600"
-                  >
-                    📑 PDF
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400">
-                  Exports include heatmaps, trajectories, and summary snapshots for the selected cameras.
-                </p>
-              </div>
             </div>
           </div>
         </section>
@@ -645,16 +524,19 @@ const AnalyticsPage: React.FC = () => {
           <div className="lg:col-span-2 rounded-2xl border border-white/10 bg-black/40 p-6 shadow-xl">
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <h3 className="text-xl font-semibold text-white">Camera Performance</h3>
-              <p className="text-sm text-gray-400">Select cameras to include in exports. Live share is based on the current time range.</p>
+              <p className="text-sm text-gray-400">
+                Select cameras to include in exports. Live share is based on the current time range.
+              </p>
             </div>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
               {cameraLoadEntries.map((camera) => {
                 const typedCameraId = camera.cameraId as BackendCameraId;
                 const isSelectable = camera.isConfigured;
                 const isSelected = isSelectable && selectedCameras.has(typedCameraId);
-                const share = totalActiveAcrossCameras > 0
-                  ? (camera.activePersons / totalActiveAcrossCameras) * 100
-                  : 0;
+                const share =
+                  totalActiveAcrossCameras > 0
+                    ? (camera.activePersons / totalActiveAcrossCameras) * 100
+                    : 0;
 
                 return (
                   <button
@@ -704,23 +586,32 @@ const AnalyticsPage: React.FC = () => {
               <dl className="space-y-3 text-sm">
                 <div className="flex items-center justify-between">
                   <dt className="text-gray-400">Cache Hit Rate</dt>
-                  <dd className="text-gray-100">{cacheHitRatePercent !== null ? `${cacheHitRatePercent.toFixed(1)}%` : '—'}</dd>
+                  <dd className="text-gray-100">
+                    {cacheHitRatePercent !== null ? `${cacheHitRatePercent.toFixed(1)}%` : '—'}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-gray-400">Processing Latency</dt>
-                  <dd className="text-gray-100">{processingLatency !== null ? `${processingLatency.toFixed(2)} s` : '—'}</dd>
+                  <dd className="text-gray-100">
+                    {processingLatency !== null ? `${processingLatency.toFixed(2)} s` : '—'}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-gray-400">Error Rate</dt>
-                  <dd className="text-gray-100">{errorRatePercent !== null ? `${errorRatePercent.toFixed(2)}%` : '—'}</dd>
+                  <dd className="text-gray-100">
+                    {errorRatePercent !== null ? `${errorRatePercent.toFixed(2)}%` : '—'}
+                  </dd>
                 </div>
                 <div className="flex items-center justify-between">
                   <dt className="text-gray-400">Memory Usage</dt>
-                  <dd className="text-gray-100">{memoryUsage !== null ? `${memoryUsage.toFixed(1)} MB` : '—'}</dd>
+                  <dd className="text-gray-100">
+                    {memoryUsage !== null ? `${memoryUsage.toFixed(1)} MB` : '—'}
+                  </dd>
                 </div>
               </dl>
               <p className="mt-4 text-xs text-gray-500">
-                Performance metrics auto-adjust to the active time range for apples-to-apples comparisons.
+                Performance metrics auto-adjust to the active time range for apples-to-apples
+                comparisons.
               </p>
             </div>
           </div>
@@ -736,18 +627,24 @@ const AnalyticsPage: React.FC = () => {
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Active Persons (range)</span>
-                <span className="text-gray-100">{formatNumber(displayMetrics?.active_persons)}</span>
+                <span className="text-gray-100">
+                  {formatNumber(displayMetrics?.active_persons)}
+                </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Detection Rate</span>
                 <span className="text-gray-100">
-                  {detectionRatePerSecond !== null ? `${detectionRatePerSecond.toFixed(2)} / sec` : '—'}
+                  {detectionRatePerSecond !== null
+                    ? `${detectionRatePerSecond.toFixed(2)} / sec`
+                    : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
                 <span className="text-gray-400">Average Confidence</span>
                 <span className="text-gray-100">
-                  {averageConfidencePercent !== null ? `${averageConfidencePercent.toFixed(1)}%` : '—'}
+                  {averageConfidencePercent !== null
+                    ? `${averageConfidencePercent.toFixed(1)}%`
+                    : '—'}
                 </span>
               </div>
               <div className="flex items-center justify-between">
@@ -762,14 +659,19 @@ const AnalyticsPage: React.FC = () => {
             <div className="space-y-3">
               {cameraLoadEntries.map((camera) => {
                 const typedCameraId = camera.cameraId as BackendCameraId;
-                const share = totalActiveAcrossCameras > 0 ? (camera.activePersons / totalActiveAcrossCameras) * 100 : 0;
+                const share =
+                  totalActiveAcrossCameras > 0
+                    ? (camera.activePersons / totalActiveAcrossCameras) * 100
+                    : 0;
                 const displayName = getDisplayName(typedCameraId) || camera.cameraId;
 
                 return (
                   <div key={`distribution-${camera.cameraId}`}>
                     <div className="flex items-center justify-between text-sm text-gray-300">
                       <span>{displayName}</span>
-                      <span className="text-gray-400">{formatNumber(camera.activePersons)} • {share.toFixed(1)}%</span>
+                      <span className="text-gray-400">
+                        {formatNumber(camera.activePersons)} • {share.toFixed(1)}%
+                      </span>
                     </div>
                     <div className="mt-2 h-2 rounded-full bg-white/10">
                       <div

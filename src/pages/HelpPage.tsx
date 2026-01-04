@@ -464,7 +464,7 @@ const HelpPage: React.FC = () => {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Header 
         connectionStatus={connectionStatus} 
         showBackButton={true} 
@@ -581,29 +581,6 @@ const HelpPage: React.FC = () => {
           )}
         </div>
 
-        {/* Contact Support */}
-        <div className="max-w-4xl mx-auto mt-12">
-          <div className="bg-gradient-to-r from-orange-500/10 to-red-500/10 border border-orange-500/20 rounded-lg p-6 text-center">
-            <h3 className="text-xl font-semibold text-white mb-3">Need Additional Help?</h3>
-            <p className="text-gray-300 mb-4">
-              Can't find what you're looking for? Our support team is here to help.
-            </p>
-            <div className="flex flex-wrap justify-center gap-4">
-              <a
-                href="mailto:support@spoton.example.com"
-                className="px-6 py-2 bg-orange-600 hover:bg-orange-700 text-white rounded-lg transition-colors"
-              >
-                📧 Email Support
-              </a>
-              <Link
-                to="/about"
-                className="px-6 py-2 bg-gray-600 hover:bg-gray-700 text-white rounded-lg transition-colors"
-              >
-                ℹ️ About SpotOn
-              </Link>
-            </div>
-          </div>
-        </div>
       </main>
     </div>
   );

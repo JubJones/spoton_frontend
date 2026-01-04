@@ -1,5 +1,5 @@
 // src/pages/GroupViewPage.tsx
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Link } from "react-router-dom";
 import DetectionPersonList from "../components/DetectionPersonList";
 // import ImageSequencePlayer from "../components/ImageSequencePlayer"; // Not used in this version
@@ -123,6 +123,8 @@ const BACKEND_WS_URL = "ws://localhost:3847";
 type TabType = "all" | BackendCameraId;
 const MAP_SOURCE_WIDTH = 1920; // Source width for map_coords (per camera)
 const MAP_SOURCE_HEIGHT = 1080; // Source height for map_coords (per camera)
+const DEFAULT_MAP_ASPECT_RATIO = 0.66; // Fallback ratio when video area is unknown
+const MIN_MAP_HEIGHT = 220;
 
 // --- MODIFIED: Type for storing calculated map points (per camera) ---
 
@@ -204,7 +206,18 @@ const GroupViewPage: React.FC = () => {
   // State to store detection data for PersonList component
   const [detectionData, setDetectionData] = useState<{ [camera_id: string]: DetectionStoreEntry }>({});
   const videoAreaRef = useRef<HTMLDivElement | null>(null);
-  const [videoAreaHeight, setVideoAreaHeight] = useState<number>();
+  const [videoAreaDimensions, setVideoAreaDimensions] = useState<{ width: number; height: number }>();
+
+  const videoAspectRatio = useMemo(() => {
+    if (!videoAreaDimensions?.width || !videoAreaDimensions?.height) {
+      return undefined;
+    }
+    if (videoAreaDimensions.width <= 0 || videoAreaDimensions.height <= 0) {
+      return undefined;
+    }
+    return videoAreaDimensions.height / videoAreaDimensions.width;
+  }, [videoAreaDimensions]);
+  const videoAreaHeight = videoAreaDimensions?.height;
 
   const [focusedPerson, setFocusedPerson] = useState<FocusedPersonState | null>(null);
 
@@ -1352,10 +1365,16 @@ const GroupViewPage: React.FC = () => {
 
     const observer = new ResizeObserver((entries) => {
       for (const entry of entries) {
-        const newHeight = entry.contentRect.height;
-        if (!Number.isNaN(newHeight)) {
-          setVideoAreaHeight((prev) => (prev !== newHeight ? newHeight : prev));
+        const { width, height } = entry.contentRect;
+        if (Number.isNaN(width) || Number.isNaN(height)) {
+          continue;
         }
+        setVideoAreaDimensions((prev) => {
+          if (prev?.width === width && prev?.height === height) {
+            return prev;
+          }
+          return { width, height };
+        });
       }
     });
 
@@ -1414,7 +1433,7 @@ const GroupViewPage: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-gray-200 p-4 sm:p-6">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-gray-200 p-4 sm:p-6">
       {/* Header Section (Keep as before) */}
       <header className="flex items-center justify-between mb-4 flex-shrink-0">
         <Link to="/" className="flex items-center text-lg hover:text-orange-400">
@@ -1868,9 +1887,61 @@ const GroupViewPage: React.FC = () => {
                   );
                 }
 
+                const selectedCameraId = activeTab === 'all' ? undefined : activeTab;
+                const targetCameraIds = selectedCameraId ? [selectedCameraId] : cameraIds;
+
+                const orderedMappingCameras = targetCameraIds.filter((cameraId) =>
+                  availableMappingCameras.includes(cameraId)
+                );
+
+                const fallbackMappingCameras = selectedCameraId
+                  ? []
+                  : availableMappingCameras.filter((cameraId) => !orderedMappingCameras.includes(cameraId));
+
+                const mappingCamerasInDisplayOrder = [
+                  ...orderedMappingCameras,
+                  ...fallbackMappingCameras,
+                ];
+
+                if (mappingCamerasInDisplayOrder.length === 0 && selectedCameraId) {
+                  const displayName = getCameraDisplayNameById(selectedCameraId);
+                  return (
+                    <div className="w-full h-full flex items-center justify-center text-gray-300 text-sm">
+                      🗺️ 2D mapping will display once detections arrive for {displayName} ({selectedCameraId})
+                    </div>
+                  );
+                }
+
+                const columns = Math.min(2, Math.max(1, mappingCamerasInDisplayOrder.length));
+                const gridClassName = columns === 1 ? 'grid-cols-1' : 'grid-cols-2';
+                const containerWidth = overallMapDimensions.width || 0;
+
+                // Account for container padding (p-2 => 8px each side), grid gap (gap-3 => 12px),
+                // and inner card padding (p-2 => 8px each side) so canvases fit without overflow.
+                const CONTAINER_HORIZONTAL_PADDING = 16;
+                const GRID_GAP = 12;
+                const CARD_HORIZONTAL_PADDING = 16;
+
+                let computedMapWidth = 320;
+                if (containerWidth > 0 && columns > 0) {
+                  const usableWidth = Math.max(0, containerWidth - CONTAINER_HORIZONTAL_PADDING);
+                  const totalGap = GRID_GAP * (columns - 1);
+                  const columnWidth = columns > 0 ? (usableWidth - totalGap) / columns : usableWidth;
+                  const rawWidth = Math.floor(columnWidth - CARD_HORIZONTAL_PADDING);
+                  computedMapWidth = rawWidth > 0 ? rawWidth : computedMapWidth;
+                }
+
+                const targetAspectRatio = videoAspectRatio && Number.isFinite(videoAspectRatio)
+                  ? videoAspectRatio
+                  : DEFAULT_MAP_ASPECT_RATIO;
+                const computedMapHeight = Math.max(
+                  MIN_MAP_HEIGHT,
+                  Math.floor(computedMapWidth * targetAspectRatio)
+                );
+
                 return (
-                  <div className="grid gap-3 grid-cols-1">
-                    {availableMappingCameras.map((backendCameraId) => {
+                  <div className={`grid gap-3 ${gridClassName}`}>
+                    {mappingCamerasInDisplayOrder.map((backendCameraId) => {
                       const coords = getMappingForCamera(backendCameraId);
                       if (!coords || coords.length === 0) return null;
                       return (
@@ -1880,8 +1951,8 @@ const GroupViewPage: React.FC = () => {
                             mappingCoordinates={coords}
                             mapVisible={true}
                             className="w-full"
-                            mapWidth={Math.max(320, Math.floor((overallMapDimensions.width || 0) - 32))}
-                            mapHeight={Math.max(220, Math.floor(((overallMapDimensions.width || 0) - 32) * 0.66))}
+                            mapWidth={computedMapWidth}
+                            mapHeight={computedMapHeight}
                           />
                         </div>
                       );

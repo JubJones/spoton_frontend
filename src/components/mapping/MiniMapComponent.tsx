@@ -1,4 +1,4 @@
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 
 /**
  * Trail point representing a person's position in their movement history
@@ -33,12 +33,45 @@ interface MiniMapComponentProps {
   className?: string;
 }
 
+const CAMERA_HUE_MAP: Record<string, number> = {
+  c01: 205,
+  c02: 140,
+  c03: 28,
+  c05: 320,
+  c09: 260,
+  c12: 36,
+  c13: 12,
+  c16: 180,
+};
+
+const hashCameraIdToHue = (cameraId: string): number => {
+  let hash = 0;
+  for (let i = 0; i < cameraId.length; i += 1) {
+    hash = (hash << 5) - hash + cameraId.charCodeAt(i);
+    hash |= 0; // Convert to 32bit integer
+  }
+  return Math.abs(hash) % 360;
+};
+
+const buildCameraColors = (cameraId: string) => {
+  const hue = CAMERA_HUE_MAP[cameraId] ?? hashCameraIdToHue(cameraId);
+  const base = `hsl(${hue}, 80%, 60%)`;
+  const trail = (alpha: number) => `hsla(${hue}, 75%, 60%, ${alpha})`;
+  const label = `hsl(${hue}, 40%, 75%)`;
+  return {
+    base,
+    trailLine: trail(0.45),
+    trailPoint: (alpha: number) => trail(alpha),
+    label,
+  };
+};
+
 /**
  * MiniMapComponent - Renders a 2D map showing person positions and movement trails
  * 
  * This component integrates with the detection endpoint WebSocket stream to display
  * real-time person positions as dots on a 2D coordinate system. It shows:
- * - Current person positions as blue dots
+ * - Current person positions color-coded per camera
  * - Movement trails (last 3 positions) as connected lines with fading points
  * - Grid coordinate system with meter-based scaling
  * - Camera identifier label
@@ -59,6 +92,7 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     minY: -10, 
     maxY: 10 
   });
+  const cameraColors = useMemo(() => buildCameraColors(cameraId), [cameraId]);
 
   // Calculate dynamic map bounds based on current coordinates
   useEffect(() => {
@@ -105,10 +139,8 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     canvas.width = width;
     canvas.height = height;
 
-    // Clear canvas and paint a uniform light background (consistent look across cams)
+    // Clear canvas so underlying card background shows through
     ctx.clearRect(0, 0, width, height);
-    ctx.fillStyle = '#f5f5f5';
-    ctx.fillRect(0, 0, width, height);
 
     const { minX, maxX, minY, maxY } = mapBounds;
     const scaleX = width / (maxX - minX);
@@ -153,8 +185,8 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
 
       // Draw trail if available
       if (coord.trail && coord.trail.length > 1) {
-        // Draw trail lines
-        ctx.strokeStyle = 'rgba(100, 150, 255, 0.6)';
+        // Draw trail lines in camera-specific color
+        ctx.strokeStyle = cameraColors.trailLine;
         ctx.lineWidth = 2;
         ctx.beginPath();
         
@@ -173,8 +205,7 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
         coord.trail.forEach((point, pointIndex) => {
           const trailPos = mapToCanvas(point.x, point.y);
           const alpha = 1 - (pointIndex * 0.3); // Fade older points
-          
-          ctx.fillStyle = `rgba(100, 150, 255, ${Math.max(alpha, 0.2)})`;
+          ctx.fillStyle = cameraColors.trailPoint(Math.max(alpha, 0.2));
           ctx.beginPath();
           ctx.arc(trailPos.x, trailPos.y, 3, 0, 2 * Math.PI);
           ctx.fill();
@@ -182,13 +213,13 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
       }
 
       // Draw current position (larger dot)
-      ctx.fillStyle = '#007bff';
+      ctx.fillStyle = cameraColors.base;
       ctx.beginPath();
       ctx.arc(currentPos.x, currentPos.y, 6, 0, 2 * Math.PI);
       ctx.fill();
 
       // Draw detection ID (last 3 characters for brevity)
-      ctx.fillStyle = '#333';
+      ctx.fillStyle = cameraColors.label;
       ctx.font = '10px Arial';
       ctx.fillText(
         coord.detection_id.slice(-3), 
@@ -198,11 +229,11 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     });
 
     // Draw camera label (keep minimal)
-    ctx.fillStyle = '#333';
+    ctx.fillStyle = cameraColors.label;
     ctx.font = 'bold 12px Arial';
     ctx.fillText(`Camera ${cameraId}`, 10, 20);
 
-  }, [mappingCoordinates, mapBounds, width, height, cameraId]);
+  }, [mappingCoordinates, mapBounds, width, height, cameraColors]);
 
   const validPersonCount = mappingCoordinates.filter(c => c.projection_successful).length;
 

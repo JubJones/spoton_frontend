@@ -113,7 +113,7 @@ const AboutPage: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-blue-900 to-purple-900">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-black text-white">
       <Header 
         connectionStatus={connectionStatus} 
         showBackButton={true} 
@@ -282,30 +282,6 @@ const AboutPage: React.FC = () => {
                       <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
                       <span className="text-gray-300">{tech}</span>
                     </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Development Team */}
-        <div className="mb-12">
-          <h2 className="text-3xl font-bold text-white text-center mb-8">Development Team</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            {teamMembers.map((member) => (
-              <div key={member.name} className="bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg p-6 text-center">
-                <div className="text-4xl mb-4">{member.avatar}</div>
-                <h3 className="text-xl font-semibold text-white mb-2">{member.name}</h3>
-                <p className="text-orange-400 font-medium mb-3">{member.role}</p>
-                <div className="space-y-1">
-                  {member.expertise.map((skill) => (
-                    <span
-                      key={skill}
-                      className="inline-block bg-gray-700/50 text-gray-300 px-2 py-1 rounded text-sm mr-1"
-                    >
-                      {skill}
-                    </span>
                   ))}
                 </div>
               </div>

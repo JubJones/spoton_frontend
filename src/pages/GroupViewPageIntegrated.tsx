@@ -305,7 +305,7 @@ const GroupViewPage: React.FC = () => {
             {/* === MODIFIED: Map Panel - Now a 2x2 Grid === */}
             <div
                 ref={overallMapContainerRef} // Ref for the main grid container
-                className="bg-gray-700 rounded-md h-1/2 grid grid-cols-2 grid-rows-2 gap-px overflow-hidden" // Grid layout with small gap for borders
+                className="bg-gray-700 rounded-md w-full aspect-video grid grid-cols-2 grid-rows-2 gap-px overflow-hidden" // Grid layout maintaining 16:9 aspect ratio
             >
                 {appCameraIds.map((appId, index) => {
                     const jsonCameraId = appCameraIdToJsonId[appId];
