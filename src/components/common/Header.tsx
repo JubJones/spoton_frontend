@@ -51,7 +51,10 @@ const Header: React.FC<HeaderProps> = ({
       <nav className="flex items-center space-x-6 text-base font-medium h-10">
         {/* Connection Status */}
         {connectionStatus && (
-          <div className="flex items-center space-x-2 h-full" data-testid="connection-indicator">
+          <div
+            className="flex items-center space-x-2 h-full pr-6 mr-4 border-r border-gray-700/60"
+            data-testid="connection-indicator"
+          >
             {typeof connectionStatus === 'string' ? (
               <span className="text-gray-300">{connectionStatus}</span>
             ) : (
@@ -74,11 +77,14 @@ const Header: React.FC<HeaderProps> = ({
           <>
             <Link
               to={`/analytics${environment ? `?environment=${environment}` : ''}`}
-              className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full"
+              className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full px-3 py-2 rounded-lg hover:bg-white/10"
             >
               Analytics
             </Link>
-            <Link to="/help" className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full">
+            <Link
+              to="/help"
+              className="text-gray-300 hover:text-orange-400 transition-colors flex items-center h-full px-3 py-2 rounded-lg hover:bg-white/10"
+            >
               Help
             </Link>
           </>
