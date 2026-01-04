@@ -31,7 +31,7 @@ const Header: React.FC<HeaderProps> = ({
       {/* Left side - Logo and back button */}
       <div className="flex items-center space-x-6">
         <Link to="/" className="flex items-center space-x-3">
-          <img src={logo} alt="SpotOn Logo" className="w-10 h-10 object-contain rounded-lg" />
+          <img src={logo} alt="SpotOn Logo" className="w-12 h-12 object-contain rounded-lg" />
           <div className="text-3xl font-bold bg-gradient-to-r from-orange-400 to-red-400 bg-clip-text text-transparent">
             SpotOn
           </div>
