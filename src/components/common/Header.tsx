@@ -40,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({
         {showBackButton && (
           <Link
             to={backUrl}
-            className="text-gray-300 hover:text-orange-400 transition-colors flex items-center space-x-2 text-sm font-medium"
+            className="text-gray-300 hover:text-orange-400 transition-colors flex items-center space-x-2 text-base font-medium"
           >
             <span>{backText}</span>
           </Link>
@@ -48,7 +48,7 @@ const Header: React.FC<HeaderProps> = ({
       </div>
 
       {/* Right side - Connection status and navigation */}
-      <nav className="flex items-center space-x-6 text-sm font-medium h-10">
+      <nav className="flex items-center space-x-6 text-base font-medium h-10">
         {/* Connection Status */}
         {connectionStatus && (
           <div className="flex items-center space-x-2 h-full" data-testid="connection-indicator">
