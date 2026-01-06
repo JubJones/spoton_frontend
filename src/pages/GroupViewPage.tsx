@@ -409,7 +409,7 @@ const GroupViewPage: React.FC = () => {
   const [focusedPerson, setFocusedPerson] = useState<FocusedPersonState | null>(null);
 
   // Mapping data hook - listens for 'websocket-mapping-message' events
-  const { mappingData, getMappingForCamera } = useMappingData({ enabled: true, maxTrailLength: 3 });
+  const { mappingData, getMappingForCamera, clearMappingData } = useMappingData({ enabled: true, maxTrailLength: 3 });
 
   const {
     environmentCameras,
@@ -898,8 +898,9 @@ const GroupViewPage: React.FC = () => {
     if (!focusedPerson.globalId) {
       setFocusedPerson(null);
       clearBackendFocus();
+      clearMappingData(); // Explicitly clear map when focus is lost/cleared
     }
-  }, [areBboxesClose, clearBackendFocus, currentFrameData, detectionData, focusedPerson, getTrackKey]);
+  }, [areBboxesClose, clearBackendFocus, clearMappingData, currentFrameData, detectionData, focusedPerson, getTrackKey]);
 
   // Get zone name based on environment
   const getZoneName = useCallback(() => {
@@ -912,8 +913,13 @@ const GroupViewPage: React.FC = () => {
       if (!isSelecting) {
         setFocusedPerson(null);
         clearBackendFocus();
+        clearMappingData(); // Explicitly clear map when selection is cleared
         return;
       }
+
+      // When explicitly selecting a new target, clear old map data immediately
+      // to avoid showing previous targets while waiting for the filtered stream
+      clearMappingData();
 
       const bboxArray: [number, number, number, number] = [
         detection.bbox.x1,
