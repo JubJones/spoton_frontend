@@ -109,7 +109,7 @@ interface UseMappingDataReturn {
 export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDataReturn => {
   const {
     enabled = true,
-    maxTrailLength = 3,
+    maxTrailLength = 100,
     maxAge = 30, // 30 seconds
   } = config;
 
@@ -170,9 +170,44 @@ export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDat
 
       // Update state
       setMappingData(prev => {
+        // Get previous coordinates for this camera to build trails
+        const prevCameraCoords = prev.mappingByCamera[cameraId] || [];
+
+        // Enhance coordinates with local trail history if not provided by backend
+        const enhancedCoordinates = validCoordinates.map(newCoord => {
+          // If backend provided a trail, use it
+          if (newCoord.trail && newCoord.trail.length > 0) {
+            return newCoord;
+          }
+
+          // Otherwise try to find previous position for this ID
+          const prevCoord = prevCameraCoords.find(p => p.detection_id === newCoord.detection_id);
+
+          if (prevCoord) {
+            // Create a trail point from the PREVIOUS position
+            const newTrailPoint: TrailPoint = {
+              x: prevCoord.map_x,
+              y: prevCoord.map_y,
+              frame_offset: 1,
+              timestamp: new Date().toISOString()
+            };
+
+            // Prepend new point to existing trail (newest first) and limit length
+            const existingTrail = prevCoord.trail || [];
+            const newTrail = [newTrailPoint, ...existingTrail].slice(0, maxTrailLength);
+
+            return {
+              ...newCoord,
+              trail: newTrail
+            };
+          }
+
+          return newCoord;
+        });
+
         const newMappingByCamera = {
           ...prev.mappingByCamera,
-          [cameraId]: validCoordinates,
+          [cameraId]: enhancedCoordinates,
         };
 
         // Calculate statistics

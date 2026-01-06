@@ -409,7 +409,7 @@ const GroupViewPage: React.FC = () => {
   const [focusedPerson, setFocusedPerson] = useState<FocusedPersonState | null>(null);
 
   // Mapping data hook - listens for 'websocket-mapping-message' events
-  const { mappingData, getMappingForCamera, clearMappingData } = useMappingData({ enabled: true, maxTrailLength: 3 });
+  const { mappingData, getMappingForCamera, clearMappingData } = useMappingData({ enabled: true, maxTrailLength: 20 });
 
   const {
     environmentCameras,
