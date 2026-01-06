@@ -1775,14 +1775,31 @@ const GroupViewPage: React.FC = () => {
                   const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
                   // Get map bounds for current environment
-                  const currentEnvId = getEnvironmentFromUrl();
-                  const envConfig = ENVIRONMENT_CONFIGS[currentEnvId];
-                  const fixedBounds = envConfig ? {
-                    minX: envConfig.map_bounds[0][0],
-                    minY: envConfig.map_bounds[0][1],
-                    maxX: envConfig.map_bounds[1][0],
-                    maxY: envConfig.map_bounds[1][1],
-                  } : undefined;
+                  let fixedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
+
+                  try {
+                    const currentEnvId = getEnvironmentFromUrl();
+                    const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
+                    if (envConfig?.map_bounds) {
+                      fixedBounds = {
+                        minX: envConfig.map_bounds[0][0],
+                        minY: envConfig.map_bounds[0][1],
+                        maxX: envConfig.map_bounds[1][0],
+                        maxY: envConfig.map_bounds[1][1],
+                      };
+                    }
+                  } catch (e) {
+                    console.warn('Failed to resolve environment map bounds', e);
+                  }
+
+                  // FORCE STATIC BOUNDS: If environment config missing, use default large bounds
+                  // This prevents dynamic zooming/shaking which the user explicitly wants to avoid.
+                  if (!fixedBounds) {
+                    console.log('📍 Using default fallback map bounds (0-60m)');
+                    fixedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
+                  } else {
+                    // console.log('📍 Using environment map bounds:', fixedBounds);
+                  }
 
                   if (availableMappingCameras.length === 0) {
                     return (
