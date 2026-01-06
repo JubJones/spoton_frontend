@@ -1250,10 +1250,12 @@ const GroupViewPage: React.FC = () => {
       // If backend didn't include future_pipeline_data.mapping_coordinates yet,
       // fall back to building minimal coordinates from track.map_coords
       let mappingPayload = message;
-      const hasMapping = Array.isArray(message?.future_pipeline_data?.mapping_coordinates)
-        && message.future_pipeline_data.mapping_coordinates.length > 0;
+      // FIX: Check if mapping_coordinates is PRESENT, not just if it has items.
+      // If the backend sends an empty list (e.g. because of focus filtering), we should respect that
+      // and NOT fallback to camera_data.tracks which might contain unfiltered data.
+      const mappingDataPresent = Array.isArray(message?.future_pipeline_data?.mapping_coordinates);
 
-      if (!hasMapping && camera_data?.tracks && camera_data.tracks.length > 0) {
+      if (!mappingDataPresent && camera_data?.tracks && camera_data.tracks.length > 0) {
         const fallbackCoords = camera_data.tracks
           .filter((t: any) => Array.isArray(t.map_coords) && t.map_coords.length === 2)
           .map((t: any, idx: number) => ({
@@ -1276,8 +1278,7 @@ const GroupViewPage: React.FC = () => {
         }
       }
 
-      if (Array.isArray(mappingPayload?.future_pipeline_data?.mapping_coordinates)
-        && mappingPayload.future_pipeline_data.mapping_coordinates.length > 0) {
+      if (Array.isArray(mappingPayload?.future_pipeline_data?.mapping_coordinates)) {
         const mappingEvent = new CustomEvent('websocket-mapping-message', {
           detail: mappingPayload,
         });
