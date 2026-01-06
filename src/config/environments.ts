@@ -260,7 +260,7 @@ export function getCameraMapping(environment: EnvironmentId) {
     colors: {
       // Define colors per backend camera ID for consistent UI display
       c09: 'bg-cyan-400',
-      c12: 'bg-red-500', 
+      c12: 'bg-red-500',
       c13: 'bg-yellow-400',
       c16: 'bg-purple-500',
       c01: 'bg-blue-400',

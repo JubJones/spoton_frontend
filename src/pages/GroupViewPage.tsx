@@ -1774,31 +1774,71 @@ const GroupViewPage: React.FC = () => {
                 {(() => {
                   const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
-                  // Get map bounds for current environment
-                  let fixedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
+                  // --- UNIFIED BOUNDS CALCULATION ---
+                  // Find the global min/max across ALL cameras to ensure they share the same zoom level.
+                  // This satisfies the requirement: "share the zoom level by use the one that has the widest zoom out"
 
-                  try {
-                    const currentEnvId = getEnvironmentFromUrl();
-                    const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
-                    if (envConfig?.map_bounds) {
-                      fixedBounds = {
-                        minX: envConfig.map_bounds[0][0],
-                        minY: envConfig.map_bounds[0][1],
-                        maxX: envConfig.map_bounds[1][0],
-                        maxY: envConfig.map_bounds[1][1],
-                      };
+                  let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
+                  const allPoints: { x: number; y: number }[] = [];
+
+                  // Collect all points from all cameras
+                  Object.values(mappingData.mappingByCamera).forEach(coords => {
+                    coords?.forEach(c => {
+                      if (c.projection_successful) {
+                        allPoints.push({ x: c.map_x, y: c.map_y });
+                        // Include trails in bounds calculation
+                        c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                      }
+                    });
+                  });
+
+                  if (allPoints.length > 0) {
+                    const xs = allPoints.map(p => p.x);
+                    const ys = allPoints.map(p => p.y);
+
+                    // Add 10% padding or minimum 5m buffer
+                    const padding = 5;
+
+                    unifiedBounds = {
+                      minX: Math.min(...xs) - padding,
+                      maxX: Math.max(...xs) + padding,
+                      minY: Math.min(...ys) - padding,
+                      maxY: Math.max(...ys) + padding
+                    };
+
+                    // Enforce minimum size to prevent super-zoom on single dots
+                    const minSize = 20;
+                    if (unifiedBounds.maxX - unifiedBounds.minX < minSize) {
+                      const midX = (unifiedBounds.minX + unifiedBounds.maxX) / 2;
+                      unifiedBounds.minX = midX - minSize / 2;
+                      unifiedBounds.maxX = midX + minSize / 2;
                     }
-                  } catch (e) {
-                    console.warn('Failed to resolve environment map bounds', e);
+                    if (unifiedBounds.maxY - unifiedBounds.minY < minSize) {
+                      const midY = (unifiedBounds.minY + unifiedBounds.maxY) / 2;
+                      unifiedBounds.minY = midY - minSize / 2;
+                      unifiedBounds.maxY = midY + minSize / 2;
+                    }
+                  } else {
+                    // Fallback to static config if no data
+                    try {
+                      const currentEnvId = getEnvironmentFromUrl();
+                      const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
+                      if (envConfig?.map_bounds) {
+                        unifiedBounds = {
+                          minX: envConfig.map_bounds[0][0],
+                          minY: envConfig.map_bounds[0][1],
+                          maxX: envConfig.map_bounds[1][0],
+                          maxY: envConfig.map_bounds[1][1],
+                        };
+                      }
+                    } catch (e) {
+                      console.warn('Failed to resolve environment map bounds', e);
+                    }
                   }
 
-                  // FORCE STATIC BOUNDS: If environment config missing, use default large bounds
-                  // This prevents dynamic zooming/shaking which the user explicitly wants to avoid.
-                  if (!fixedBounds) {
-                    console.log('📍 Using default fallback map bounds (0-60m)');
-                    fixedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
-                  } else {
-                    // console.log('📍 Using environment map bounds:', fixedBounds);
+                  // Fallback default
+                  if (!unifiedBounds) {
+                    unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
                   }
 
                   if (availableMappingCameras.length === 0) {
@@ -1838,7 +1878,7 @@ const GroupViewPage: React.FC = () => {
                               className="w-full"
                               mapWidth={Math.max(280, overallMapDimensions.width > 0 ? Math.floor(overallMapDimensions.width - 32) : 350)}
                               mapHeight={Math.max(180, overallMapDimensions.width > 0 ? Math.floor((overallMapDimensions.width - 32) * 0.45) : 200)}
-                              fixedBounds={fixedBounds}
+                              fixedBounds={unifiedBounds}
                             />
                           </div>
                         );
