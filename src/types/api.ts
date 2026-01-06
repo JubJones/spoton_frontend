@@ -150,7 +150,8 @@ export type WebSocketMessageType =
   | 'unsubscribe_tracking'
   | 'request_status'
   | 'ping'
-  | 'queued_message';
+  | 'queued_message'
+  | 'clear_focus';
 
 export type WebSocketConnectionState = 'disconnected' | 'connecting' | 'connected' | 'error';
 
@@ -781,6 +782,7 @@ export function isValidWebSocketMessageType(value: string): value is WebSocketMe
     'unsubscribe_tracking',
     'request_status',
     'ping',
+    'clear_focus',
   ].includes(value);
 }
 

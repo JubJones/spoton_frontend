@@ -1585,6 +1585,16 @@ const GroupViewPage: React.FC = () => {
           >
             Debug
           </button>
+
+          {focusedPerson && (
+            <button
+              onClick={clearFocus}
+              className="px-4 py-1.5 rounded text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center"
+              title="Clear current tracking target"
+            >
+              <span className="mr-1">🎯</span> Clear Target
+            </button>
+          )}
         </div>
       </div>
 
@@ -1678,10 +1688,10 @@ const GroupViewPage: React.FC = () => {
                     <div
                       key={cameraId}
                       className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
-                          ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer transition-colors'
-                          : isSingleActive
-                            ? 'w-full h-full min-h-[320px]'
-                            : ''
+                        ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer transition-colors'
+                        : isSingleActive
+                          ? 'w-full h-full min-h-[320px]'
+                          : ''
                         }`}
                       style={{ display: isVisible ? 'flex' : 'none' }}
                       onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
