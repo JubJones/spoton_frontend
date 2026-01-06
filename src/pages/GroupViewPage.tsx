@@ -6,7 +6,12 @@ import DetectionPersonList from "../components/DetectionPersonList";
 import { CameraMapPair } from "../components/mapping";
 import { useMappingData } from "../hooks/useMappingData";
 import TaskPlaybackControls from "../components/TaskPlaybackControls";
-import type { BackendCameraId, EnvironmentId, PlaybackStatusResponse } from "../types/api";
+import { ENVIRONMENT_CONFIGS } from '../config/environments';
+import {
+  BackendCameraId,
+  EnvironmentId,
+  PlaybackStatusResponse
+} from "../types/api";
 import { DEFAULT_CONFIG, WEBSOCKET_ENDPOINTS, API_ENDPOINTS } from "../types/api";
 import { useCameraConfig } from "../context/CameraConfigContext";
 
@@ -1768,6 +1773,16 @@ const GroupViewPage: React.FC = () => {
               <div className="p-3">
                 {(() => {
                   const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
+
+                  // Get map bounds for current environment
+                  const currentEnvId = getEnvironmentFromUrl();
+                  const envConfig = ENVIRONMENT_CONFIGS[currentEnvId];
+                  const fixedBounds = envConfig ? {
+                    minX: envConfig.map_bounds[0][0],
+                    minY: envConfig.map_bounds[0][1],
+                    maxX: envConfig.map_bounds[1][0],
+                    maxY: envConfig.map_bounds[1][1],
+                  } : undefined;
 
                   if (availableMappingCameras.length === 0) {
                     return (

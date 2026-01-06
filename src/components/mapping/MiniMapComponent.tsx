@@ -31,6 +31,12 @@ interface MiniMapComponentProps {
   width?: number;
   height?: number;
   className?: string;
+  fixedBounds?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  };
 }
 
 // Color palette for professional appearance
@@ -60,7 +66,8 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
   mappingCoordinates,
   width = 300,
   height = 200,
-  className = ''
+  className = '',
+  fixedBounds
 }) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [mapBounds, setMapBounds] = useState({
@@ -70,8 +77,14 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
     maxY: 10
   });
 
-  // Calculate dynamic map bounds based on current coordinates
+  // Calculate dynamic map bounds based on current coordinates OR use fixed bounds
   useEffect(() => {
+    // If fixed bounds are provided, use them and DO NOT calculate from data
+    if (fixedBounds) {
+      setMapBounds(fixedBounds);
+      return;
+    }
+
     if (mappingCoordinates.length > 0) {
       const validCoords = mappingCoordinates.filter(coord => coord.projection_successful);
       if (validCoords.length > 0) {
@@ -111,7 +124,7 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
         setMapBounds({ minX, maxX, minY, maxY });
       }
     }
-  }, [mappingCoordinates]);
+  }, [mappingCoordinates, fixedBounds]);
 
   // Draw on canvas
   useEffect(() => {

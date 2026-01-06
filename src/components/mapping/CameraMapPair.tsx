@@ -33,6 +33,12 @@ interface CameraMapPairProps {
   // Optional map sizing (defaults to 300x200)
   mapWidth?: number;
   mapHeight?: number;
+  fixedBounds?: {
+    minX: number;
+    maxX: number;
+    minY: number;
+    maxY: number;
+  };
 }
 
 /**
@@ -53,6 +59,7 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
   children,
   mapWidth = 600,
   mapHeight = 400,
+  fixedBounds,
 }) => {
   const handleToggleMap = () => {
     onToggleMap?.(cameraId, !mapVisible);
@@ -164,6 +171,7 @@ export const CameraMapPair: React.FC<CameraMapPairProps> = ({
             className="camera-mini-map"
             width={mapWidth}
             height={mapHeight}
+            fixedBounds={fixedBounds}
           />
         </div>
       )}
