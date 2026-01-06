@@ -109,7 +109,7 @@ interface UseMappingDataReturn {
 export const useMappingData = (config: UseMappingDataConfig = {}): UseMappingDataReturn => {
   const {
     enabled = true,
-    maxTrailLength = 100,
+    maxTrailLength = Infinity,
     maxAge = 30, // 30 seconds
   } = config;
 
