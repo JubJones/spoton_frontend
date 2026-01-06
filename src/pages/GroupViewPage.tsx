@@ -1841,6 +1841,10 @@ const GroupViewPage: React.FC = () => {
                     unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
                   }
 
+                  // Calculate global span (zoom level)
+                  const globalSpanX = unifiedBounds ? (unifiedBounds.maxX - unifiedBounds.minX) : 60;
+                  const globalSpanY = unifiedBounds ? (unifiedBounds.maxY - unifiedBounds.minY) : 60;
+
                   if (availableMappingCameras.length === 0) {
                     return (
                       <div
@@ -1869,6 +1873,36 @@ const GroupViewPage: React.FC = () => {
                       {availableMappingCameras.map((backendCameraId) => {
                         const coords = getMappingForCamera(backendCameraId);
                         if (!coords || coords.length === 0) return null;
+
+                        // --- PER-CAMERA CENTERING WITH UNIFIED ZOOM ---
+                        // 1. Calculate the center of points for THIS camera
+                        let cameraSpecificBounds = unifiedBounds; // Fallback to global view if calc fails
+
+                        const camPoints: { x: number, y: number }[] = [];
+                        coords.forEach(c => {
+                          if (c.projection_successful) {
+                            camPoints.push({ x: c.map_x, y: c.map_y });
+                            c.trail?.forEach(t => camPoints.push({ x: t.x, y: t.y }));
+                          }
+                        });
+
+                        if (camPoints.length > 0 && unifiedBounds) {
+                          const xs = camPoints.map(p => p.x);
+                          const ys = camPoints.map(p => p.y);
+
+                          // Average center of this camera's activity
+                          const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                          const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+                          // Apply GLOBAL span around LOCAL center
+                          cameraSpecificBounds = {
+                            minX: centerX - (globalSpanX / 2),
+                            maxX: centerX + (globalSpanX / 2),
+                            minY: centerY - (globalSpanY / 2),
+                            maxY: centerY + (globalSpanY / 2),
+                          };
+                        }
+
                         return (
                           <div key={`map-${backendCameraId}`}>
                             <CameraMapPair
@@ -1878,7 +1912,7 @@ const GroupViewPage: React.FC = () => {
                               className="w-full"
                               mapWidth={Math.max(280, overallMapDimensions.width > 0 ? Math.floor(overallMapDimensions.width - 32) : 350)}
                               mapHeight={Math.max(180, overallMapDimensions.width > 0 ? Math.floor((overallMapDimensions.width - 32) * 0.45) : 200)}
-                              fixedBounds={unifiedBounds}
+                              fixedBounds={cameraSpecificBounds}
                             />
                           </div>
                         );
