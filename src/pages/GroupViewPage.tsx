@@ -1586,15 +1586,7 @@ const GroupViewPage: React.FC = () => {
             Debug
           </button>
 
-          {focusedPerson && (
-            <button
-              onClick={clearFocus}
-              className="px-4 py-1.5 rounded text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors flex items-center"
-              title="Clear current tracking target"
-            >
-              <span className="mr-1">🎯</span> Clear Target
-            </button>
-          )}
+
         </div>
       </div>
 
@@ -1635,7 +1627,7 @@ const GroupViewPage: React.FC = () => {
       )}
 
       {/* Tab Bar (Keep as before) */}
-      <div className="mb-4 border-b border-gray-700 flex-shrink-0">
+      <div className="mb-4 border-b border-gray-700 flex-shrink-0 flex justify-between items-center">
         <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
           <button onClick={() => setActiveTab("all")} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "all" ? "border-orange-500 text-orange-500" : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"}`}>View all</button>
           {cameraIds.map((cameraId) => (
@@ -1651,6 +1643,15 @@ const GroupViewPage: React.FC = () => {
             </button>
           ))}
         </nav>
+        {focusedPerson && (
+          <button
+            onClick={clearFocus}
+            className="px-3 py-1.5 rounded text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            title="Clear current tracking target"
+          >
+            Clear Target
+          </button>
+        )}
       </div>
 
       {/* Main Content Area */}
