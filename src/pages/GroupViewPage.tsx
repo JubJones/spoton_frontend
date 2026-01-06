@@ -1838,6 +1838,7 @@ const GroupViewPage: React.FC = () => {
                               className="w-full"
                               mapWidth={Math.max(280, overallMapDimensions.width > 0 ? Math.floor(overallMapDimensions.width - 32) : 350)}
                               mapHeight={Math.max(180, overallMapDimensions.width > 0 ? Math.floor((overallMapDimensions.width - 32) * 0.45) : 200)}
+                              fixedBounds={fixedBounds}
                             />
                           </div>
                         );
