@@ -1868,8 +1868,31 @@ const GroupViewPage: React.FC = () => {
                     );
                   }
 
+                  const horizontalPadding = 32; // matches earlier sizing assumptions
+                  const measuredContentWidth = Math.max(0, overallMapDimensions.width - horizontalPadding);
+                  const hasMeasuredWidth = measuredContentWidth > 0;
+                  const columnGapPx = 16; // tailwind gap-4
+                  const minColumnWidth = 180;
+                  const canUseTwoColumns =
+                    availableMappingCameras.length > 1 &&
+                    measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
+                  const mapColumns = canUseTwoColumns ? 2 : 1;
+                  const effectiveColumnWidth = hasMeasuredWidth
+                    ? (mapColumns === 1
+                      ? measuredContentWidth
+                      : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
+                    : 0;
+                  const fallbackMapWidth = 350;
+                  const fallbackMapHeight = 200;
+                  const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
+                  const minMapHeight = mapColumns === 1 ? 180 : 160;
+                  const mapHeight = hasMeasuredWidth
+                    ? Math.max(minMapHeight, Math.floor(mapWidth * 0.45))
+                    : fallbackMapHeight;
+                  const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
+
                   return (
-                    <div className="grid gap-4 grid-cols-1">
+                    <div className="grid gap-4" style={{ gridTemplateColumns }}>
                       {availableMappingCameras.map((backendCameraId) => {
                         const coords = getMappingForCamera(backendCameraId);
                         if (!coords || coords.length === 0) return null;
@@ -1910,8 +1933,8 @@ const GroupViewPage: React.FC = () => {
                               mappingCoordinates={coords}
                               mapVisible={true}
                               className="w-full"
-                              mapWidth={Math.max(280, overallMapDimensions.width > 0 ? Math.floor(overallMapDimensions.width - 32) : 350)}
-                              mapHeight={Math.max(180, overallMapDimensions.width > 0 ? Math.floor((overallMapDimensions.width - 32) * 0.45) : 200)}
+                              mapWidth={mapWidth}
+                              mapHeight={mapHeight}
                               fixedBounds={cameraSpecificBounds}
                             />
                           </div>
