@@ -126,6 +126,7 @@ const BACKEND_BASE_URL = "http://localhost:3847";  // Updated to match Docker ba
 const BACKEND_WS_URL = "ws://localhost:3847";
 
 type TabType = "all" | BackendCameraId;
+type MapLayoutMode = 'grid' | 'stacked';
 const MAP_SOURCE_WIDTH = 1920; // Source width for map_coords (per camera)
 const MAP_SOURCE_HEIGHT = 1080; // Source height for map_coords (per camera)
 
@@ -398,6 +399,8 @@ const GroupViewPage: React.FC = () => {
 
   const overallMapContainerRef = useRef<HTMLDivElement>(null);
   const [overallMapDimensions, setOverallMapDimensions] = useState({ width: 0, height: 0 });
+  const [mapLayoutMode, setMapLayoutMode] = useState<MapLayoutMode>('grid');
+  const isStackedLayout = mapLayoutMode === 'stacked';
 
   // State to store points per camera
   const [perCameraMapPoints, setPerCameraMapPoints] = useState<{ [jsonCameraId: string]: SingleCameraMapPoint[] }>({});
@@ -1771,6 +1774,31 @@ const GroupViewPage: React.FC = () => {
 
               {/* Panel Content */}
               <div className="p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-400">
+                  <span className="uppercase tracking-wide text-[11px] font-semibold text-slate-500">Layout</span>
+                  <div className="inline-flex bg-slate-900/60 rounded-full p-0.5 shadow-inner">
+                    <button
+                      type="button"
+                      onClick={() => setMapLayoutMode('grid')}
+                      className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'grid'
+                        ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                        : 'text-slate-400 hover:text-slate-100'
+                        }`}
+                    >
+                      Grid
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setMapLayoutMode('stacked')}
+                      className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'stacked'
+                        ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                        : 'text-slate-400 hover:text-slate-100'
+                        }`}
+                    >
+                      Big view
+                    </button>
+                  </div>
+                </div>
                 {(() => {
                   const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
@@ -1876,23 +1904,26 @@ const GroupViewPage: React.FC = () => {
                   const canUseTwoColumns =
                     availableMappingCameras.length > 1 &&
                     measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
-                  const mapColumns = canUseTwoColumns ? 2 : 1;
+                  const mapColumns = isStackedLayout ? 1 : (canUseTwoColumns ? 2 : 1);
                   const effectiveColumnWidth = hasMeasuredWidth
                     ? (mapColumns === 1
                       ? measuredContentWidth
                       : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
                     : 0;
                   const fallbackMapWidth = 350;
-                  const fallbackMapHeight = 200;
+                  const fallbackMapHeight = isStackedLayout ? 260 : 200;
                   const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
-                  const minMapHeight = mapColumns === 1 ? 180 : 160;
+                  const minMapHeight = isStackedLayout ? 240 : (mapColumns === 1 ? 180 : 160);
+                  const heightRatio = isStackedLayout ? 0.55 : 0.45;
                   const mapHeight = hasMeasuredWidth
-                    ? Math.max(minMapHeight, Math.floor(mapWidth * 0.45))
+                    ? Math.max(minMapHeight, Math.floor(mapWidth * heightRatio))
                     : fallbackMapHeight;
                   const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
+                  const mapContainerClass = isStackedLayout ? 'flex flex-col gap-4' : 'grid gap-4';
+                  const mapContainerStyle = isStackedLayout ? undefined : { gridTemplateColumns };
 
                   return (
-                    <div className="grid gap-4" style={{ gridTemplateColumns }}>
+                    <div className={mapContainerClass} style={mapContainerStyle}>
                       {availableMappingCameras.map((backendCameraId) => {
                         const coords = getMappingForCamera(backendCameraId);
                         if (!coords || coords.length === 0) return null;
@@ -1927,7 +1958,10 @@ const GroupViewPage: React.FC = () => {
                         }
 
                         return (
-                          <div key={`map-${backendCameraId}`}>
+                          <div
+                            key={`map-${backendCameraId}`}
+                            className={isStackedLayout ? 'bg-slate-900/40 border border-slate-700/40 rounded-xl p-3' : undefined}
+                          >
                             <CameraMapPair
                               cameraId={backendCameraId}
                               mappingCoordinates={coords}
