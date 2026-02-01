@@ -152,7 +152,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
     onPersonClick?.(detection, camera_id, willSelect);
   }, [selectedPerson, onPersonClick]);
 
-  // Memoized: Get all detections across all cameras, sorted by confidence
+  // Memoized: Get all detections across all cameras, deduplicated by track_id, sorted by confidence
   const sortedDetections = useMemo(() => {
     const allDetections = Object.entries(cameraDetections).flatMap(([camera_id, cameraData]) =>
       (cameraData.detections || []).map(detection => ({
@@ -161,8 +161,24 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
         processing_time: cameraData.processing_time_ms
       }))
     );
+
+    // Deduplicate by track_id within each camera, keeping highest confidence
+    const deduplicatedMap = new Map<string, typeof allDetections[0]>();
+
+    for (const detection of allDetections) {
+      // Create a unique key: prefer track_id, fall back to detection_id
+      const trackKey = typeof detection.track_id === 'number'
+        ? `${detection.camera_id}:track:${detection.track_id}`
+        : `${detection.camera_id}:det:${detection.detection_id}`;
+
+      const existing = deduplicatedMap.get(trackKey);
+      if (!existing || detection.confidence > existing.confidence) {
+        deduplicatedMap.set(trackKey, detection);
+      }
+    }
+
     // Sort by confidence (highest first)
-    return allDetections.sort((a, b) => b.confidence - a.confidence);
+    return Array.from(deduplicatedMap.values()).sort((a, b) => b.confidence - a.confidence);
   }, [cameraDetections]);
 
   // Get camera display name
