@@ -369,37 +369,70 @@ const AnalyticsPage: React.FC = () => {
     return events.sort((a, b) => priority[a.type] - priority[b.type]);
   }, [systemStats, summary]);
 
-  // Handle export report
+  // Handle export report (Client-side generation)
   const handleExportReport = async () => {
-    if (isExporting) return;
+    if (isExporting || !dashboardData) return;
 
     setIsExporting(true);
     try {
-      const api = new APIService();
+      // Create CSV content from current dashboard data
+      // Section 1: Summary
+      const summaryRows = [
+        ['Analytics Report', `Environment: ${environment}`, `Generated: ${new Date().toLocaleString()}`],
+        [''],
+        ['SUMMARY METRICS'],
+        ['Metric', 'Value'],
+        ['Total Detections', dashboardData.summary.total_detections.toString()],
+        ['Avg Confidence', `${dashboardData.summary.average_confidence_percent.toFixed(1)}%`],
+        ['System Uptime', `${dashboardData.summary.system_uptime_percent}%`],
+        ['Active Cameras', dashboardData.cameras.length.toString()],
+        ['']
+      ];
 
-      // Calculate time range for export
-      const endTime = new Date();
-      const startTime = new Date();
-      const windowHours = getWindowHours(timeRange);
-      startTime.setHours(startTime.getHours() - windowHours);
+      // Section 2: Camera Performance
+      const cameraRows = [
+        ['CAMERA PERFORMANCE'],
+        ['Camera ID', 'Total Detections', 'Unique Entities', 'Avg Confidence', 'Uptime'],
+        ...dashboardData.cameras.map(cam => [
+          cam.camera_id,
+          cam.detections.toString(),
+          cam.unique_entities.toString(),
+          `${cam.average_confidence_percent.toFixed(1)}%`,
+          `${cam.uptime_percent}%`
+        ]),
+        ['']
+      ];
 
-      const response = await api.createAnalyticsExport({
-        environment_id: environment,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        format: ExportFormat.CSV,
-        include_zones: true,
-        include_heatmaps: false,
-        include_trajectories: false,
-      });
+      // Section 3: Activity Timeline (Hourly)
+      const activityRows = [
+        ['ACTIVITY LOG (Timeline)'],
+        ['Time', 'Detections'],
+        ...(dashboardData.charts?.detections_per_bucket?.map(b => [
+          new Date(b.timestamp).toLocaleString(),
+          b.detections.toString()
+        ]) || [])
+      ];
 
-      if (response.job_id) {
-        // Show success message - in a real app you'd track the job and show download when ready
-        alert(`Export job created! Job ID: ${response.job_id}\nStatus: ${response.status}`);
-      }
+      // Combine all rows
+      const allRows = [...summaryRows, ...cameraRows, ...activityRows];
+      const csvContent = allRows.map(row => row.join(',')).join('\n');
+
+      // Create download link
+      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `analytics_report_${environment}_${new Date().toISOString().slice(0, 19).replace(/[:]/g, '-')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Clean up
+      window.URL.revokeObjectURL(url);
+
     } catch (err) {
       console.error('Failed to export report:', err);
-      alert('Failed to create export. Please try again.');
+      alert('Failed to generate export file');
     } finally {
       setIsExporting(false);
     }
