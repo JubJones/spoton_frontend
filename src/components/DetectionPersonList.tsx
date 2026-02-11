@@ -257,7 +257,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                     <span className="text-sm font-semibold text-gray-300">{getCameraName(camera_id)}</span>
                     <span className="text-xs text-gray-500">({stableSorted.length})</span>
                   </div>
-                  <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
+                  <div className="flex flex-wrap gap-4 pb-2">
                     {stableSorted.map((detection) => {
                       const cropKey = `${detection.camera_id}-${detection.detection_id}`;
                       const isSelected = selectedPerson === cropKey;
