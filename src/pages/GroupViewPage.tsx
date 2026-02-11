@@ -167,12 +167,14 @@ interface CameraStreamViewProps {
   onTrackClick: (track: Track) => void;
   focusedPerson: FocusedPersonState | null;
   onFrameCapture?: (cameraId: string, frameBase64: string) => void;
+  streamSessionId: number;
 }
 
 // Memoized to prevent re-renders when props haven't changed
-const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture }) => {
-  // Force fresh connection on mount by appending timestamp
-  const streamKey = useMemo(() => Date.now(), [taskId]);
+const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture, streamSessionId }) => {
+  // Force fresh connection on new session by appending timestamp
+  // We use streamSessionId directly which updates on every start/restart
+  const streamKey = streamSessionId;
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -427,6 +429,7 @@ const GroupViewPage: React.FC = () => {
   const [taskId, setTaskId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [playbackStatus, setPlaybackStatus] = useState<PlaybackStatusResponse | null>(null);
+  const [streamSessionId, setStreamSessionId] = useState<number>(Date.now());
 
   // WebSocket ref
   const wsRef = useRef<WebSocket | null>(null);
@@ -1255,6 +1258,8 @@ const GroupViewPage: React.FC = () => {
   // Connect to WebSocket for detection tracking frames
   const connectWebSocket = useCallback((taskId: string) => {
     console.log('🔌 Attempting to connect WebSocket for task:', taskId);
+    // Update session ID to force refresh of all camera streams
+    setStreamSessionId(Date.now());
 
     if (wsRef.current) {
       console.log('🔌 Closing existing WebSocket connection');
@@ -1294,8 +1299,10 @@ const GroupViewPage: React.FC = () => {
       }
 
       // Update detection data for PersonList component - Throttle to every 10 frames
-      if (detection_data && (message.frame_index % 10 === 0)) {
-        setDetectionData(prev => ({
+      // Use global_frame_index or default to 0 to prevent undefined errors
+      const frameIndex = message.global_frame_index || 0;
+      if (detection_data && (frameIndex % 10 === 0)) {
+        setDetectionData(prev => ({ // Throttle update logic
           ...prev,
           [camera_id]: {
             camera_id,
@@ -1755,6 +1762,7 @@ const GroupViewPage: React.FC = () => {
                         focusedPerson={focusedPerson}
                         onTrackClick={(track) => handleTrackFocus(cameraId, track)}
                         onFrameCapture={handleFrameCapture}
+                        streamSessionId={streamSessionId}
                       />
                       <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
                         {displayName} ({cameraId})
