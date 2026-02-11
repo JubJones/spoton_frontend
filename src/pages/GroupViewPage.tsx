@@ -171,6 +171,8 @@ interface CameraStreamViewProps {
 
 // Memoized to prevent re-renders when props haven't changed
 const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStreaming, tracks, onTrackClick, focusedPerson, onFrameCapture }) => {
+  // Force fresh connection on mount by appending timestamp
+  const streamKey = useMemo(() => Date.now(), [taskId]);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const imgRef = useRef<HTMLImageElement>(null);
@@ -250,6 +252,14 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
       // Draw Logic - Image source dimensions are 1920x1080
       const srcW = 1920;
       const srcH = 1080;
+
+      // Ensure img src has timestamp to prevent caching
+      if (imgRef.current && !imgRef.current.src.includes('?')) {
+        const streamUrl = `${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}?t=${streamKey}`;
+        if (imgRef.current.src !== streamUrl) {
+          imgRef.current.src = streamUrl;
+        }
+      }
 
       // Calculate letterboxing
       const srcRatio = srcW / srcH;
@@ -1283,8 +1293,8 @@ const GroupViewPage: React.FC = () => {
         // Just ignoring it to save memory
       }
 
-      // Update detection data for PersonList component
-      if (detection_data) {
+      // Update detection data for PersonList component - Throttle to every 10 frames
+      if (detection_data && (message.frame_index % 10 === 0)) {
         setDetectionData(prev => ({
           ...prev,
           [camera_id]: {

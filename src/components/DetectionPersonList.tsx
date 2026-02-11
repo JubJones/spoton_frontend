@@ -257,7 +257,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                     <span className="text-sm font-semibold text-gray-300">{getCameraName(camera_id)}</span>
                     <span className="text-xs text-gray-500">({stableSorted.length})</span>
                   </div>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                  <div className="flex overflow-x-auto gap-4 pb-2 scrollbar-thin scrollbar-thumb-gray-700 scrollbar-track-transparent">
                     {stableSorted.map((detection) => {
                       const cropKey = `${detection.camera_id}-${detection.detection_id}`;
                       const isSelected = selectedPerson === cropKey;
@@ -281,13 +281,13 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                         <div
                           key={cropKey}
                           onClick={() => handlePersonClick(detection, detection.camera_id)}
-                          className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${isSelected
-                            ? 'ring-2 ring-blue-500 bg-blue-600'
-                            : 'hover:bg-gray-600 hover:shadow-lg'
-                            }`}
+                          className={`
+                            flex-shrink-0 flex items-center bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:bg-gray-600 w-64 h-20
+                            ${isSelected ? 'ring-2 ring-blue-500 bg-blue-600' : 'hover:shadow-lg'}
+                          `}
                         >
-                          {/* Cropped Person Image or Placeholder */}
-                          <div className="aspect-[3/4] relative">
+                          {/* Left: Image */}
+                          <div className="relative w-20 h-20 flex-shrink-0 bg-black">
                             {croppedImage ? (
                               <img
                                 src={croppedImage}
@@ -295,57 +295,34 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                                 className="w-full h-full object-cover"
                               />
                             ) : (
-                              <div className={`w-full h-full flex flex-col items-center justify-center ${detection.confidence >= 0.8
-                                ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
-                                : detection.confidence >= 0.6
-                                  ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
-                                  : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
+                              <div className={`w-full h-full flex items-center justify-center ${detection.confidence >= 0.8 ? 'bg-green-900/40' :
+                                detection.confidence >= 0.6 ? 'bg-yellow-900/40' : 'bg-red-900/40'
                                 }`}>
-                                <div className="text-4xl mb-1">👤</div>
-                                <div className="text-xs text-gray-400 font-mono">
-                                  {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
-                                </div>
+                                <span className="text-2xl">👤</span>
                               </div>
                             )}
 
                             {/* Confidence Badge */}
-                            <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${detection.confidence >= 0.8
-                              ? 'bg-green-500 text-white'
-                              : detection.confidence >= 0.6
-                                ? 'bg-yellow-500 text-black'
-                                : 'bg-red-500 text-white'
-                              }`}>
+                            <div className="absolute bottom-0 right-0 bg-black/60 px-1 py-0.5 text-[10px] text-white">
                               {Math.round(detection.confidence * 100)}%
                             </div>
-
-                            {/* Selection Indicator */}
-                            {isSelected && (
-                              <div className="absolute top-2 left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                                <div className="text-white text-xs font-bold">✓</div>
-                              </div>
-                            )}
                           </div>
 
-                          {/* Person Details */}
-                          <div className="p-3">
-                            <div className="flex items-center justify-between mb-1">
-                              <p className="text-sm font-medium text-white truncate">
+                          {/* Right: Info */}
+                          <div className="flex-1 p-2 min-w-0 flex flex-col justify-center h-full">
+                            <div className="flex items-center justify-between">
+                              <span className="text-white font-bold text-sm truncate">
                                 {primaryLabel}
-                              </p>
+                              </span>
+                              {isSelected && <span className="text-blue-200 text-xs">✓</span>}
                             </div>
 
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="text-xs text-gray-500">
-                                {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
-                              </p>
+                            <div className="text-xs text-gray-400 mt-1 truncate">
+                              Box: {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
                             </div>
 
-                            {/* Map Coordinates (if available) */}
-                            {detection.map_coords && (
-                              <p className="text-xs text-blue-400 truncate">
-                                Map: ({detection.map_coords.map_x.toFixed(1)}, {detection.map_coords.map_y.toFixed(1)})
-                              </p>
-                            )}
+                            {/* Attributes if available */}
+
                           </div>
                         </div>
                       );
