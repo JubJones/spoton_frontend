@@ -2128,6 +2128,8 @@ const GroupViewPage: React.FC = () => {
               isSelecting
             );
           }}
+          activeCameraId={activeTab === 'all' ? null : activeTab}
+          allCameraIds={cameraIds}
         />
       </div >
     </div >

@@ -42,6 +42,8 @@ interface DetectionPersonListProps {
   className?: string;
   onPersonClick?: (detection: DetectedPerson, camera_id: string, isSelecting: boolean) => void;
   selectedPersonKey?: string | null;
+  activeCameraId?: string | null;
+  allCameraIds?: string[];
 }
 
 // Memoized to prevent re-renders when props haven't changed
@@ -50,6 +52,8 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
   className = '',
   onPersonClick,
   selectedPersonKey = null,
+  activeCameraId = null,
+  allCameraIds = [],
 }) => {
   const [croppedImages, setCroppedImages] = useState<{ [key: string]: string }>({});
   const [selectedPerson, setSelectedPerson] = useState<string | null>(selectedPersonKey);
@@ -181,6 +185,30 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
     return Array.from(deduplicatedMap.values()).sort((a, b) => b.confidence - a.confidence);
   }, [cameraDetections]);
 
+  // Group sorted detections by camera for easier rendering
+  const detectionsByCamera = useMemo(() => {
+    const grouped: Record<string, typeof sortedDetections> = {};
+    sortedDetections.forEach(detection => {
+      if (!grouped[detection.camera_id]) grouped[detection.camera_id] = [];
+      grouped[detection.camera_id].push(detection);
+    });
+    return grouped;
+  }, [sortedDetections]);
+
+  // Determine which cameras to display
+  const displayedCameraIds = useMemo(() => {
+    // If a specific camera is active (and not "all"), show only that camera
+    if (activeCameraId && activeCameraId !== 'all') {
+      return [activeCameraId];
+    }
+    // Otherwise show all configured cameras
+    if (allCameraIds && allCameraIds.length > 0) {
+      return allCameraIds;
+    }
+    // Fallback to only cameras with detections if no config provided
+    return Object.keys(detectionsByCamera).sort();
+  }, [activeCameraId, allCameraIds, detectionsByCamera]);
+
   // Get camera display name
   const getCameraName = (camera_id: string) => {
     if (camera_id) {
@@ -224,25 +252,18 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
 
       {/* Person Grid - Grouped by Camera */}
       <div className="flex-1 overflow-y-auto">
-        {sortedDetections.length === 0 ? (
+        {displayedCameraIds.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
             <div className="text-center">
               <div className="text-6xl mb-4">👥</div>
-              <div className="text-lg font-medium">No people detected</div>
-              <div className="text-sm mt-2">Detections will appear here when streaming</div>
+              <div className="text-lg font-medium">No cameras available</div>
             </div>
           </div>
         ) : (
           <div className="space-y-6">
-            {/* Group detections by camera */}
-            {Object.entries(
-              sortedDetections.reduce<Record<string, typeof sortedDetections>>((acc, detection) => {
-                const camId = detection.camera_id;
-                if (!acc[camId]) acc[camId] = [];
-                acc[camId].push(detection);
-                return acc;
-              }, {})
-            ).map(([camera_id, detections]) => {
+            {displayedCameraIds.map((camera_id) => {
+              const detections = detectionsByCamera[camera_id] || [];
+
               // Sort by track_id for stable ordering within each camera
               const stableSorted = [...detections].sort((a, b) => {
                 const aId = typeof a.track_id === 'number' ? a.track_id : Infinity;
@@ -254,80 +275,88 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                 <div key={camera_id}>
                   {/* Camera Section Header */}
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold text-gray-300">{getCameraName(camera_id)}</span>
+                    <span className="text-sm font-semibold text-gray-300">
+                      {getCameraName(camera_id).replace(/\s*\(.*?\)\s*/g, '').trim()}
+                    </span>
                     <span className="text-xs text-gray-500">({stableSorted.length})</span>
                   </div>
-                  <div className="flex flex-wrap gap-4 pb-2">
-                    {stableSorted.map((detection) => {
-                      const cropKey = `${detection.camera_id}-${detection.detection_id}`;
-                      const isSelected = selectedPerson === cropKey;
-                      const croppedImage = croppedImages[cropKey];
-                      let trackLabel: string | undefined;
-                      if (typeof detection.track_id === 'number') {
-                        trackLabel = `Track ${detection.track_id.toString().padStart(3, '0')}`;
-                      } else if (typeof detection.tracking_key === 'string') {
-                        const lastSegment = detection.tracking_key.split(':').pop();
-                        trackLabel = lastSegment ? `Track ${lastSegment.toString().padStart(3, '0')}` : `Track ${detection.tracking_key}`;
-                      }
+                  {stableSorted.length === 0 ? (
+                    <div className="text-xs text-gray-500 italic px-2 py-4 border border-gray-700/50 rounded-lg border-dashed">
+                      No active detections
+                    </div>
+                  ) : (
+                    <div className="flex flex-wrap gap-4 pb-2">
+                      {stableSorted.map((detection) => {
+                        const cropKey = `${detection.camera_id}-${detection.detection_id}`;
+                        const isSelected = selectedPerson === cropKey;
+                        const croppedImage = croppedImages[cropKey];
+                        let trackLabel: string | undefined;
+                        if (typeof detection.track_id === 'number') {
+                          trackLabel = `Track ${detection.track_id.toString().padStart(3, '0')}`;
+                        } else if (typeof detection.tracking_key === 'string') {
+                          const lastSegment = detection.tracking_key.split(':').pop();
+                          trackLabel = lastSegment ? `Track ${lastSegment.toString().padStart(3, '0')}` : `Track ${detection.tracking_key}`;
+                        }
 
-                      const fallbackLabel = detection.detection_id?.startsWith('track_')
-                        ? `Track ${detection.detection_id.slice(-3)}`
-                        : detection.detection_id
-                          ? `Detection ${detection.detection_id.slice(-4)}`
-                          : 'Detection';
-                      const primaryLabel = trackLabel ?? fallbackLabel;
+                        const fallbackLabel = detection.detection_id?.startsWith('track_')
+                          ? `Track ${detection.detection_id.slice(-3)}`
+                          : detection.detection_id
+                            ? `Detection ${detection.detection_id.slice(-4)}`
+                            : 'Detection';
+                        const primaryLabel = trackLabel ?? fallbackLabel;
 
-                      return (
-                        <div
-                          key={cropKey}
-                          onClick={() => handlePersonClick(detection, detection.camera_id)}
-                          className={`
+                        return (
+                          <div
+                            key={cropKey}
+                            onClick={() => handlePersonClick(detection, detection.camera_id)}
+                            className={`
                             flex-shrink-0 flex items-center bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:bg-gray-600 w-64 h-20
                             ${isSelected ? 'ring-2 ring-blue-500 bg-blue-600' : 'hover:shadow-lg'}
                           `}
-                        >
-                          {/* Left: Image */}
-                          <div className="relative w-20 h-20 flex-shrink-0 bg-black">
-                            {croppedImage ? (
-                              <img
-                                src={croppedImage}
-                                alt={`Person ${primaryLabel}`}
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <div className={`w-full h-full flex items-center justify-center ${detection.confidence >= 0.8 ? 'bg-green-900/40' :
-                                detection.confidence >= 0.6 ? 'bg-yellow-900/40' : 'bg-red-900/40'
-                                }`}>
-                                <span className="text-2xl">👤</span>
+                          >
+                            {/* Left: Image */}
+                            <div className="relative w-20 h-20 flex-shrink-0 bg-black">
+                              {croppedImage ? (
+                                <img
+                                  src={croppedImage}
+                                  alt={`Person ${primaryLabel}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <div className={`w-full h-full flex items-center justify-center ${detection.confidence >= 0.8 ? 'bg-green-900/40' :
+                                  detection.confidence >= 0.6 ? 'bg-yellow-900/40' : 'bg-red-900/40'
+                                  }`}>
+                                  <span className="text-2xl">👤</span>
+                                </div>
+                              )}
+
+                              {/* Confidence Badge */}
+                              <div className="absolute bottom-0 right-0 bg-black/60 px-1 py-0.5 text-[10px] text-white">
+                                {Math.round(detection.confidence * 100)}%
                               </div>
-                            )}
+                            </div>
 
-                            {/* Confidence Badge */}
-                            <div className="absolute bottom-0 right-0 bg-black/60 px-1 py-0.5 text-[10px] text-white">
-                              {Math.round(detection.confidence * 100)}%
+                            {/* Right: Info */}
+                            <div className="flex-1 p-2 min-w-0 flex flex-col justify-center h-full">
+                              <div className="flex items-center justify-between">
+                                <span className="text-white font-bold text-sm truncate">
+                                  {primaryLabel}
+                                </span>
+                                {isSelected && <span className="text-blue-200 text-xs">✓</span>}
+                              </div>
+
+                              <div className="text-xs text-gray-400 mt-1 truncate">
+                                Box: {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                              </div>
+
+                              {/* Attributes if available */}
+
                             </div>
                           </div>
-
-                          {/* Right: Info */}
-                          <div className="flex-1 p-2 min-w-0 flex flex-col justify-center h-full">
-                            <div className="flex items-center justify-between">
-                              <span className="text-white font-bold text-sm truncate">
-                                {primaryLabel}
-                              </span>
-                              {isSelected && <span className="text-blue-200 text-xs">✓</span>}
-                            </div>
-
-                            <div className="text-xs text-gray-400 mt-1 truncate">
-                              Box: {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
-                            </div>
-
-                            {/* Attributes if available */}
-
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
               );
             })}
