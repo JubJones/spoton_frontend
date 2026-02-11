@@ -55,6 +55,8 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
   activeCameraId = null,
   allCameraIds = [],
 }) => {
+  console.log('DetectionPersonList render:', { activeCameraId, allCameraIdsLength: allCameraIds.length });
+
   const [croppedImages, setCroppedImages] = useState<{ [key: string]: string }>({});
   const [selectedPerson, setSelectedPerson] = useState<string | null>(selectedPersonKey);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -208,6 +210,8 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
     // Fallback to only cameras with detections if no config provided
     return Object.keys(detectionsByCamera).sort();
   }, [activeCameraId, allCameraIds, detectionsByCamera]);
+
+  console.log('displayedCameraIds:', displayedCameraIds);
 
   // Get camera display name
   const getCameraName = (camera_id: string) => {
