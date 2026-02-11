@@ -256,7 +256,8 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
       const srcH = 1080;
 
       // Ensure img src has timestamp to prevent caching
-      if (imgRef.current && !imgRef.current.src.includes('?')) {
+      // Ensure img src has latest timestamp to prevent caching
+      if (imgRef.current) {
         const streamUrl = `${BACKEND_BASE_URL}/api/v1/stream/${taskId}/${cameraId}?t=${streamKey}`;
         if (imgRef.current.src !== streamUrl) {
           imgRef.current.src = streamUrl;
@@ -1736,7 +1737,8 @@ const GroupViewPage: React.FC = () => {
               >
                 {cameraIds.map((cameraId) => {
                   const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
-                  const displayName = getCameraDisplayNameById(cameraId);
+                  const rawDisplayName = getCameraDisplayNameById(cameraId);
+                  const displayName = rawDisplayName.replace(/\s*\(.*?\)\s*/g, '').trim();
                   const isViewAll = activeTab === "all";
                   const isSingleActive = activeTab === cameraId;
                   const isVisible = isViewAll || isSingleActive;
@@ -1850,7 +1852,10 @@ const GroupViewPage: React.FC = () => {
                     </div>
                   </div>
                   {(() => {
-                    const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
+                    // Use cameraIds (which are sorted) to determine availability, preserving order
+                    const availableMappingCameras = cameraIds.filter(id =>
+                      mappingData.mappingByCamera[id] && mappingData.mappingByCamera[id].length > 0
+                    ) as BackendCameraId[];
 
                     // --- UNIFIED BOUNDS CALCULATION ---
                     // Find the global min/max across ALL cameras to ensure they share the same zoom level.
