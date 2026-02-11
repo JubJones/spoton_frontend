@@ -1724,7 +1724,7 @@ const GroupViewPage: React.FC = () => {
                     <div
                       key={cameraId}
                       className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
-                        ? 'min-h-0 hover:ring-1 hover:ring-blue-500 cursor-pointer transition-colors'
+                        ? 'min-h-0 cursor-pointer transition-colors'
                         : isSingleActive
                           ? 'w-full h-full min-h-[320px]'
                           : ''
