@@ -222,7 +222,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
         </div>
       </div>
 
-      {/* Person Grid */}
+      {/* Person Grid - Grouped by Camera */}
       <div className="flex-1 overflow-y-auto">
         {sortedDetections.length === 0 ? (
           <div className="flex items-center justify-center h-full text-gray-500">
@@ -233,98 +233,123 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
             </div>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
-            {sortedDetections.map((detection) => {
-              const cropKey = `${detection.camera_id}-${detection.detection_id}`;
-              const isSelected = selectedPerson === cropKey;
-              const croppedImage = croppedImages[cropKey];
-              let trackLabel: string | undefined;
-              if (typeof detection.track_id === 'number') {
-                trackLabel = `Track ${detection.track_id.toString().padStart(3, '0')}`;
-              } else if (typeof detection.tracking_key === 'string') {
-                const lastSegment = detection.tracking_key.split(':').pop();
-                trackLabel = lastSegment ? `Track ${lastSegment.toString().padStart(3, '0')}` : `Track ${detection.tracking_key}`;
-              }
-
-              const fallbackLabel = detection.detection_id?.startsWith('track_')
-                ? `Track ${detection.detection_id.slice(-3)}`
-                : detection.detection_id
-                  ? `Detection ${detection.detection_id.slice(-4)}`
-                  : 'Detection';
-              const primaryLabel = trackLabel ?? fallbackLabel;
+          <div className="space-y-6">
+            {/* Group detections by camera */}
+            {Object.entries(
+              sortedDetections.reduce<Record<string, typeof sortedDetections>>((acc, detection) => {
+                const camId = detection.camera_id;
+                if (!acc[camId]) acc[camId] = [];
+                acc[camId].push(detection);
+                return acc;
+              }, {})
+            ).map(([camera_id, detections]) => {
+              // Sort by track_id for stable ordering within each camera
+              const stableSorted = [...detections].sort((a, b) => {
+                const aId = typeof a.track_id === 'number' ? a.track_id : Infinity;
+                const bId = typeof b.track_id === 'number' ? b.track_id : Infinity;
+                return aId - bId;
+              });
 
               return (
-                <div
-                  key={cropKey}
-                  onClick={() => handlePersonClick(detection, detection.camera_id)}
-                  className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${isSelected
-                    ? 'ring-2 ring-blue-500 bg-blue-600'
-                    : 'hover:bg-gray-600 hover:shadow-lg'
-                    }`}
-                >
-                  {/* Cropped Person Image or Placeholder */}
-                  <div className="aspect-[3/4] relative">
-                    {croppedImage ? (
-                      <img
-                        src={croppedImage}
-                        alt={`Person ${primaryLabel}`}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <div className={`w-full h-full flex flex-col items-center justify-center ${detection.confidence >= 0.8
-                        ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
-                        : detection.confidence >= 0.6
-                          ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
-                          : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
-                        }`}>
-                        <div className="text-4xl mb-1">👤</div>
-                        <div className="text-xs text-gray-400 font-mono">
-                          {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Confidence Badge */}
-                    <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${detection.confidence >= 0.8
-                      ? 'bg-green-500 text-white'
-                      : detection.confidence >= 0.6
-                        ? 'bg-yellow-500 text-black'
-                        : 'bg-red-500 text-white'
-                      }`}>
-                      {Math.round(detection.confidence * 100)}%
-                    </div>
-
-                    {/* Selection Indicator */}
-                    {isSelected && (
-                      <div className="absolute top-2 left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
-                        <div className="text-white text-xs font-bold">✓</div>
-                      </div>
-                    )}
+                <div key={camera_id}>
+                  {/* Camera Section Header */}
+                  <div className="flex items-center gap-2 mb-2">
+                    <span className="text-sm font-semibold text-gray-300">{getCameraName(camera_id)}</span>
+                    <span className="text-xs text-gray-500">({stableSorted.length})</span>
                   </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-4">
+                    {stableSorted.map((detection) => {
+                      const cropKey = `${detection.camera_id}-${detection.detection_id}`;
+                      const isSelected = selectedPerson === cropKey;
+                      const croppedImage = croppedImages[cropKey];
+                      let trackLabel: string | undefined;
+                      if (typeof detection.track_id === 'number') {
+                        trackLabel = `Track ${detection.track_id.toString().padStart(3, '0')}`;
+                      } else if (typeof detection.tracking_key === 'string') {
+                        const lastSegment = detection.tracking_key.split(':').pop();
+                        trackLabel = lastSegment ? `Track ${lastSegment.toString().padStart(3, '0')}` : `Track ${detection.tracking_key}`;
+                      }
 
-                  {/* Person Details */}
-                  <div className="p-3">
-                    <div className="flex items-center justify-between mb-1">
-                      <p className="text-sm font-medium text-white truncate">
-                        {primaryLabel}
-                      </p>
-                    </div>
+                      const fallbackLabel = detection.detection_id?.startsWith('track_')
+                        ? `Track ${detection.detection_id.slice(-3)}`
+                        : detection.detection_id
+                          ? `Detection ${detection.detection_id.slice(-4)}`
+                          : 'Detection';
+                      const primaryLabel = trackLabel ?? fallbackLabel;
 
-                    <div className="flex items-center justify-between mb-2">
-                      <p className="text-xs text-gray-400">
-                        {getCameraName(detection.camera_id)}
-                      </p>
-                      <p className="text-xs text-gray-500">
-                        {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
-                      </p>
-                    </div>
+                      return (
+                        <div
+                          key={cropKey}
+                          onClick={() => handlePersonClick(detection, detection.camera_id)}
+                          className={`relative bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:scale-105 ${isSelected
+                            ? 'ring-2 ring-blue-500 bg-blue-600'
+                            : 'hover:bg-gray-600 hover:shadow-lg'
+                            }`}
+                        >
+                          {/* Cropped Person Image or Placeholder */}
+                          <div className="aspect-[3/4] relative">
+                            {croppedImage ? (
+                              <img
+                                src={croppedImage}
+                                alt={`Person ${primaryLabel}`}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className={`w-full h-full flex flex-col items-center justify-center ${detection.confidence >= 0.8
+                                ? 'bg-gradient-to-br from-green-900/50 to-green-800/30'
+                                : detection.confidence >= 0.6
+                                  ? 'bg-gradient-to-br from-yellow-900/50 to-yellow-800/30'
+                                  : 'bg-gradient-to-br from-red-900/50 to-red-800/30'
+                                }`}>
+                                <div className="text-4xl mb-1">👤</div>
+                                <div className="text-xs text-gray-400 font-mono">
+                                  {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                                </div>
+                              </div>
+                            )}
 
-                    {/* Map Coordinates (if available) */}
-                    {detection.map_coords && (
-                      <p className="text-xs text-blue-400 truncate">
-                        Map: ({detection.map_coords.map_x.toFixed(1)}, {detection.map_coords.map_y.toFixed(1)})
-                      </p>
-                    )}
+                            {/* Confidence Badge */}
+                            <div className={`absolute top-2 right-2 text-xs font-bold px-2 py-1 rounded-full ${detection.confidence >= 0.8
+                              ? 'bg-green-500 text-white'
+                              : detection.confidence >= 0.6
+                                ? 'bg-yellow-500 text-black'
+                                : 'bg-red-500 text-white'
+                              }`}>
+                              {Math.round(detection.confidence * 100)}%
+                            </div>
+
+                            {/* Selection Indicator */}
+                            {isSelected && (
+                              <div className="absolute top-2 left-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+                                <div className="text-white text-xs font-bold">✓</div>
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Person Details */}
+                          <div className="p-3">
+                            <div className="flex items-center justify-between mb-1">
+                              <p className="text-sm font-medium text-white truncate">
+                                {primaryLabel}
+                              </p>
+                            </div>
+
+                            <div className="flex items-center justify-between mb-2">
+                              <p className="text-xs text-gray-500">
+                                {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                              </p>
+                            </div>
+
+                            {/* Map Coordinates (if available) */}
+                            {detection.map_coords && (
+                              <p className="text-xs text-blue-400 truncate">
+                                Map: ({detection.map_coords.map_x.toFixed(1)}, {detection.map_coords.map_y.toFixed(1)})
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               );

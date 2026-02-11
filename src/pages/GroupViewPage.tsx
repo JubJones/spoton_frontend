@@ -270,6 +270,7 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
       }
 
       // Draw tracks
+      const placedLabels: { x: number; y: number; w: number; h: number }[] = [];
       for (let i = 0; i < tracks.length; i++) {
         const track = tracks[i];
         const [x1, y1, x2, y2] = track.bbox_xyxy;
@@ -301,16 +302,47 @@ const CameraStreamView = memo<CameraStreamViewProps>(({ taskId, cameraId, isStre
         ctx.lineWidth = 2;
         ctx.strokeRect(dx1, dy1, w, h);
 
-        // ID Label
+        // ID Label with collision avoidance
         ctx.font = 'bold 12px sans-serif';
         const labelText = `ID: ${track.global_id ?? track.track_id}`;
         const textMetrics = ctx.measureText(labelText);
+        const labelW = textMetrics.width + 4;
+        const labelH = 16;
+
+        // Default position: above the bbox
+        let labelX = dx1;
+        let labelY = dy1 - labelH;
+
+        // Check collision with previously placed labels and shift down if needed
+        let collision = true;
+        let attempts = 0;
+        while (collision && attempts < 4) {
+          collision = false;
+          for (const placed of placedLabels) {
+            if (
+              labelX < placed.x + placed.w &&
+              labelX + labelW > placed.x &&
+              labelY < placed.y + placed.h &&
+              labelY + labelH > placed.y
+            ) {
+              collision = true;
+              labelY = placed.y - labelH - 1; // shift above the colliding label
+              break;
+            }
+          }
+          attempts++;
+        }
+
+        // Clamp to canvas bounds
+        if (labelY < 0) labelY = dy2 + 2;
+
+        placedLabels.push({ x: labelX, y: labelY, w: labelW, h: labelH });
 
         ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-        ctx.fillRect(dx1, dy1 - 16, textMetrics.width + 4, 16);
+        ctx.fillRect(labelX, labelY, labelW, labelH);
 
         ctx.fillStyle = '#FFFFFF';
-        ctx.fillText(labelText, dx1 + 2, dy1 - 4);
+        ctx.fillText(labelText, labelX + 2, labelY + labelH - 4);
       }
     };
 
@@ -1588,18 +1620,6 @@ const GroupViewPage: React.FC = () => {
           >
             {error && !isStreaming ? 'Clean Up' : 'Stop Stream'}
           </button>
-          <button
-            onClick={() => {
-              console.log('🔍 DEBUG STATE:', {
-                isStreaming,
-                taskId,
-                currentFrameData: !!currentFrameData
-              });
-            }}
-            className="px-2 py-1.5 rounded text-white text-xs bg-blue-600 hover:bg-blue-700"
-          >
-            Debug
-          </button>
 
 
         </div>
@@ -1704,7 +1724,7 @@ const GroupViewPage: React.FC = () => {
                     <div
                       key={cameraId}
                       className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
-                        ? 'min-h-0 border border-gray-800 hover:border-blue-500 cursor-pointer transition-colors'
+                        ? 'min-h-0 hover:ring-1 hover:ring-blue-500 cursor-pointer transition-colors'
                         : isSingleActive
                           ? 'w-full h-full min-h-[320px]'
                           : ''
@@ -1713,6 +1733,7 @@ const GroupViewPage: React.FC = () => {
                       onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
                     >
                       <CameraStreamView
+                        key={`${cameraId}-${taskId ?? 'idle'}`}
                         taskId={taskId}
                         cameraId={cameraId}
                         isStreaming={isStreaming}
@@ -1736,253 +1757,259 @@ const GroupViewPage: React.FC = () => {
             className="flex flex-col gap-4"
             style={{
               maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : '600px',
-              overflowY: 'auto',
-              overflowX: 'hidden',
             }}
           >
-            {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
+            {/* Scrollable map area */}
             <div
-              ref={overallMapContainerRef}
-              className="rounded-xl"
               style={{
-                background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
-                border: '1px solid rgba(100, 116, 139, 0.2)',
-                boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
-                overflow: 'visible',
+                flex: '1 1 auto',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                minHeight: 0,
               }}
             >
-              {/* Panel Header */}
+              {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
               <div
-                className="flex items-center justify-between px-4 py-3"
+                ref={overallMapContainerRef}
+                className="rounded-xl"
                 style={{
-                  borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
-                  background: 'linear-gradient(90deg, rgba(34, 211, 238, 0.05), transparent)',
+                  background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+                  border: '1px solid rgba(100, 116, 139, 0.2)',
+                  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
+                  overflow: 'visible',
                 }}
               >
-                <div className="flex items-center gap-2">
-                  <span className="text-cyan-400">🗺️</span>
-                  <h3 className="text-sm font-semibold text-slate-200">Live 2D Mapping</h3>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="relative flex h-2 w-2">
-                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                    <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                  </span>
-                  <span className="text-xs text-emerald-400 font-medium">Live</span>
-                </div>
-              </div>
-
-              {/* Panel Content */}
-              <div className="p-3">
-                <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-400">
-                  <span className="uppercase tracking-wide text-[11px] font-semibold text-slate-500">Layout</span>
-                  <div className="inline-flex bg-slate-900/60 rounded-full p-0.5 shadow-inner">
-                    <button
-                      type="button"
-                      onClick={() => setMapLayoutMode('grid')}
-                      className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'grid'
-                        ? 'bg-cyan-500/30 text-cyan-100 shadow'
-                        : 'text-slate-400 hover:text-slate-100'
-                        }`}
-                    >
-                      Grid
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setMapLayoutMode('stacked')}
-                      className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'stacked'
-                        ? 'bg-cyan-500/30 text-cyan-100 shadow'
-                        : 'text-slate-400 hover:text-slate-100'
-                        }`}
-                    >
-                      Big view
-                    </button>
+                {/* Panel Header */}
+                <div
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{
+                    borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                    background: 'linear-gradient(90deg, rgba(34, 211, 238, 0.05), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-400">🗺️</span>
+                    <h3 className="text-sm font-semibold text-slate-200">Live 2D Mapping</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs text-emerald-400 font-medium">Live</span>
                   </div>
                 </div>
-                {(() => {
-                  const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
-                  // --- UNIFIED BOUNDS CALCULATION ---
-                  // Find the global min/max across ALL cameras to ensure they share the same zoom level.
-                  // This satisfies the requirement: "share the zoom level by use the one that has the widest zoom out"
-
-                  let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
-                  const allPoints: { x: number; y: number }[] = [];
-
-                  // Collect all points from all cameras
-                  Object.values(mappingData.mappingByCamera).forEach(coords => {
-                    coords?.forEach(c => {
-                      if (c.projection_successful) {
-                        allPoints.push({ x: c.map_x, y: c.map_y });
-                        // Include trails in bounds calculation
-                        c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
-                      }
-                    });
-                  });
-
-                  if (allPoints.length > 0) {
-                    const xs = allPoints.map(p => p.x);
-                    const ys = allPoints.map(p => p.y);
-
-                    // Add 10% padding or minimum 5m buffer
-                    const padding = 5;
-
-                    unifiedBounds = {
-                      minX: Math.min(...xs) - padding,
-                      maxX: Math.max(...xs) + padding,
-                      minY: Math.min(...ys) - padding,
-                      maxY: Math.max(...ys) + padding
-                    };
-
-                    // Enforce minimum size to prevent super-zoom on single dots
-                    const minSize = 20;
-                    if (unifiedBounds.maxX - unifiedBounds.minX < minSize) {
-                      const midX = (unifiedBounds.minX + unifiedBounds.maxX) / 2;
-                      unifiedBounds.minX = midX - minSize / 2;
-                      unifiedBounds.maxX = midX + minSize / 2;
-                    }
-                    if (unifiedBounds.maxY - unifiedBounds.minY < minSize) {
-                      const midY = (unifiedBounds.minY + unifiedBounds.maxY) / 2;
-                      unifiedBounds.minY = midY - minSize / 2;
-                      unifiedBounds.maxY = midY + minSize / 2;
-                    }
-                  } else {
-                    // Fallback to static config if no data
-                    try {
-                      const currentEnvId = getEnvironmentFromUrl();
-                      const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
-                      if (envConfig?.map_bounds) {
-                        unifiedBounds = {
-                          minX: envConfig.map_bounds[0][0],
-                          minY: envConfig.map_bounds[0][1],
-                          maxX: envConfig.map_bounds[1][0],
-                          maxY: envConfig.map_bounds[1][1],
-                        };
-                      }
-                    } catch (e) {
-                      console.warn('Failed to resolve environment map bounds', e);
-                    }
-                  }
-
-                  // Fallback default
-                  if (!unifiedBounds) {
-                    unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
-                  }
-
-                  // Calculate global span (zoom level)
-                  const globalSpanX = unifiedBounds ? (unifiedBounds.maxX - unifiedBounds.minX) : 60;
-                  const globalSpanY = unifiedBounds ? (unifiedBounds.maxY - unifiedBounds.minY) : 60;
-
-                  if (availableMappingCameras.length === 0) {
-                    return (
-                      <div
-                        className="w-full flex flex-col items-center justify-center py-12 text-center"
-                        style={{ minHeight: '200px' }}
+                {/* Panel Content */}
+                <div className="p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-400">
+                    <span className="uppercase tracking-wide text-[11px] font-semibold text-slate-500">Layout</span>
+                    <div className="inline-flex bg-slate-900/60 rounded-full p-0.5 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setMapLayoutMode('grid')}
+                        className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'grid'
+                          ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                          : 'text-slate-400 hover:text-slate-100'
+                          }`}
                       >
-                        <div
-                          className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                          style={{
-                            background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))',
-                            border: '1px solid rgba(34, 211, 238, 0.2)',
-                          }}
-                        >
-                          <span className="text-3xl">📍</span>
-                        </div>
-                        <p className="text-slate-300 text-sm font-medium mb-1">No Active Positions</p>
-                        <p className="text-slate-500 text-xs max-w-[200px]">
-                          2D mapping will appear when person positions are detected
-                        </p>
-                      </div>
-                    );
-                  }
+                        Grid
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapLayoutMode('stacked')}
+                        className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'stacked'
+                          ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                          : 'text-slate-400 hover:text-slate-100'
+                          }`}
+                      >
+                        Big view
+                      </button>
+                    </div>
+                  </div>
+                  {(() => {
+                    const availableMappingCameras = Object.keys(mappingData.mappingByCamera) as BackendCameraId[];
 
-                  const horizontalPadding = 32; // matches earlier sizing assumptions
-                  const measuredContentWidth = Math.max(0, overallMapDimensions.width - horizontalPadding);
-                  const hasMeasuredWidth = measuredContentWidth > 0;
-                  const columnGapPx = 16; // tailwind gap-4
-                  const minColumnWidth = 180;
-                  const canUseTwoColumns =
-                    availableMappingCameras.length > 1 &&
-                    measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
-                  const mapColumns = isStackedLayout ? 1 : (canUseTwoColumns ? 2 : 1);
-                  const effectiveColumnWidth = hasMeasuredWidth
-                    ? (mapColumns === 1
-                      ? measuredContentWidth
-                      : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
-                    : 0;
-                  const fallbackMapWidth = 350;
-                  const fallbackMapHeight = isStackedLayout ? 260 : 200;
-                  const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
-                  const minMapHeight = isStackedLayout ? 240 : (mapColumns === 1 ? 180 : 160);
-                  const heightRatio = isStackedLayout ? 0.55 : 0.45;
-                  const mapHeight = hasMeasuredWidth
-                    ? Math.max(minMapHeight, Math.floor(mapWidth * heightRatio))
-                    : fallbackMapHeight;
-                  const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
-                  const mapContainerClass = isStackedLayout ? 'flex flex-col gap-4' : 'grid gap-4';
-                  const mapContainerStyle = isStackedLayout ? undefined : { gridTemplateColumns };
+                    // --- UNIFIED BOUNDS CALCULATION ---
+                    // Find the global min/max across ALL cameras to ensure they share the same zoom level.
+                    // This satisfies the requirement: "share the zoom level by use the one that has the widest zoom out"
 
-                  return (
-                    <div className={mapContainerClass} style={mapContainerStyle}>
-                      {availableMappingCameras.map((backendCameraId) => {
-                        const coords = getMappingForCamera(backendCameraId);
-                        if (!coords || coords.length === 0) return null;
+                    let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
+                    const allPoints: { x: number; y: number }[] = [];
 
-                        // --- PER-CAMERA CENTERING WITH UNIFIED ZOOM ---
-                        // 1. Calculate the center of points for THIS camera
-                        let cameraSpecificBounds = unifiedBounds; // Fallback to global view if calc fails
+                    // Collect all points from all cameras
+                    Object.values(mappingData.mappingByCamera).forEach(coords => {
+                      coords?.forEach(c => {
+                        if (c.projection_successful) {
+                          allPoints.push({ x: c.map_x, y: c.map_y });
+                          // Include trails in bounds calculation
+                          c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                        }
+                      });
+                    });
 
-                        const camPoints: { x: number, y: number }[] = [];
-                        coords.forEach(c => {
-                          if (c.projection_successful) {
-                            camPoints.push({ x: c.map_x, y: c.map_y });
-                            c.trail?.forEach(t => camPoints.push({ x: t.x, y: t.y }));
-                          }
-                        });
+                    if (allPoints.length > 0) {
+                      const xs = allPoints.map(p => p.x);
+                      const ys = allPoints.map(p => p.y);
 
-                        if (camPoints.length > 0 && unifiedBounds) {
-                          const xs = camPoints.map(p => p.x);
-                          const ys = camPoints.map(p => p.y);
+                      // Add 10% padding or minimum 5m buffer
+                      const padding = 5;
 
-                          // Average center of this camera's activity
-                          const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                          const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+                      unifiedBounds = {
+                        minX: Math.min(...xs) - padding,
+                        maxX: Math.max(...xs) + padding,
+                        minY: Math.min(...ys) - padding,
+                        maxY: Math.max(...ys) + padding
+                      };
 
-                          // Apply GLOBAL span around LOCAL center
-                          cameraSpecificBounds = {
-                            minX: centerX - (globalSpanX / 2),
-                            maxX: centerX + (globalSpanX / 2),
-                            minY: centerY - (globalSpanY / 2),
-                            maxY: centerY + (globalSpanY / 2),
+                      // Enforce minimum size to prevent super-zoom on single dots
+                      const minSize = 20;
+                      if (unifiedBounds.maxX - unifiedBounds.minX < minSize) {
+                        const midX = (unifiedBounds.minX + unifiedBounds.maxX) / 2;
+                        unifiedBounds.minX = midX - minSize / 2;
+                        unifiedBounds.maxX = midX + minSize / 2;
+                      }
+                      if (unifiedBounds.maxY - unifiedBounds.minY < minSize) {
+                        const midY = (unifiedBounds.minY + unifiedBounds.maxY) / 2;
+                        unifiedBounds.minY = midY - minSize / 2;
+                        unifiedBounds.maxY = midY + minSize / 2;
+                      }
+                    } else {
+                      // Fallback to static config if no data
+                      try {
+                        const currentEnvId = getEnvironmentFromUrl();
+                        const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
+                        if (envConfig?.map_bounds) {
+                          unifiedBounds = {
+                            minX: envConfig.map_bounds[0][0],
+                            minY: envConfig.map_bounds[0][1],
+                            maxX: envConfig.map_bounds[1][0],
+                            maxY: envConfig.map_bounds[1][1],
                           };
                         }
+                      } catch (e) {
+                        console.warn('Failed to resolve environment map bounds', e);
+                      }
+                    }
 
-                        return (
+                    // Fallback default
+                    if (!unifiedBounds) {
+                      unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
+                    }
+
+                    // Calculate global span (zoom level)
+                    const globalSpanX = unifiedBounds ? (unifiedBounds.maxX - unifiedBounds.minX) : 60;
+                    const globalSpanY = unifiedBounds ? (unifiedBounds.maxY - unifiedBounds.minY) : 60;
+
+                    if (availableMappingCameras.length === 0) {
+                      return (
+                        <div
+                          className="w-full flex flex-col items-center justify-center py-12 text-center"
+                          style={{ minHeight: '200px' }}
+                        >
                           <div
-                            key={`map-${backendCameraId}`}
-                            className={isStackedLayout ? 'bg-slate-900/40 border border-slate-700/40 rounded-xl p-3' : undefined}
+                            className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))',
+                              border: '1px solid rgba(34, 211, 238, 0.2)',
+                            }}
                           >
-                            <CameraMapPair
-                              cameraId={backendCameraId}
-                              mappingCoordinates={coords}
-                              mapVisible={true}
-                              className="w-full"
-                              mapWidth={mapWidth}
-                              mapHeight={mapHeight}
-                              fixedBounds={cameraSpecificBounds}
-                            />
+                            <span className="text-3xl">📍</span>
                           </div>
-                        );
-                      })}
-                    </div>
-                  );
-                })()}
+                          <p className="text-slate-300 text-sm font-medium mb-1">No Active Positions</p>
+                          <p className="text-slate-500 text-xs max-w-[200px]">
+                            2D mapping will appear when person positions are detected
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const horizontalPadding = 32; // matches earlier sizing assumptions
+                    const measuredContentWidth = Math.max(0, overallMapDimensions.width - horizontalPadding);
+                    const hasMeasuredWidth = measuredContentWidth > 0;
+                    const columnGapPx = 16; // tailwind gap-4
+                    const minColumnWidth = 180;
+                    const canUseTwoColumns =
+                      availableMappingCameras.length > 1 &&
+                      measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
+                    const mapColumns = isStackedLayout ? 1 : (canUseTwoColumns ? 2 : 1);
+                    const effectiveColumnWidth = hasMeasuredWidth
+                      ? (mapColumns === 1
+                        ? measuredContentWidth
+                        : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
+                      : 0;
+                    const fallbackMapWidth = 350;
+                    const fallbackMapHeight = isStackedLayout ? 260 : 200;
+                    const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
+                    const minMapHeight = isStackedLayout ? 240 : (mapColumns === 1 ? 180 : 160);
+                    const heightRatio = isStackedLayout ? 0.55 : 0.45;
+                    const mapHeight = hasMeasuredWidth
+                      ? Math.max(minMapHeight, Math.floor(mapWidth * heightRatio))
+                      : fallbackMapHeight;
+                    const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
+                    const mapContainerClass = isStackedLayout ? 'flex flex-col gap-4' : 'grid gap-4';
+                    const mapContainerStyle = isStackedLayout ? undefined : { gridTemplateColumns };
+
+                    return (
+                      <div className={mapContainerClass} style={mapContainerStyle}>
+                        {availableMappingCameras.map((backendCameraId) => {
+                          const coords = getMappingForCamera(backendCameraId);
+                          if (!coords || coords.length === 0) return null;
+
+                          // --- PER-CAMERA CENTERING WITH UNIFIED ZOOM ---
+                          // 1. Calculate the center of points for THIS camera
+                          let cameraSpecificBounds = unifiedBounds; // Fallback to global view if calc fails
+
+                          const camPoints: { x: number, y: number }[] = [];
+                          coords.forEach(c => {
+                            if (c.projection_successful) {
+                              camPoints.push({ x: c.map_x, y: c.map_y });
+                              c.trail?.forEach(t => camPoints.push({ x: t.x, y: t.y }));
+                            }
+                          });
+
+                          if (camPoints.length > 0 && unifiedBounds) {
+                            const xs = camPoints.map(p => p.x);
+                            const ys = camPoints.map(p => p.y);
+
+                            // Average center of this camera's activity
+                            const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                            const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+                            // Apply GLOBAL span around LOCAL center
+                            cameraSpecificBounds = {
+                              minX: centerX - (globalSpanX / 2),
+                              maxX: centerX + (globalSpanX / 2),
+                              minY: centerY - (globalSpanY / 2),
+                              maxY: centerY + (globalSpanY / 2),
+                            };
+                          }
+
+                          return (
+                            <div
+                              key={`map-${backendCameraId}`}
+                              className={isStackedLayout ? 'bg-slate-900/40 border border-slate-700/40 rounded-xl p-3' : undefined}
+                            >
+                              <CameraMapPair
+                                cameraId={backendCameraId}
+                                mappingCoordinates={coords}
+                                mapVisible={true}
+                                className="w-full"
+                                mapWidth={mapWidth}
+                                mapHeight={mapHeight}
+                                fixedBounds={cameraSpecificBounds}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
               </div>
             </div>
 
-
-
-            {/* Upper Lower Panels - Tracks and Stream Info */}
+            {/* Upper Lower Panels - Tracks and Stream Info (below scrollable map) */}
             <div className="flex gap-4">
               <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
                 <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
@@ -1999,7 +2026,7 @@ const GroupViewPage: React.FC = () => {
 
                       return (
                         <div key={cameraId} className="flex items-center justify-between">
-                          <span>{displayName}</span>
+                          <span>{displayName.replace(/\s*\(.*\)\s*$/, '')}</span>
                           <div className="flex items-center">
                             <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
                               <div
@@ -2043,20 +2070,7 @@ const GroupViewPage: React.FC = () => {
                     </>
                   )}
                 </div>
-                <button
-                  onClick={isStreaming ? handleStopStreaming : error ? handleStopStreaming : handleStartStreaming}
-                  className={`w-full py-1.5 text-white rounded text-sm font-semibold mt-3 ${isStreaming
-                    ? "bg-red-600 hover:bg-red-700"
-                    : error && !isStreaming
-                      ? "bg-orange-600 hover:bg-orange-700"
-                      : systemHealth?.status === 'healthy'
-                        ? "bg-green-600 hover:bg-green-700"
-                        : "bg-gray-600 cursor-not-allowed"
-                    }`}
-                  disabled={!isStreaming && !error && systemHealth?.status !== 'healthy'}
-                >
-                  {isStreaming ? 'Stop Stream' : error ? 'Clean Up' : 'Start Stream'}
-                </button>
+
               </div>
             </div>
           </div>

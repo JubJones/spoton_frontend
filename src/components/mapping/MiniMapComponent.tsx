@@ -253,11 +253,16 @@ export const MiniMapComponent: React.FC<MiniMapComponentProps> = ({
       ctx.arc(currentPos.x, currentPos.y, 3, 0, 2 * Math.PI);
       ctx.fill();
 
-      // Detection ID label
+      // Detection ID label - formatted to match frame overlay (ID: XXX)
       ctx.fillStyle = COLORS.textSecondary;
       ctx.font = 'bold 9px Arial, sans-serif';
       ctx.textAlign = 'left';
-      ctx.fillText(`#${coord.detection_id.slice(-4)}`, currentPos.x + 12, currentPos.y + 3);
+      // Extract numeric track portion from detection_id (e.g. "track_5" → "5")
+      const rawId = coord.detection_id;
+      const idLabel = rawId.startsWith('track_')
+        ? `ID: ${rawId.slice(6)}`
+        : `ID: ${rawId.slice(-3)}`;
+      ctx.fillText(idLabel, currentPos.x + 12, currentPos.y + 3);
     });
 
     // Camera badge in top-left

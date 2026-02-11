@@ -266,10 +266,8 @@ const ExportSettings: React.FC<ExportSettingsProps> = ({
     [selectedTemplate, onSettingsChange]
   );
 
-  // Export template
+  // Export template - generates a downloadable file
   const exportTemplate = useCallback((template: ExportTemplate) => {
-    console.log('Exporting with template:', template);
-
     // Update use count and last used
     setExportTemplates((prev) =>
       prev.map((t) =>
@@ -277,9 +275,53 @@ const ExportSettings: React.FC<ExportSettingsProps> = ({
       )
     );
 
-    // Simulate export process
-    const fileName = `export_${template.format}_${new Date().toISOString().split('T')[0]}.${template.format}`;
-    console.log(`Exporting to ${fileName}`);
+    // Generate export content based on format
+    const timestamp = new Date().toISOString();
+    const dateStr = timestamp.split('T')[0];
+
+    let content: string;
+    let mimeType: string;
+    let fileExtension: string;
+
+    if (template.format === 'json') {
+      const data = {
+        export_template: template.name,
+        exported_at: timestamp,
+        fields: template.fields,
+        data: [] as Record<string, string>[],
+        note: 'Export generated from SpotOn tracking system',
+      };
+      // Add a sample row showing the field structure
+      const sampleRow: Record<string, string> = {};
+      template.fields.forEach(field => { sampleRow[field] = `<${field}>`; });
+      data.data.push(sampleRow);
+      content = JSON.stringify(data, null, 2);
+      mimeType = 'application/json';
+      fileExtension = 'json';
+    } else {
+      // Default to CSV for csv, excel, and other formats
+      const header = template.fields.join(',');
+      const sampleRow = template.fields.map(f => `<${f}>`).join(',');
+      content = `# SpotOn Export - ${template.name}\n# Exported: ${timestamp}\n${header}\n${sampleRow}\n`;
+      mimeType = 'text/csv';
+      fileExtension = template.format === 'excel' ? 'csv' : template.format === 'xml' ? 'xml' : 'csv';
+
+      if (template.format === 'xml') {
+        content = `<?xml version="1.0" encoding="UTF-8"?>\n<export template="${template.name}" exported_at="${timestamp}">\n  <fields>${template.fields.map(f => `\n    <field name="${f}" />`).join('')}\n  </fields>\n  <data>\n    <row>${template.fields.map(f => `\n      <${f}></${f}>`).join('')}\n    </row>\n  </data>\n</export>\n`;
+        mimeType = 'application/xml';
+      }
+    }
+
+    // Trigger browser download
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `spoton_export_${template.id}_${dateStr}.${fileExtension}`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
   }, []);
 
   // Test backup

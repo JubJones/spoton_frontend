@@ -23,7 +23,7 @@ const LandingPage: React.FC = () => {
     uptime: '99.9%',
     activeEnvironments: 2,
     totalCameras: 8,
-    processingSpeed: '30 FPS',
+    processingSpeed: '23 FPS',
   };
 
   return (

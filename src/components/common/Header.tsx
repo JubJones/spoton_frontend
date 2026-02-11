@@ -27,7 +27,7 @@ const Header: React.FC<HeaderProps> = ({
   rightContent,
 }) => {
   return (
-    <header className="flex justify-between items-center p-6 backdrop-blur-sm bg-black/20">
+    <header className="relative z-10 flex justify-between items-center p-6 backdrop-blur-sm bg-black/20">
       {/* Left side - Logo and back button */}
       <div className="flex items-center space-x-6">
         <Link to="/" className="flex items-center space-x-3">
