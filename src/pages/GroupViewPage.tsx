@@ -1551,590 +1551,590 @@ const GroupViewPage: React.FC = () => {
   };
 
   const handleStopStreaming = async () => {
+
+    // Close WebSocket connection
+    if (wsRef.current) {
+      wsRef.current.close();
+    }
+    disconnectFocusWebSocket();
+
+    // Clear local state immediately for responsive UI
+    setIsStreaming(false);
+    setTaskId(null);
+    setPlaybackStatus(null);
+    // setCameraFrames({});
+    setCurrentFrameData(null);
+    // setImageLoadingStates({});
+    // setImageDebugInfo({});
+    setDetectionData({});
+    setFocusedPerson(null);
+    clearBackendFocus();
+
+    // Call backend to cleanup all detection tasks for this environment
     try {
-      // Close WebSocket connection
-      if (wsRef.current) {
-        wsRef.current.close();
+      const environment = getEnvironmentFromUrl();
+      console.log('🧹 Cleaning up all detection tasks for environment:', environment);
+
+      const response = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/environment/${environment}/cleanup`, {
+        method: 'DELETE'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        console.log('✅ Environment cleanup successful:', result.data?.message);
       }
-      disconnectFocusWebSocket();
-
-      // Clear local state immediately for responsive UI
-      setIsStreaming(false);
-      setTaskId(null);
-      setPlaybackStatus(null);
-      // setCameraFrames({});
-      setCurrentFrameData(null);
-      // setImageLoadingStates({});
-      // setImageDebugInfo({});
-      setDetectionData({});
-      setFocusedPerson(null);
-      clearBackendFocus();
-
-      // Call backend to cleanup all detection tasks for this environment
-      try {
-        const environment = getEnvironmentFromUrl();
-        console.log('🧹 Cleaning up all detection tasks for environment:', environment);
-
-        const response = await fetch(`${BACKEND_BASE_URL}/api/v1/detection-processing-tasks/environment/${environment}/cleanup`, {
-          method: 'DELETE'
-        });
-
-        if (response.ok) {
-          const result = await response.json();
-          console.log('✅ Environment cleanup successful:', result.data?.message);
-        }
-      } catch (error) {
-        console.error('❌ Error during cleanup:', error);
-        // Don't re-throw - we want the UI to still update even if cleanup fails
-      }
-    };
-
-    console.log('GroupViewPage render:', { activeTab, cameraIdsLength: cameraIds.length });
-
-    return (
-      <div className="flex flex-col h-screen bg-gray-900 text-white p-4 overflow-hidden" style={{ backgroundColor: '#101827' }}>
-        {/* Header Section (Keep as before) */}
-        <header className="flex items-center justify-between mb-4 flex-shrink-0">
-          <Link to="/" className="flex items-center text-lg hover:text-orange-400">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
-            Back
-          </Link>
-          <h1 className="text-2xl font-semibold">{getZoneName()}</h1>
-          <div></div>
-        </header>
-
-        {/* Info Bar & Global Controls */}
-        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-gray-800 p-3 rounded-md flex-shrink-0 gap-4">
-          <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1">
-            <div>Num cameras: <span className="font-semibold">{cameraIds.length}</span></div>
-            <div className="flex space-x-4">
-              <span className={`flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
-                <span className={`h-2 w-2 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
-                {isStreaming ? 'Streaming' : 'Disconnected'}
-              </span>
-              <span className="text-blue-400 flex items-center">
-                <span className="h-2 w-2 bg-blue-400 rounded-full mr-1"></span>
-                Backend: {systemHealth?.status || 'Unknown'}
-              </span>
-            </div>
-            <div>Mode: <span className="font-semibold">Raw Video</span></div>
-            {taskId && <div>Task: <span className="font-semibold text-xs">{taskId.slice(0, 8)}...</span></div>}
-          </div>
-          <div className="flex space-x-2 flex-shrink-0">
-            <button
-              onClick={handleStartStreaming}
-              disabled={isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)}
-              className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)
-                ? "bg-gray-600 cursor-not-allowed"
-                : "bg-green-600 hover:bg-green-700"
-                }`}
-            >
-              {!!taskId && !isStreaming ? 'Connecting...' : 'Start Stream'}
-            </button>
-            <button
-              onClick={handleStopStreaming}
-              disabled={!isStreaming && !error}
-              className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${!isStreaming && !error
-                ? "bg-gray-600 cursor-not-allowed"
-                : (error && !isStreaming)
-                  ? "bg-orange-600 hover:bg-orange-700"
-                  : "bg-red-600 hover:bg-red-700"
-                }`}
-            >
-              {error && !isStreaming ? 'Clean Up' : 'Stop Stream'}
-            </button>
-
-
-          </div>
-        </div>
-
-        <div className="mb-4 flex-shrink-0">
-          <TaskPlaybackControls
-            taskId={taskId}
-            playbackStatus={playbackStatus}
-            onPause={pausePlaybackCommand}
-            onResume={resumePlaybackCommand}
-            onRefresh={refreshPlaybackStatusCommand}
-          />
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mb-4 bg-red-800 border border-red-600 text-red-200 p-3 rounded-md flex-shrink-0">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-              </svg>
-              {error}
-            </div>
-          </div>
-        )}
-        {cameraConfigError && (
-          <div className="mb-4 bg-yellow-900 border border-yellow-700 text-yellow-200 p-3 rounded-md flex-shrink-0">
-            <div className="flex items-center">
-              <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
-                <path
-                  fillRule="evenodd"
-                  d="M18 10A8 8 0 11.001 10 8 8 0 0118 10zm-9-4a1 1 0 112 0v4a1 1 0 01-2 0V6zm1 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"
-                  clipRule="evenodd"
-                />
-              </svg>
-              Unable to refresh camera configuration: {cameraConfigError}
-            </div>
-          </div>
-        )}
-
-        {/* Tab Bar (Keep as before) */}
-        <div className="mb-4 border-b border-gray-700 flex-shrink-0 flex justify-between items-center">
-          <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
-            <button onClick={() => setActiveTab("all")} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "all" ? "border-orange-500 text-orange-500" : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"}`}>View all</button>
-            {cameraIds.map((cameraId) => (
-              <button
-                key={cameraId}
-                onClick={() => setActiveTab(cameraId)}
-                className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === cameraId
-                  ? "border-orange-500 text-orange-500"
-                  : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"
-                  }`}
-              >
-                {getCameraDisplayNameById(cameraId)}
-              </button>
-            ))}
-          </nav>
-          {focusedPerson && (
-            <button
-              onClick={clearFocus}
-              className="px-3 py-1.5 rounded text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors"
-              title="Clear current tracking target"
-            >
-              Clear Target
-            </button>
-          )}
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex flex-col flex-grow gap-4">
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
-            {/* Left Side (Video Player Area) */}
-            <div
-              className="bg-gray-800 rounded-md p-1 flex items-center justify-center min-h-[320px]"
-              ref={videoAreaRef}
-            >
-              {cameraConfigLoading && cameraIds.length === 0 ? (
-                <div className="text-gray-400 text-sm">Loading camera configuration...</div>
-              ) : cameraIds.length === 0 ? (
-                <div className="text-gray-400 text-sm">No cameras available for this environment.</div>
-              ) : (
-                /* 
-                 * UNIFIED RENDERING: All cameras rendered ONCE, never unmounted.
-                 * Layout controlled by CSS based on activeTab.
-                 * This preserves MJPEG stream connections when switching views.
-                 */
-                <div
-                  className={`w-full h-full ${activeTab === "all"
-                    ? `grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`
-                    : 'relative'
-                    }`}
-                >
-                  {cameraIds.map((cameraId) => {
-                    const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
-                    const rawDisplayName = getCameraDisplayNameById(cameraId);
-                    const displayName = rawDisplayName.replace(/\s*\(.*?\)\s*/g, '').trim();
-                    const isViewAll = activeTab === "all";
-                    const isSingleActive = activeTab === cameraId;
-                    const isVisible = isViewAll || isSingleActive;
-
-                    return (
-                      <div
-                        key={cameraId}
-                        className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
-                          ? 'min-h-0 cursor-pointer transition-colors'
-                          : isSingleActive
-                            ? 'w-full h-full min-h-[320px]'
-                            : ''
-                          }`}
-                        style={{ display: isVisible ? 'flex' : 'none' }}
-                        onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
-                      >
-                        <CameraStreamView
-                          key={`${cameraId}-${taskId ?? 'idle'}`}
-                          taskId={taskId}
-                          cameraId={cameraId}
-                          isStreaming={isStreaming}
-                          tracks={tracks}
-                          focusedPerson={focusedPerson}
-                          onTrackClick={(track) => handleTrackFocus(cameraId, track)}
-                          onFrameCapture={handleFrameCapture}
-                          streamSessionId={streamSessionId}
-                        />
-                        <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
-                          {displayName} ({cameraId})
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Right Side Panels */}
-            <div
-              className="flex flex-col gap-4"
-              style={{
-                maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : '600px',
-              }}
-            >
-              {/* Scrollable map area */}
-              <div
-                style={{
-                  flex: '1 1 auto',
-                  overflowY: 'auto',
-                  overflowX: 'hidden',
-                  minHeight: 0,
-                }}
-              >
-                {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
-                <div
-                  ref={overallMapContainerRef}
-                  className="rounded-xl"
-                  style={{
-                    background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
-                    border: '1px solid rgba(100, 116, 139, 0.2)',
-                    boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
-                    overflow: 'visible',
-                  }}
-                >
-                  {/* Panel Header */}
-                  <div
-                    className="flex items-center justify-between px-4 py-3"
-                    style={{
-                      borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
-                      background: 'linear-gradient(90deg, rgba(34, 211, 238, 0.05), transparent)',
-                    }}
-                  >
-                    <div className="flex items-center gap-2">
-                      <span className="text-cyan-400">🗺️</span>
-                      <h3 className="text-sm font-semibold text-slate-200">Live 2D Mapping</h3>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="relative flex h-2 w-2">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                      </span>
-                      <span className="text-xs text-emerald-400 font-medium">Live</span>
-                    </div>
-                  </div>
-
-                  {/* Panel Content */}
-                  <div className="p-3">
-                    <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-400">
-                      <span className="uppercase tracking-wide text-[11px] font-semibold text-slate-500">Layout</span>
-                      <div className="inline-flex bg-slate-900/60 rounded-full p-0.5 shadow-inner">
-                        <button
-                          type="button"
-                          onClick={() => setMapLayoutMode('grid')}
-                          className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'grid'
-                            ? 'bg-cyan-500/30 text-cyan-100 shadow'
-                            : 'text-slate-400 hover:text-slate-100'
-                            }`}
-                        >
-                          Grid
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setMapLayoutMode('stacked')}
-                          className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'stacked'
-                            ? 'bg-cyan-500/30 text-cyan-100 shadow'
-                            : 'text-slate-400 hover:text-slate-100'
-                            }`}
-                        >
-                          Big view
-                        </button>
-                      </div>
-                    </div>
-                    {(() => {
-                      // Use cameraIds (which are sorted) to determine availability, preserving order
-                      const availableMappingCameras = cameraIds.filter(id =>
-                        mappingData.mappingByCamera[id] && mappingData.mappingByCamera[id].length > 0
-                      ) as BackendCameraId[];
-
-                      // --- UNIFIED BOUNDS CALCULATION ---
-                      // Find the global min/max across ALL cameras to ensure they share the same zoom level.
-                      // This satisfies the requirement: "share the zoom level by use the one that has the widest zoom out"
-
-                      let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
-                      const allPoints: { x: number; y: number }[] = [];
-
-                      // Collect all points from all cameras
-                      Object.values(mappingData.mappingByCamera).forEach(coords => {
-                        coords?.forEach(c => {
-                          if (c.projection_successful) {
-                            allPoints.push({ x: c.map_x, y: c.map_y });
-                            // Include trails in bounds calculation
-                            c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
-                          }
-                        });
-                      });
-
-                      if (allPoints.length > 0) {
-                        const xs = allPoints.map(p => p.x);
-                        const ys = allPoints.map(p => p.y);
-
-                        // Add 10% padding or minimum 5m buffer
-                        const padding = 5;
-
-                        unifiedBounds = {
-                          minX: Math.min(...xs) - padding,
-                          maxX: Math.max(...xs) + padding,
-                          minY: Math.min(...ys) - padding,
-                          maxY: Math.max(...ys) + padding
-                        };
-
-                        // Enforce minimum size to prevent super-zoom on single dots
-                        const minSize = 20;
-                        if (unifiedBounds.maxX - unifiedBounds.minX < minSize) {
-                          const midX = (unifiedBounds.minX + unifiedBounds.maxX) / 2;
-                          unifiedBounds.minX = midX - minSize / 2;
-                          unifiedBounds.maxX = midX + minSize / 2;
-                        }
-                        if (unifiedBounds.maxY - unifiedBounds.minY < minSize) {
-                          const midY = (unifiedBounds.minY + unifiedBounds.maxY) / 2;
-                          unifiedBounds.minY = midY - minSize / 2;
-                          unifiedBounds.maxY = midY + minSize / 2;
-                        }
-                      } else {
-                        // Fallback to static config if no data
-                        try {
-                          const currentEnvId = getEnvironmentFromUrl();
-                          const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
-                          if (envConfig?.map_bounds) {
-                            unifiedBounds = {
-                              minX: envConfig.map_bounds[0][0],
-                              minY: envConfig.map_bounds[0][1],
-                              maxX: envConfig.map_bounds[1][0],
-                              maxY: envConfig.map_bounds[1][1],
-                            };
-                          }
-                        } catch (e) {
-                          console.warn('Failed to resolve environment map bounds', e);
-                        }
-                      }
-
-                      // Fallback default
-                      if (!unifiedBounds) {
-                        unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
-                      }
-
-                      // Calculate global span (zoom level)
-                      const globalSpanX = unifiedBounds ? (unifiedBounds.maxX - unifiedBounds.minX) : 60;
-                      const globalSpanY = unifiedBounds ? (unifiedBounds.maxY - unifiedBounds.minY) : 60;
-
-                      if (availableMappingCameras.length === 0) {
-                        return (
-                          <div
-                            className="w-full flex flex-col items-center justify-center py-12 text-center"
-                            style={{ minHeight: '200px' }}
-                          >
-                            <div
-                              className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
-                              style={{
-                                background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))',
-                                border: '1px solid rgba(34, 211, 238, 0.2)',
-                              }}
-                            >
-                              <span className="text-3xl">📍</span>
-                            </div>
-                            <p className="text-slate-300 text-sm font-medium mb-1">No Active Positions</p>
-                            <p className="text-slate-500 text-xs max-w-[200px]">
-                              2D mapping will appear when person positions are detected
-                            </p>
-                          </div>
-                        );
-                      }
-
-                      const horizontalPadding = 32; // matches earlier sizing assumptions
-                      const measuredContentWidth = Math.max(0, overallMapDimensions.width - horizontalPadding);
-                      const hasMeasuredWidth = measuredContentWidth > 0;
-                      const columnGapPx = 16; // tailwind gap-4
-                      const minColumnWidth = 180;
-                      const canUseTwoColumns =
-                        availableMappingCameras.length > 1 &&
-                        measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
-                      const mapColumns = isStackedLayout ? 1 : (canUseTwoColumns ? 2 : 1);
-                      const effectiveColumnWidth = hasMeasuredWidth
-                        ? (mapColumns === 1
-                          ? measuredContentWidth
-                          : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
-                        : 0;
-                      const fallbackMapWidth = 350;
-                      const fallbackMapHeight = isStackedLayout ? 260 : 200;
-                      const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
-                      const minMapHeight = isStackedLayout ? 240 : (mapColumns === 1 ? 180 : 160);
-                      const heightRatio = isStackedLayout ? 0.55 : 0.45;
-                      const mapHeight = hasMeasuredWidth
-                        ? Math.max(minMapHeight, Math.floor(mapWidth * heightRatio))
-                        : fallbackMapHeight;
-                      const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
-                      const mapContainerClass = isStackedLayout ? 'flex flex-col gap-4' : 'grid gap-4';
-                      const mapContainerStyle = isStackedLayout ? undefined : { gridTemplateColumns };
-
-                      return (
-                        <div className={mapContainerClass} style={mapContainerStyle}>
-                          {availableMappingCameras.map((backendCameraId) => {
-                            const coords = getMappingForCamera(backendCameraId);
-                            if (!coords || coords.length === 0) return null;
-
-                            // --- PER-CAMERA CENTERING WITH UNIFIED ZOOM ---
-                            // 1. Calculate the center of points for THIS camera
-                            let cameraSpecificBounds = unifiedBounds; // Fallback to global view if calc fails
-
-                            const camPoints: { x: number, y: number }[] = [];
-                            coords.forEach(c => {
-                              if (c.projection_successful) {
-                                camPoints.push({ x: c.map_x, y: c.map_y });
-                                c.trail?.forEach(t => camPoints.push({ x: t.x, y: t.y }));
-                              }
-                            });
-
-                            if (camPoints.length > 0 && unifiedBounds) {
-                              const xs = camPoints.map(p => p.x);
-                              const ys = camPoints.map(p => p.y);
-
-                              // Average center of this camera's activity
-                              const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
-                              const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
-
-                              // Apply GLOBAL span around LOCAL center
-                              cameraSpecificBounds = {
-                                minX: centerX - (globalSpanX / 2),
-                                maxX: centerX + (globalSpanX / 2),
-                                minY: centerY - (globalSpanY / 2),
-                                maxY: centerY + (globalSpanY / 2),
-                              };
-                            }
-
-                            return (
-                              <div
-                                key={`map-${backendCameraId}`}
-                                className={isStackedLayout ? 'bg-slate-900/40 border border-slate-700/40 rounded-xl p-3' : undefined}
-                              >
-                                <CameraMapPair
-                                  cameraId={backendCameraId}
-                                  mappingCoordinates={coords}
-                                  mapVisible={true}
-                                  className="w-full"
-                                  mapWidth={mapWidth}
-                                  mapHeight={mapHeight}
-                                  fixedBounds={cameraSpecificBounds}
-                                />
-                              </div>
-                            );
-                          })}
-                        </div>
-                      );
-                    })()}
-                  </div>
-                </div>
-              </div>
-
-              {/* Upper Lower Panels - Tracks and Stream Info (below scrollable map) */}
-              <div className="flex gap-4">
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
-                  <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
-                  <div className="space-y-2 text-xs flex-grow overflow-y-auto">
-                    {(() => {
-                      const maxDetections = Math.max(
-                        1,
-                        ...cameraIds.map((cameraId) => detectionData[cameraId]?.detections?.length || 0)
-                      );
-
-                      return cameraIds.map((cameraId) => {
-                        const displayName = getCameraDisplayNameById(cameraId);
-                        const detectionCount = detectionData[cameraId]?.detections?.length || 0;
-
-                        return (
-                          <div key={cameraId} className="flex items-center justify-between">
-                            <span>{displayName.replace(/\s*\(.*\)\s*$/, '')}</span>
-                            <div className="flex items-center">
-                              <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
-                                <div
-                                  className="h-2 bg-green-500 rounded-full"
-                                  style={{
-                                    width: `${maxDetections ? (detectionCount / maxDetections) * 100 : 0}%`,
-                                  }}
-                                ></div>
-                              </div>
-                              <span className="font-mono">{detectionCount}</span>
-                            </div>
-                          </div>
-                        );
-                      });
-                    })()}
-                  </div>
-                </div>
-                <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
-                      <span className={`text-xs font-semibold flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
-                        <span className={`h-1.5 w-1.5 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
-                        {isStreaming ? 'Live' : 'Offline'}
-                      </span>
-                    </div>
-                    {isStreaming && currentFrameData ? (
-                      <>
-                        <p className="text-xs">Mode: <span className="font-bold">Raw Video</span></p>
-                        <p className="text-xs mt-1">Frame: <span className="font-bold">{currentFrameData.global_frame_index}</span></p>
-                        <p className="text-xs mt-1">Last update: <span className="font-bold">{new Date(currentFrameData.timestamp_processed_utc).toLocaleTimeString()}</span></p>
-                        <p className="text-xs mt-1">Total tracks: <span className="font-bold">
-                          {Object.values(currentFrameData.cameras).reduce((sum, cam) => sum + (cam.tracks?.length || 0), 0)}
-                        </span></p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-xs">Status: <span className="font-bold">No stream</span></p>
-                        <p className="text-xs mt-1">Backend: <span className="font-bold">{systemHealth?.status || 'Unknown'}</span></p>
-                        <p className="text-xs mt-1">Click Start Stream to begin</p>
-                      </>
-                    )}
-                  </div>
-
-                </div>
-              </div>
-            </div>
-          </div>
-        </div >
-
-        {/* Detection Person List - full width beneath video & panels */}
-        < div className="bg-gray-800 rounded-md p-3 mt-4" >
-          <DetectionPersonList
-            cameraDetections={
-              // Merge detection data with captured frames for person cropping
-              Object.fromEntries(
-                Object.entries(detectionData).map(([camera_id, data]) => [
-                  camera_id,
-                  {
-                    ...data,
-                    frame_image_base64: capturedFrames[camera_id] || undefined
-                  }
-                ])
-              )
-            }
-            className="h-full"
-            selectedPersonKey={focusedPerson?.detectionKey ?? null}
-            onPersonClick={(detection, camera_id, isSelecting) => {
-              handleDetectionSelection(
-                detection as DetectionListItem,
-                camera_id as BackendCameraId,
-                isSelecting
-              );
-            }}
-            activeCameraId={activeTab === 'all' ? null : activeTab}
-            allCameraIds={cameraIds}
-          />
-        </div >
-      </div >
-    );
+    } catch (error) {
+      console.error('❌ Error during cleanup:', error);
+      // Don't re-throw - we want the UI to still update even if cleanup fails
+    }
   };
 
-  export default GroupViewPage;
+  console.log('GroupViewPage render:', { activeTab, cameraIdsLength: cameraIds.length });
+
+  return (
+    <div className="flex flex-col h-screen bg-gray-900 text-white p-4 overflow-hidden" style={{ backgroundColor: '#101827' }}>
+      {/* Header Section (Keep as before) */}
+      <header className="flex items-center justify-between mb-4 flex-shrink-0">
+        <Link to="/" className="flex items-center text-lg hover:text-orange-400">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" /></svg>
+          Back
+        </Link>
+        <h1 className="text-2xl font-semibold">{getZoneName()}</h1>
+        <div></div>
+      </header>
+
+      {/* Info Bar & Global Controls */}
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 bg-gray-800 p-3 rounded-md flex-shrink-0 gap-4">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-x-4 gap-y-1">
+          <div>Num cameras: <span className="font-semibold">{cameraIds.length}</span></div>
+          <div className="flex space-x-4">
+            <span className={`flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
+              <span className={`h-2 w-2 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
+              {isStreaming ? 'Streaming' : 'Disconnected'}
+            </span>
+            <span className="text-blue-400 flex items-center">
+              <span className="h-2 w-2 bg-blue-400 rounded-full mr-1"></span>
+              Backend: {systemHealth?.status || 'Unknown'}
+            </span>
+          </div>
+          <div>Mode: <span className="font-semibold">Raw Video</span></div>
+          {taskId && <div>Task: <span className="font-semibold text-xs">{taskId.slice(0, 8)}...</span></div>}
+        </div>
+        <div className="flex space-x-2 flex-shrink-0">
+          <button
+            onClick={handleStartStreaming}
+            disabled={isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)}
+            className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${isStreaming || systemHealth?.status !== 'healthy' || (!!taskId && !isStreaming)
+              ? "bg-gray-600 cursor-not-allowed"
+              : "bg-green-600 hover:bg-green-700"
+              }`}
+          >
+            {!!taskId && !isStreaming ? 'Connecting...' : 'Start Stream'}
+          </button>
+          <button
+            onClick={handleStopStreaming}
+            disabled={!isStreaming && !error}
+            className={`px-4 py-1.5 rounded text-white text-sm font-semibold ${!isStreaming && !error
+              ? "bg-gray-600 cursor-not-allowed"
+              : (error && !isStreaming)
+                ? "bg-orange-600 hover:bg-orange-700"
+                : "bg-red-600 hover:bg-red-700"
+              }`}
+          >
+            {error && !isStreaming ? 'Clean Up' : 'Stop Stream'}
+          </button>
+
+
+        </div>
+      </div>
+
+      <div className="mb-4 flex-shrink-0">
+        <TaskPlaybackControls
+          taskId={taskId}
+          playbackStatus={playbackStatus}
+          onPause={pausePlaybackCommand}
+          onResume={resumePlaybackCommand}
+          onRefresh={refreshPlaybackStatusCommand}
+        />
+      </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="mb-4 bg-red-800 border border-red-600 text-red-200 p-3 rounded-md flex-shrink-0">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+            </svg>
+            {error}
+          </div>
+        </div>
+      )}
+      {cameraConfigError && (
+        <div className="mb-4 bg-yellow-900 border border-yellow-700 text-yellow-200 p-3 rounded-md flex-shrink-0">
+          <div className="flex items-center">
+            <svg className="h-5 w-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M18 10A8 8 0 11.001 10 8 8 0 0118 10zm-9-4a1 1 0 112 0v4a1 1 0 01-2 0V6zm1 8a1.5 1.5 0 100-3 1.5 1.5 0 000 3z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Unable to refresh camera configuration: {cameraConfigError}
+          </div>
+        </div>
+      )}
+
+      {/* Tab Bar (Keep as before) */}
+      <div className="mb-4 border-b border-gray-700 flex-shrink-0 flex justify-between items-center">
+        <nav className="-mb-px flex space-x-6 overflow-x-auto" aria-label="Tabs">
+          <button onClick={() => setActiveTab("all")} className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === "all" ? "border-orange-500 text-orange-500" : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"}`}>View all</button>
+          {cameraIds.map((cameraId) => (
+            <button
+              key={cameraId}
+              onClick={() => setActiveTab(cameraId)}
+              className={`whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm ${activeTab === cameraId
+                ? "border-orange-500 text-orange-500"
+                : "border-transparent text-gray-400 hover:text-gray-200 hover:border-gray-500"
+                }`}
+            >
+              {getCameraDisplayNameById(cameraId)}
+            </button>
+          ))}
+        </nav>
+        {focusedPerson && (
+          <button
+            onClick={clearFocus}
+            className="px-3 py-1.5 rounded text-white text-sm font-semibold bg-indigo-600 hover:bg-indigo-700 transition-colors"
+            title="Clear current tracking target"
+          >
+            Clear Target
+          </button>
+        )}
+      </div>
+
+      {/* Main Content Area */}
+      <div className="flex flex-col flex-grow gap-4">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+          {/* Left Side (Video Player Area) */}
+          <div
+            className="bg-gray-800 rounded-md p-1 flex items-center justify-center min-h-[320px]"
+            ref={videoAreaRef}
+          >
+            {cameraConfigLoading && cameraIds.length === 0 ? (
+              <div className="text-gray-400 text-sm">Loading camera configuration...</div>
+            ) : cameraIds.length === 0 ? (
+              <div className="text-gray-400 text-sm">No cameras available for this environment.</div>
+            ) : (
+              /* 
+               * UNIFIED RENDERING: All cameras rendered ONCE, never unmounted.
+               * Layout controlled by CSS based on activeTab.
+               * This preserves MJPEG stream connections when switching views.
+               */
+              <div
+                className={`w-full h-full ${activeTab === "all"
+                  ? `grid ${cameraIds.length >= 2 ? 'grid-cols-2' : 'grid-cols-1'} ${cameraIds.length > 2 ? 'grid-rows-2' : ''} gap-1`
+                  : 'relative'
+                  }`}
+              >
+                {cameraIds.map((cameraId) => {
+                  const tracks = currentFrameData?.cameras?.[cameraId]?.tracks || [];
+                  const rawDisplayName = getCameraDisplayNameById(cameraId);
+                  const displayName = rawDisplayName.replace(/\s*\(.*?\)\s*/g, '').trim();
+                  const isViewAll = activeTab === "all";
+                  const isSingleActive = activeTab === cameraId;
+                  const isVisible = isViewAll || isSingleActive;
+
+                  return (
+                    <div
+                      key={cameraId}
+                      className={`relative bg-black rounded overflow-hidden flex items-center justify-center ${isViewAll
+                        ? 'min-h-0 cursor-pointer transition-colors'
+                        : isSingleActive
+                          ? 'w-full h-full min-h-[320px]'
+                          : ''
+                        }`}
+                      style={{ display: isVisible ? 'flex' : 'none' }}
+                      onClick={isViewAll ? () => setActiveTab(cameraId) : undefined}
+                    >
+                      <CameraStreamView
+                        key={`${cameraId}-${taskId ?? 'idle'}`}
+                        taskId={taskId}
+                        cameraId={cameraId}
+                        isStreaming={isStreaming}
+                        tracks={tracks}
+                        focusedPerson={focusedPerson}
+                        onTrackClick={(track) => handleTrackFocus(cameraId, track)}
+                        onFrameCapture={handleFrameCapture}
+                        streamSessionId={streamSessionId}
+                      />
+                      <div className="absolute top-2 left-2 pointer-events-none bg-black bg-opacity-70 text-white text-xs px-2 py-1 rounded">
+                        {displayName} ({cameraId})
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Right Side Panels */}
+          <div
+            className="flex flex-col gap-4"
+            style={{
+              maxHeight: videoAreaHeight ? `${Math.floor(videoAreaHeight)}px` : '600px',
+            }}
+          >
+            {/* Scrollable map area */}
+            <div
+              style={{
+                flex: '1 1 auto',
+                overflowY: 'auto',
+                overflowX: 'hidden',
+                minHeight: 0,
+              }}
+            >
+              {/* === UPDATED: Live 2D Mapping Panel (MiniMapComponent per camera) === */}
+              <div
+                ref={overallMapContainerRef}
+                className="rounded-xl"
+                style={{
+                  background: 'linear-gradient(180deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.95))',
+                  border: '1px solid rgba(100, 116, 139, 0.2)',
+                  boxShadow: '0 4px 24px rgba(0, 0, 0, 0.25)',
+                  overflow: 'visible',
+                }}
+              >
+                {/* Panel Header */}
+                <div
+                  className="flex items-center justify-between px-4 py-3"
+                  style={{
+                    borderBottom: '1px solid rgba(100, 116, 139, 0.15)',
+                    background: 'linear-gradient(90deg, rgba(34, 211, 238, 0.05), transparent)',
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-cyan-400">🗺️</span>
+                    <h3 className="text-sm font-semibold text-slate-200">Live 2D Mapping</h3>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <span className="relative flex h-2 w-2">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <span className="text-xs text-emerald-400 font-medium">Live</span>
+                  </div>
+                </div>
+
+                {/* Panel Content */}
+                <div className="p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2 mb-3 text-xs text-slate-400">
+                    <span className="uppercase tracking-wide text-[11px] font-semibold text-slate-500">Layout</span>
+                    <div className="inline-flex bg-slate-900/60 rounded-full p-0.5 shadow-inner">
+                      <button
+                        type="button"
+                        onClick={() => setMapLayoutMode('grid')}
+                        className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'grid'
+                          ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                          : 'text-slate-400 hover:text-slate-100'
+                          }`}
+                      >
+                        Grid
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setMapLayoutMode('stacked')}
+                        className={`px-3 py-1 rounded-full font-semibold transition-colors ${mapLayoutMode === 'stacked'
+                          ? 'bg-cyan-500/30 text-cyan-100 shadow'
+                          : 'text-slate-400 hover:text-slate-100'
+                          }`}
+                      >
+                        Big view
+                      </button>
+                    </div>
+                  </div>
+                  {(() => {
+                    // Use cameraIds (which are sorted) to determine availability, preserving order
+                    const availableMappingCameras = cameraIds.filter(id =>
+                      mappingData.mappingByCamera[id] && mappingData.mappingByCamera[id].length > 0
+                    ) as BackendCameraId[];
+
+                    // --- UNIFIED BOUNDS CALCULATION ---
+                    // Find the global min/max across ALL cameras to ensure they share the same zoom level.
+                    // This satisfies the requirement: "share the zoom level by use the one that has the widest zoom out"
+
+                    let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
+                    const allPoints: { x: number; y: number }[] = [];
+
+                    // Collect all points from all cameras
+                    Object.values(mappingData.mappingByCamera).forEach(coords => {
+                      coords?.forEach(c => {
+                        if (c.projection_successful) {
+                          allPoints.push({ x: c.map_x, y: c.map_y });
+                          // Include trails in bounds calculation
+                          c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                        }
+                      });
+                    });
+
+                    if (allPoints.length > 0) {
+                      const xs = allPoints.map(p => p.x);
+                      const ys = allPoints.map(p => p.y);
+
+                      // Add 10% padding or minimum 5m buffer
+                      const padding = 5;
+
+                      unifiedBounds = {
+                        minX: Math.min(...xs) - padding,
+                        maxX: Math.max(...xs) + padding,
+                        minY: Math.min(...ys) - padding,
+                        maxY: Math.max(...ys) + padding
+                      };
+
+                      // Enforce minimum size to prevent super-zoom on single dots
+                      const minSize = 20;
+                      if (unifiedBounds.maxX - unifiedBounds.minX < minSize) {
+                        const midX = (unifiedBounds.minX + unifiedBounds.maxX) / 2;
+                        unifiedBounds.minX = midX - minSize / 2;
+                        unifiedBounds.maxX = midX + minSize / 2;
+                      }
+                      if (unifiedBounds.maxY - unifiedBounds.minY < minSize) {
+                        const midY = (unifiedBounds.minY + unifiedBounds.maxY) / 2;
+                        unifiedBounds.minY = midY - minSize / 2;
+                        unifiedBounds.maxY = midY + minSize / 2;
+                      }
+                    } else {
+                      // Fallback to static config if no data
+                      try {
+                        const currentEnvId = getEnvironmentFromUrl();
+                        const envConfig = ENVIRONMENT_CONFIGS[currentEnvId as EnvironmentId];
+                        if (envConfig?.map_bounds) {
+                          unifiedBounds = {
+                            minX: envConfig.map_bounds[0][0],
+                            minY: envConfig.map_bounds[0][1],
+                            maxX: envConfig.map_bounds[1][0],
+                            maxY: envConfig.map_bounds[1][1],
+                          };
+                        }
+                      } catch (e) {
+                        console.warn('Failed to resolve environment map bounds', e);
+                      }
+                    }
+
+                    // Fallback default
+                    if (!unifiedBounds) {
+                      unifiedBounds = { minX: 0, maxX: 60, minY: 0, maxY: 60 };
+                    }
+
+                    // Calculate global span (zoom level)
+                    const globalSpanX = unifiedBounds ? (unifiedBounds.maxX - unifiedBounds.minX) : 60;
+                    const globalSpanY = unifiedBounds ? (unifiedBounds.maxY - unifiedBounds.minY) : 60;
+
+                    if (availableMappingCameras.length === 0) {
+                      return (
+                        <div
+                          className="w-full flex flex-col items-center justify-center py-12 text-center"
+                          style={{ minHeight: '200px' }}
+                        >
+                          <div
+                            className="w-16 h-16 rounded-full flex items-center justify-center mb-4"
+                            style={{
+                              background: 'linear-gradient(135deg, rgba(34, 211, 238, 0.1), rgba(34, 211, 238, 0.05))',
+                              border: '1px solid rgba(34, 211, 238, 0.2)',
+                            }}
+                          >
+                            <span className="text-3xl">📍</span>
+                          </div>
+                          <p className="text-slate-300 text-sm font-medium mb-1">No Active Positions</p>
+                          <p className="text-slate-500 text-xs max-w-[200px]">
+                            2D mapping will appear when person positions are detected
+                          </p>
+                        </div>
+                      );
+                    }
+
+                    const horizontalPadding = 32; // matches earlier sizing assumptions
+                    const measuredContentWidth = Math.max(0, overallMapDimensions.width - horizontalPadding);
+                    const hasMeasuredWidth = measuredContentWidth > 0;
+                    const columnGapPx = 16; // tailwind gap-4
+                    const minColumnWidth = 180;
+                    const canUseTwoColumns =
+                      availableMappingCameras.length > 1 &&
+                      measuredContentWidth >= minColumnWidth * 2 + columnGapPx;
+                    const mapColumns = isStackedLayout ? 1 : (canUseTwoColumns ? 2 : 1);
+                    const effectiveColumnWidth = hasMeasuredWidth
+                      ? (mapColumns === 1
+                        ? measuredContentWidth
+                        : Math.floor((measuredContentWidth - columnGapPx) / mapColumns))
+                      : 0;
+                    const fallbackMapWidth = 350;
+                    const fallbackMapHeight = isStackedLayout ? 260 : 200;
+                    const mapWidth = effectiveColumnWidth > 0 ? effectiveColumnWidth : fallbackMapWidth;
+                    const minMapHeight = isStackedLayout ? 240 : (mapColumns === 1 ? 180 : 160);
+                    const heightRatio = isStackedLayout ? 0.55 : 0.45;
+                    const mapHeight = hasMeasuredWidth
+                      ? Math.max(minMapHeight, Math.floor(mapWidth * heightRatio))
+                      : fallbackMapHeight;
+                    const gridTemplateColumns = `repeat(${mapColumns}, minmax(0, 1fr))`;
+                    const mapContainerClass = isStackedLayout ? 'flex flex-col gap-4' : 'grid gap-4';
+                    const mapContainerStyle = isStackedLayout ? undefined : { gridTemplateColumns };
+
+                    return (
+                      <div className={mapContainerClass} style={mapContainerStyle}>
+                        {availableMappingCameras.map((backendCameraId) => {
+                          const coords = getMappingForCamera(backendCameraId);
+                          if (!coords || coords.length === 0) return null;
+
+                          // --- PER-CAMERA CENTERING WITH UNIFIED ZOOM ---
+                          // 1. Calculate the center of points for THIS camera
+                          let cameraSpecificBounds = unifiedBounds; // Fallback to global view if calc fails
+
+                          const camPoints: { x: number, y: number }[] = [];
+                          coords.forEach(c => {
+                            if (c.projection_successful) {
+                              camPoints.push({ x: c.map_x, y: c.map_y });
+                              c.trail?.forEach(t => camPoints.push({ x: t.x, y: t.y }));
+                            }
+                          });
+
+                          if (camPoints.length > 0 && unifiedBounds) {
+                            const xs = camPoints.map(p => p.x);
+                            const ys = camPoints.map(p => p.y);
+
+                            // Average center of this camera's activity
+                            const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                            const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+                            // Apply GLOBAL span around LOCAL center
+                            cameraSpecificBounds = {
+                              minX: centerX - (globalSpanX / 2),
+                              maxX: centerX + (globalSpanX / 2),
+                              minY: centerY - (globalSpanY / 2),
+                              maxY: centerY + (globalSpanY / 2),
+                            };
+                          }
+
+                          return (
+                            <div
+                              key={`map-${backendCameraId}`}
+                              className={isStackedLayout ? 'bg-slate-900/40 border border-slate-700/40 rounded-xl p-3' : undefined}
+                            >
+                              <CameraMapPair
+                                cameraId={backendCameraId}
+                                mappingCoordinates={coords}
+                                mapVisible={true}
+                                className="w-full"
+                                mapWidth={mapWidth}
+                                mapHeight={mapHeight}
+                                fixedBounds={cameraSpecificBounds}
+                              />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })()}
+                </div>
+              </div>
+            </div>
+
+            {/* Upper Lower Panels - Tracks and Stream Info (below scrollable map) */}
+            <div className="flex gap-4">
+              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col">
+                <h3 className="text-sm font-semibold mb-3 text-gray-400">Tracks per camera</h3>
+                <div className="space-y-2 text-xs flex-grow overflow-y-auto">
+                  {(() => {
+                    const maxDetections = Math.max(
+                      1,
+                      ...cameraIds.map((cameraId) => detectionData[cameraId]?.detections?.length || 0)
+                    );
+
+                    return cameraIds.map((cameraId) => {
+                      const displayName = getCameraDisplayNameById(cameraId);
+                      const detectionCount = detectionData[cameraId]?.detections?.length || 0;
+
+                      return (
+                        <div key={cameraId} className="flex items-center justify-between">
+                          <span>{displayName.replace(/\s*\(.*\)\s*$/, '')}</span>
+                          <div className="flex items-center">
+                            <div className="w-16 h-2 bg-gray-700 rounded-full mr-2">
+                              <div
+                                className="h-2 bg-green-500 rounded-full"
+                                style={{
+                                  width: `${maxDetections ? (detectionCount / maxDetections) * 100 : 0}%`,
+                                }}
+                              ></div>
+                            </div>
+                            <span className="font-mono">{detectionCount}</span>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </div>
+              <div className="bg-gray-800 rounded-md p-4 w-1/2 flex flex-col justify-between">
+                <div>
+                  <div className="flex justify-between items-center mb-2">
+                    <h3 className="text-sm font-semibold text-gray-400">Stream Info</h3>
+                    <span className={`text-xs font-semibold flex items-center ${isStreaming ? 'text-green-400' : 'text-red-400'}`}>
+                      <span className={`h-1.5 w-1.5 ${isStreaming ? 'bg-green-400' : 'bg-red-400'} rounded-full mr-1`}></span>
+                      {isStreaming ? 'Live' : 'Offline'}
+                    </span>
+                  </div>
+                  {isStreaming && currentFrameData ? (
+                    <>
+                      <p className="text-xs">Mode: <span className="font-bold">Raw Video</span></p>
+                      <p className="text-xs mt-1">Frame: <span className="font-bold">{currentFrameData.global_frame_index}</span></p>
+                      <p className="text-xs mt-1">Last update: <span className="font-bold">{new Date(currentFrameData.timestamp_processed_utc).toLocaleTimeString()}</span></p>
+                      <p className="text-xs mt-1">Total tracks: <span className="font-bold">
+                        {Object.values(currentFrameData.cameras).reduce((sum, cam) => sum + (cam.tracks?.length || 0), 0)}
+                      </span></p>
+                    </>
+                  ) : (
+                    <>
+                      <p className="text-xs">Status: <span className="font-bold">No stream</span></p>
+                      <p className="text-xs mt-1">Backend: <span className="font-bold">{systemHealth?.status || 'Unknown'}</span></p>
+                      <p className="text-xs mt-1">Click Start Stream to begin</p>
+                    </>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          </div>
+        </div>
+      </div >
+
+      {/* Detection Person List - full width beneath video & panels */}
+      < div className="bg-gray-800 rounded-md p-3 mt-4" >
+        <DetectionPersonList
+          cameraDetections={
+            // Merge detection data with captured frames for person cropping
+            Object.fromEntries(
+              Object.entries(detectionData).map(([camera_id, data]) => [
+                camera_id,
+                {
+                  ...data,
+                  frame_image_base64: capturedFrames[camera_id] || undefined
+                }
+              ])
+            )
+          }
+          className="h-full"
+          selectedPersonKey={focusedPerson?.detectionKey ?? null}
+          onPersonClick={(detection, camera_id, isSelecting) => {
+            handleDetectionSelection(
+              detection as DetectionListItem,
+              camera_id as BackendCameraId,
+              isSelecting
+            );
+          }}
+          activeCameraId={activeTab === 'all' ? null : activeTab}
+          allCameraIds={cameraIds}
+        />
+      </div >
+    </div >
+  );
+};
+
+export default GroupViewPage;
