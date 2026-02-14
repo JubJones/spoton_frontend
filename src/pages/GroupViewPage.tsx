@@ -1592,7 +1592,7 @@ const GroupViewPage: React.FC = () => {
   console.log('GroupViewPage render:', { activeTab, cameraIdsLength: cameraIds.length });
 
   return (
-    <div className="flex flex-col h-screen bg-gray-900 text-white p-4 overflow-hidden" style={{ backgroundColor: '#101827' }}>
+    <div className="flex flex-col h-screen bg-gray-900 text-white p-4 overflow-y-auto" style={{ backgroundColor: '#101827' }}>
       {/* Header Section (Keep as before) */}
       <header className="flex items-center justify-between mb-4 flex-shrink-0">
         <Link to="/" className="flex items-center text-lg hover:text-orange-400">
