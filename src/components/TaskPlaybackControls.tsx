@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { PlaybackStatusResponse } from '../types/api';
 
 interface TaskPlaybackControlsProps {
@@ -7,9 +7,10 @@ interface TaskPlaybackControlsProps {
   onPause: () => Promise<PlaybackStatusResponse | null>;
   onResume: () => Promise<PlaybackStatusResponse | null>;
   onRefresh: () => Promise<PlaybackStatusResponse | null>;
+  onSeek?: (frameIndex: number) => Promise<PlaybackStatusResponse | null>;
 }
 
-type ActionInFlight = 'toggle' | 'refresh' | null;
+type ActionInFlight = 'toggle' | 'refresh' | 'seek' | null;
 
 const getStatusBadgeStyles = (state: PlaybackStatusResponse['state'] | undefined) => {
   switch (state) {
@@ -39,10 +40,12 @@ const TaskPlaybackControls: React.FC<TaskPlaybackControlsProps> = ({
   onPause,
   onResume,
   onRefresh,
+  onSeek,
 }) => {
   const [status, setStatus] = useState<PlaybackStatusResponse | null>(playbackStatus);
   const [actionInFlight, setActionInFlight] = useState<ActionInFlight>(null);
   const [error, setError] = useState<string | null>(null);
+  const seekTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setStatus(playbackStatus);
@@ -82,6 +85,34 @@ const TaskPlaybackControls: React.FC<TaskPlaybackControlsProps> = ({
 
   const handleRefresh = useCallback(() => runAction('refresh', onRefresh), [runAction, onRefresh]);
 
+  // Debounced seek handler — waits 250ms after the last change before firing
+  const handleSeekChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const target = Number(e.target.value);
+      if (seekTimerRef.current) {
+        clearTimeout(seekTimerRef.current);
+      }
+      seekTimerRef.current = setTimeout(() => {
+        if (onSeek) {
+          runAction('seek', () => onSeek(target));
+        }
+      }, 250);
+    },
+    [onSeek, runAction]
+  );
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (seekTimerRef.current) {
+        clearTimeout(seekTimerRef.current);
+      }
+    };
+  }, []);
+
+  const totalFrames = status?.total_frames ?? null;
+  const currentFrame = status?.last_frame_index ?? 0;
+
   const statusBadge = useMemo(() => {
     const state = status?.state;
     const text = state ? state.toUpperCase() : 'UNKNOWN';
@@ -99,7 +130,7 @@ const TaskPlaybackControls: React.FC<TaskPlaybackControlsProps> = ({
         <div>
           <h2 className="text-lg font-semibold text-gray-100">Playback Controls</h2>
           <p className="text-sm text-gray-400">
-            Issue pause and resume commands against the active processing task.
+            Issue pause, resume, and seek commands against the active processing task.
           </p>
         </div>
         {statusBadge}
@@ -128,6 +159,28 @@ const TaskPlaybackControls: React.FC<TaskPlaybackControlsProps> = ({
           {actionInFlight === 'refresh' ? 'Refreshing...' : 'Refresh Status'}
         </button>
       </div>
+
+      {/* Progress bar / seek scrubber */}
+      {totalFrames != null && totalFrames > 0 && onSeek && (
+        <div className="mb-4">
+          <div className="flex items-center justify-between text-xs text-gray-400 mb-1">
+            <span>Frame {currentFrame}</span>
+            <span>{totalFrames} total</span>
+          </div>
+          <input
+            type="range"
+            min={0}
+            max={totalFrames - 1}
+            value={currentFrame}
+            onChange={handleSeekChange}
+            disabled={!taskId || actionInFlight === 'seek'}
+            className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-orange-500 disabled:cursor-not-allowed disabled:opacity-50"
+          />
+          {actionInFlight === 'seek' && (
+            <p className="text-xs text-orange-400 mt-1">Seeking...</p>
+          )}
+        </div>
+      )}
 
       <dl className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-300">
         <div>

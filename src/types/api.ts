@@ -47,6 +47,7 @@ export interface PlaybackStatusResponse {
   last_transition_at: string;
   last_frame_index?: number;
   last_error?: string;
+  total_frames?: number;
 }
 
 // ============================================================================
@@ -834,6 +835,7 @@ export const API_ENDPOINTS = {
   PLAYBACK_PAUSE: (taskId: string) => `/api/v1/controls/${taskId}/pause`,
   PLAYBACK_RESUME: (taskId: string) => `/api/v1/controls/${taskId}/resume`,
   PLAYBACK_STATUS: (taskId: string) => `/api/v1/controls/${taskId}/status`,
+  PLAYBACK_SEEK: (taskId: string) => `/api/v1/controls/${taskId}/seek`,
 
   // Media content
   CAMERA_FRAME: (taskId: string, cameraId: string) => `/api/v1/media/frames/${taskId}/${cameraId}`,

@@ -780,6 +780,27 @@ const GroupViewPage: React.FC = () => {
     return fetchPlaybackStatusForTask(taskId);
   }, [taskId, fetchPlaybackStatusForTask]);
 
+  const seekPlaybackCommand = useCallback(async (frameIndex: number): Promise<PlaybackStatusResponse | null> => {
+    if (!taskId) {
+      return null;
+    }
+    const response = await fetch(
+      `${BACKEND_BASE_URL}${API_ENDPOINTS.PLAYBACK_SEEK(taskId)}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ frame_index: frameIndex }),
+      }
+    );
+    if (!response.ok) {
+      const message = await response.text();
+      throw new Error(message || `Failed to seek playback (${response.status})`);
+    }
+    const payload = (await response.json()) as PlaybackStatusResponse;
+    setPlaybackStatus(payload);
+    return payload;
+  }, [taskId]);
+
   useEffect(() => {
     if (!taskId) {
       setPlaybackStatus(null);
@@ -1655,6 +1676,7 @@ const GroupViewPage: React.FC = () => {
           onPause={pausePlaybackCommand}
           onResume={resumePlaybackCommand}
           onRefresh={refreshPlaybackStatusCommand}
+          onSeek={seekPlaybackCommand}
         />
       </div>
 
