@@ -1607,6 +1607,9 @@ const GroupViewPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error during cleanup:', error);
       // Don't re-throw - we want the UI to still update even if cleanup fails
+    } finally {
+      // Refresh the page to clear any residual state and ensure a clean start for the next stream
+      window.location.reload();
     }
   };
 
