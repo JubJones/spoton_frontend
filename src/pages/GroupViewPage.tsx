@@ -123,7 +123,7 @@ interface DetectionTask {
 
 // --- Configuration ---
 const BACKEND_BASE_URL = "http://localhost:3847";  // Updated to match Docker backend port
-const BACKEND_WS_URL = "ws://localhost:3847";
+
 
 type TabType = "all" | BackendCameraId;
 type MapLayoutMode = 'grid' | 'stacked';
@@ -1291,10 +1291,10 @@ const GroupViewPage: React.FC = () => {
       wsRef.current.close();
     }
 
-    const wsUrl = `${BACKEND_WS_URL}/api/v1/ws/tracking/${taskId}?tab_id=${tabIdRef.current}`;
+    const wsUrl = `${DEFAULT_CONFIG.WS_BASE_URL}${WEBSOCKET_ENDPOINTS.TRACKING(taskId)}?tab_id=${tabIdRef.current}`;
     console.log('🔌 Connecting to WebSocket URL:', wsUrl);
     console.log('🔌 Using task ID:', taskId);
-    console.log('🔌 Backend WS URL:', BACKEND_WS_URL);
+    console.log('🔌 Backend WS URL:', DEFAULT_CONFIG.WS_BASE_URL);
 
     const ws = new WebSocket(wsUrl);
     wsRef.current = ws;
