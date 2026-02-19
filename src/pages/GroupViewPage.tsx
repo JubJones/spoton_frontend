@@ -2132,10 +2132,10 @@ const GroupViewPage: React.FC = () => {
               </div>
             </div>
           </div>
-        </div >
+        </div>
 
         {/* Detection Person List - full width beneath video & panels */}
-        < div className="bg-gray-800 rounded-md p-3 mt-4" >
+        <div className="bg-gray-800 rounded-md p-3 mt-4">
           <DetectionPersonList
             cameraDetections={
               // Merge detection data with captured frames for person cropping
@@ -2161,8 +2161,8 @@ const GroupViewPage: React.FC = () => {
             activeCameraId={activeTab === 'all' ? null : activeTab}
             allCameraIds={cameraIds}
           />
-        </div >
-      </div >
+        </div>
+      </div>
     );
   };
 
