@@ -1350,15 +1350,20 @@ const GroupViewPage: React.FC = () => {
 
       if (!mappingDataPresent && camera_data?.tracks && camera_data.tracks.length > 0) {
         const fallbackCoords = camera_data.tracks
-          .filter((t: any) => Array.isArray(t.map_coords) && t.map_coords.length === 2)
-          .map((t: any, idx: number) => ({
-            detection_id: String(t.global_id ?? t.track_id ?? `det_${idx}`),
-            map_x: t.map_coords[0],
-            map_y: t.map_coords[1],
-            projection_successful: true,
-            coordinate_system: 'bev_map_meters',
-            trail: [],
-          }));
+          .filter((t: any) => Array.isArray(t.map_coords) && t.map_coords.length === 2 &&
+            typeof t.map_coords[0] === 'number' && typeof t.map_coords[1] === 'number')
+          .map((t: any, idx: number) => {
+            const rawId = t.global_id !== undefined && t.global_id !== null ? t.global_id :
+              (t.track_id !== undefined && t.track_id !== null ? t.track_id : `det_${idx}`);
+            return {
+              detection_id: String(rawId),
+              map_x: t.map_coords[0],
+              map_y: t.map_coords[1],
+              projection_successful: true,
+              coordinate_system: 'bev_map_meters',
+              trail: [],
+            };
+          });
 
         if (fallbackCoords.length > 0) {
           mappingPayload = {
@@ -1922,8 +1927,11 @@ const GroupViewPage: React.FC = () => {
                       Object.values(mappingData.mappingByCamera).forEach(coords => {
                         coords?.forEach(c => {
                           if (c.projection_successful) {
-                            allPoints.push({ x: c.map_x, y: c.map_y });
-                            c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                            // Ignore literal (0,0) fallback coordinates to prevent snap-to-origin
+                            if (Math.abs(c.map_x) > 0.001 || Math.abs(c.map_y) > 0.001) {
+                              allPoints.push({ x: c.map_x, y: c.map_y });
+                              c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                            }
                           }
                         });
                       });
