@@ -1915,19 +1915,48 @@ const GroupViewPage: React.FC = () => {
                     let unifiedBounds: { minX: number; maxX: number; minY: number; maxY: number } | undefined;
 
                     if (isCampus) {
-                      // Fix zoom for campus to ALWAYS show the whole campus and prevent single-dot collapse
-                      try {
-                        const envConfig = ENVIRONMENT_CONFIGS['campus'];
-                        if (envConfig?.map_bounds) {
-                          unifiedBounds = {
-                            minX: envConfig.map_bounds[0][0],
-                            minY: envConfig.map_bounds[0][1],
-                            maxX: envConfig.map_bounds[1][0],
-                            maxY: envConfig.map_bounds[1][1],
-                          };
+                      // Fix zoom for campus to a 60x60m window centered dynamically on the current points
+                      const allPoints: { x: number; y: number }[] = [];
+
+                      // Collect all points from all cameras
+                      Object.values(mappingData.mappingByCamera).forEach(coords => {
+                        coords?.forEach(c => {
+                          if (c.projection_successful) {
+                            allPoints.push({ x: c.map_x, y: c.map_y });
+                            c.trail?.forEach(t => allPoints.push({ x: t.x, y: t.y }));
+                          }
+                        });
+                      });
+
+                      if (allPoints.length > 0) {
+                        const xs = allPoints.map(p => p.x);
+                        const ys = allPoints.map(p => p.y);
+
+                        const centerX = (Math.min(...xs) + Math.max(...xs)) / 2;
+                        const centerY = (Math.min(...ys) + Math.max(...ys)) / 2;
+
+                        // Fixed 60x60m view window centered on the points
+                        const fixedSpan = 60;
+                        unifiedBounds = {
+                          minX: centerX - (fixedSpan / 2),
+                          maxX: centerX + (fixedSpan / 2),
+                          minY: centerY - (fixedSpan / 2),
+                          maxY: centerY + (fixedSpan / 2)
+                        };
+                      } else {
+                        try {
+                          const envConfig = ENVIRONMENT_CONFIGS['campus'];
+                          if (envConfig?.map_bounds) {
+                            unifiedBounds = {
+                              minX: envConfig.map_bounds[0][0],
+                              minY: envConfig.map_bounds[0][1],
+                              maxX: envConfig.map_bounds[1][0],
+                              maxY: envConfig.map_bounds[1][1],
+                            };
+                          }
+                        } catch (e) {
+                          console.warn('Failed to resolve campus map bounds', e);
                         }
-                      } catch (e) {
-                        console.warn('Failed to resolve campus map bounds', e);
                       }
                     } else {
                       const allPoints: { x: number; y: number }[] = [];
