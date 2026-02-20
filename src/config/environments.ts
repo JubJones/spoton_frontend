@@ -154,8 +154,8 @@ export const ENVIRONMENT_CONFIGS: Record<EnvironmentId, EnvironmentConfiguration
     scene_id: 's47',
     cameras: CAMPUS_CAMERAS,
     map_bounds: [
-      [0, 0],
-      [60, 50],
+      [-10, -10], // Increased to zoom out
+      [70, 60],
     ], // [min_x, min_y], [max_x, max_y] in meters
     default_zoom: 10,
   },
