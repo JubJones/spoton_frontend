@@ -1594,9 +1594,23 @@ const GroupViewPage: React.FC = () => {
   // Control handlers for detection processing
   const handleStartStreaming = () => {
     if (!isStreaming && systemHealth?.status === 'healthy') {
-      startDetectionProcessing();
+      sessionStorage.setItem('autoStartStream', 'true');
+      window.location.reload();
     }
   };
+
+  // Auto-start stream after a reload if the flag was set
+  useEffect(() => {
+    if (sessionStorage.getItem('autoStartStream') === 'true') {
+      sessionStorage.removeItem('autoStartStream');
+      if (systemHealth?.status === 'healthy' && !isStreaming) {
+        // Short timeout to ensure state is ready
+        setTimeout(() => {
+          startDetectionProcessing();
+        }, 500);
+      }
+    }
+  }, [systemHealth?.status, isStreaming, startDetectionProcessing]);
 
   const handleStopStreaming = async () => {
 
@@ -1634,9 +1648,6 @@ const GroupViewPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error during cleanup:', error);
       // Don't re-throw - we want the UI to still update even if cleanup fails
-    } finally {
-      // Refresh the page to clear any residual state and ensure a clean start for the next stream
-      window.location.reload();
     }
   };
 
