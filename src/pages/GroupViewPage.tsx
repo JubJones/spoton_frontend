@@ -1376,10 +1376,17 @@ const GroupViewPage: React.FC = () => {
           detail: mappingPayload,
         });
         window.dispatchEvent(mappingEvent);
-        // Debug log for visibility
+
+        // Debug log for visibility - added diagnostic logging for map_coords values
+        const coordsStr = mappingPayload.future_pipeline_data.mapping_coordinates
+          .slice(0, 3) // log just a few to avoid spam
+          .map((c: any) => `${c.detection_id}: (${c.map_x?.toFixed(2)}, ${c.map_y?.toFixed(2)})`)
+          .join(', ');
+
         console.log('🗺️ Emitted websocket-mapping-message:', {
           camera_id,
           count: mappingPayload.future_pipeline_data.mapping_coordinates.length,
+          sample_coords: coordsStr
         });
       }
     };
