@@ -2200,7 +2200,8 @@ const GroupViewPage: React.FC = () => {
           />
         </div>
       </div>
-      );
+    </div>
+  );
 };
 
-      export default memo(GroupViewPage);
+export default memo(GroupViewPage);
