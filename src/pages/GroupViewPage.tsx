@@ -1458,6 +1458,18 @@ const GroupViewPage: React.FC = () => {
     };
   }, [connectFocusWebSocket, disconnectFocusWebSocket]);
 
+  // Handle auto-refresh when stream stops/drops
+  useEffect(() => {
+    // If we transition to not streaming, and we actually had a task (not just initial load), reload
+    // We skip the reload if there's a tab conflict, because we show a special UI for that
+    if (!isStreaming && taskId && !isTabConflict) {
+      console.log('🔄 Stream stopped or dropped, auto-refreshing page state...');
+      setTimeout(() => {
+        window.location.reload();
+      }, 500); // Small delay to let final WS events process
+    }
+  }, [isStreaming, taskId, isTabConflict]);
+
   // Initialize on component mount - check health and reconnect to existing tasks only
   // Does NOT automatically start new pipeline - user must click "Start Stream"
   useEffect(() => {
@@ -1594,23 +1606,9 @@ const GroupViewPage: React.FC = () => {
   // Control handlers for detection processing
   const handleStartStreaming = () => {
     if (!isStreaming && systemHealth?.status === 'healthy') {
-      sessionStorage.setItem('autoStartStream', 'true');
-      window.location.reload();
+      startDetectionProcessing();
     }
   };
-
-  // Auto-start stream after a reload if the flag was set
-  useEffect(() => {
-    if (sessionStorage.getItem('autoStartStream') === 'true') {
-      sessionStorage.removeItem('autoStartStream');
-      if (systemHealth?.status === 'healthy' && !isStreaming) {
-        // Short timeout to ensure state is ready
-        setTimeout(() => {
-          startDetectionProcessing();
-        }, 500);
-      }
-    }
-  }, [systemHealth?.status, isStreaming, startDetectionProcessing]);
 
   const handleStopStreaming = async () => {
 
@@ -1648,6 +1646,9 @@ const GroupViewPage: React.FC = () => {
     } catch (error) {
       console.error('❌ Error during cleanup:', error);
       // Don't re-throw - we want the UI to still update even if cleanup fails
+    } finally {
+      // Refresh the page to clear any residual state and ensure a clean start for the next stream
+      window.location.reload();
     }
   };
 
