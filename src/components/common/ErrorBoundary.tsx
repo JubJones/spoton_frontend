@@ -124,7 +124,13 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   retry = () => {
     this.resetErrorBoundary();
     // Force a re-render by changing the key
-    window.location.reload();
+    try {
+      if (typeof window !== 'undefined' && typeof window.location?.reload === 'function') {
+        window.location.reload();
+      }
+    } catch (error) {
+      console.warn('Window reload skipped:', error);
+    }
   };
 
   render() {

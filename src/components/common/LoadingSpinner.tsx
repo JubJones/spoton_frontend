@@ -6,6 +6,7 @@ interface LoadingSpinnerProps {
   color?: 'orange' | 'blue' | 'green' | 'white';
   text?: string;
   className?: string;
+  ariaLabel?: string;
 }
 
 const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
@@ -13,6 +14,7 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
   color = 'orange',
   text,
   className = '',
+  ariaLabel,
 }) => {
   const getSizeClasses = () => {
     switch (size) {
@@ -54,9 +56,16 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     }
   };
 
+  const label = ariaLabel || text || 'Loading...';
+
   if (text) {
     return (
-      <div className={`inline-flex items-center space-x-3 ${className}`}>
+      <div
+        role="status"
+        aria-live="polite"
+        aria-label={label}
+        className={`inline-flex items-center space-x-3 ${className}`}
+      >
         <div className={`animate-spin ${getSizeClasses()} ${getColorClasses()} rounded-full`} />
         <span className={`${getTextColor()}`}>{text}</span>
       </div>
@@ -65,6 +74,9 @@ const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
 
   return (
     <div
+      role="status"
+      aria-live="polite"
+      aria-label={label}
       className={`animate-spin ${getSizeClasses()} ${getColorClasses()} rounded-full ${className}`}
     />
   );
