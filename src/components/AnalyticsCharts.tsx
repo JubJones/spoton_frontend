@@ -62,7 +62,9 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       confidence: trend.confidence,
     }));
 
-    // Modify data based on selected metric type
+    // In a fully integrated system with all metrics populated from backend, 
+    // the value and label configurations would map exactly to the data type.
+    // Since currently timeRangeMetrics only passes "count", we pass it directly.
     switch (selectedMetricType) {
       case 'detections':
         return baseData;
@@ -70,22 +72,19 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       case 'occupancy':
         return baseData.map((point) => ({
           ...point,
-          value: Math.round(point.value * 0.3), // Convert to occupancy
-          label: `${Math.round(point.value * 0.3)} persons`,
+          label: `${point.value} persons`,
         }));
 
       case 'flow':
         return baseData.map((point) => ({
           ...point,
-          value: Math.round(point.value * 1.2), // Flow rate
-          label: `${Math.round(point.value * 1.2)} movements/hr`,
+          label: `${point.value} movements/hr`,
         }));
 
       case 'dwell':
         return baseData.map((point) => ({
           ...point,
-          value: 2 + Math.random() * 6, // 2-8 minute dwell times
-          label: `${(2 + Math.random() * 6).toFixed(1)} min avg`,
+          label: `${point.value} min avg`,
         }));
 
       default:
