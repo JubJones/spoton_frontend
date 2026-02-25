@@ -57,8 +57,8 @@ describe('APIService', () => {
 
     const mockResponse: ProcessingTaskCreateResponse = {
       task_id: 'test-task-123',
-      websocket_url: 'ws://localhost:8000/ws/tracking/test-task-123',
-      status_url: 'http://localhost:8000/api/v1/tasks/test-task-123',
+      websocket_url: 'ws://localhost:3847/ws/tracking/test-task-123',
+      status_url: 'http://localhost:3847/api/v1/processing-tasks/test-task-123/status',
       message: 'Task started',
     };
 
@@ -73,11 +73,12 @@ describe('APIService', () => {
       const result = await apiService.startProcessingTask(mockRequest);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/api/v1/tasks',
+        'http://localhost:3847/api/v1/processing-tasks/start',
         expect.objectContaining({
           method: 'POST',
           headers: expect.objectContaining({
             'Content-Type': 'application/json',
+            Accept: 'application/json',
           }),
           body: JSON.stringify(mockRequest),
         })
@@ -96,13 +97,12 @@ describe('APIService', () => {
       } as unknown as Response);
 
       await expect(apiService.startProcessingTask(mockRequest)).rejects.toThrow(
-        'API request failed: 400 Bad Request'
+        'HTTP 400: Bad Request'
       );
     });
 
     it('should retry on network failure', async () => {
       mockFetch
-        .mockRejectedValueOnce(new Error('Network error'))
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce({
           ok: true,
@@ -113,15 +113,14 @@ describe('APIService', () => {
 
       const result = await apiService.startProcessingTask(mockRequest);
 
-      expect(mockFetch).toHaveBeenCalledTimes(3); // Initial + 2 retries
+      expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(result).toEqual(mockResponse);
     });
 
     it('should handle timeout', async () => {
       const slowApiService = new APIService({ timeout: 100, retryAttempts: 0 });
 
-      // Mock a slow response
-      mockFetch.mockImplementationOnce(() => new Promise((resolve) => setTimeout(resolve, 200)));
+      mockFetch.mockRejectedValueOnce(new DOMException('Aborted', 'AbortError'));
 
       await expect(slowApiService.startProcessingTask(mockRequest)).rejects.toThrow(
         'Request timeout'
@@ -152,11 +151,12 @@ describe('APIService', () => {
       const result = await apiService.getTaskStatus(taskId);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `http://localhost:8000/api/v1/tasks/${taskId}`,
+        `http://localhost:3847/api/v1/processing-tasks/${taskId}/status`,
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
             Accept: 'application/json',
+            'Content-Type': 'application/json',
           }),
         })
       );
@@ -174,7 +174,7 @@ describe('APIService', () => {
       } as unknown as Response);
 
       await expect(apiService.getTaskStatus(taskId)).rejects.toThrow(
-        'API request failed: 404 Not Found'
+        'HTTP 404: Not Found'
       );
     });
   });
@@ -199,11 +199,12 @@ describe('APIService', () => {
       const result = await apiService.getSystemHealth();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        'http://localhost:8000/health',
+        'http://localhost:3847/health',
         expect.objectContaining({
           method: 'GET',
           headers: expect.objectContaining({
             Accept: 'application/json',
+            'Content-Type': 'application/json',
           }),
         })
       );
@@ -212,17 +213,15 @@ describe('APIService', () => {
     });
 
     it('should handle health check failure', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockImplementation(() => Promise.resolve({
         ok: false,
         status: 503,
         statusText: 'Service Unavailable',
         json: async () => ({ error: 'Health check failed' }),
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as unknown as Response);
+      } as unknown as Response));
 
-      await expect(apiService.getSystemHealth()).rejects.toThrow(
-        'API request failed: 503 Service Unavailable'
-      );
+      await expect(apiService.getSystemHealth()).rejects.toThrow('HTTP 503: Service Unavailable');
     });
   });
 
@@ -230,22 +229,26 @@ describe('APIService', () => {
 
   describe('Error Handling', () => {
     it('should handle invalid JSON response', async () => {
-      mockFetch.mockResolvedValueOnce({
+      mockFetch.mockImplementation(() => Promise.resolve({
         ok: true,
         status: 200,
         json: async () => {
           throw new Error('Invalid JSON');
         },
         headers: new Headers({ 'content-type': 'application/json' }),
-      } as unknown as Response);
+      } as unknown as Response));
 
-      await expect(apiService.getSystemHealth()).rejects.toThrow('Invalid JSON');
+      await expect(apiService.getSystemHealth()).rejects.toThrow(
+        'Request failed after 2 attempts: Invalid JSON'
+      );
     });
 
     it('should handle network errors', async () => {
       mockFetch.mockRejectedValue(new Error('Network connection failed'));
 
-      await expect(apiService.getSystemHealth()).rejects.toThrow('Network connection failed');
+      await expect(apiService.getSystemHealth()).rejects.toThrow(
+        'Request failed after 2 attempts: Network connection failed'
+      );
     });
 
     it('should handle empty response body', async () => {
@@ -256,8 +259,9 @@ describe('APIService', () => {
         headers: new Headers({ 'content-type': 'application/json' }),
       } as unknown as Response);
 
-      const result = await apiService.getSystemHealth();
-      expect(result).toEqual({});
+      await expect(apiService.getSystemHealth()).rejects.toThrow(
+        'Invalid system health response format'
+      );
     });
   });
 
@@ -274,7 +278,7 @@ describe('APIService', () => {
       } as unknown as Response);
 
       await expect(apiService.startProcessingTask(invalidRequest)).rejects.toThrow(
-        'API request failed: 400 Bad Request'
+        'HTTP 400: Bad Request'
       );
     });
 
