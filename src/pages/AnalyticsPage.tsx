@@ -249,9 +249,9 @@ const AnalyticsPage: React.FC = () => {
             </div>
           </div>
 
-          <div className="w-full h-[500px]">
+          <div className="w-full flex flex-col relative rounded-lg mb-8" style={{ minHeight: '550px', height: '550px', overflow: 'hidden' }}>
             {loading && !dashboardData ? (
-              <div className="w-full h-full flex items-center justify-center bg-gray-900/50 border border-gray-700 rounded-lg">
+              <div className="w-full flex-1 flex flex-col items-center justify-center bg-gray-900/50 border border-gray-700 rounded-lg">
                 <div className="animate-pulse flex flex-col items-center">
                   <div className="w-8 h-8 rounded-full border-2 border-t-orange-500 border-r-orange-500 border-b-transparent border-l-transparent animate-spin mb-4"></div>
                   <span className="text-gray-400">Loading multi-dimensional analytics...</span>
@@ -263,7 +263,7 @@ const AnalyticsPage: React.FC = () => {
                 selectedMetricType={selectedMetricType}
                 selectedCameras={selectedCameras}
                 environment={environment}
-                className="h-full"
+                className="flex-1 w-full h-full"
                 chartType={selectedMetricType === 'detections' ? 'area' : 'line'}
                 showConfidenceInterval={true}
                 showTrendLine={true}
