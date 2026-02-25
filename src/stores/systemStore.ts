@@ -2,7 +2,7 @@
 // src/stores/systemStore.ts
 
 import { create } from 'zustand';
-import { devtools, persist } from 'zustand/middleware';
+import { devtools, persist, type StateStorage } from 'zustand/middleware';
 
 import { AppState, EnvironmentId, TaskStatus, SystemHealthResponse, API_ENDPOINTS } from '../types/api';
 import { apiService } from '../services/apiService';
@@ -11,6 +11,86 @@ import { dataCacheService } from '../services/dataCacheService';
 import { offlineQueueService, queueApiRequest } from '../services/offlineQueueService';
 import { dataValidationService } from '../services/dataValidationService';
 import { performanceMonitoringService } from '../services/performanceMonitoringService';
+
+const isTestEnvironment = typeof process !== 'undefined' && process.env.NODE_ENV === 'test';
+
+const createPersistenceStorage = (): StateStorage => {
+  if (typeof window === 'undefined' || isTestEnvironment) {
+    const memoryStorage: Record<string, string> = {};
+    return {
+      getItem: (name: string) => memoryStorage[name] ?? null,
+      setItem: (name: string, value: string) => {
+        memoryStorage[name] = value;
+      },
+      removeItem: (name: string) => {
+        delete memoryStorage[name];
+      },
+    };
+  }
+
+  return {
+    getItem: async (name: string): Promise<any> => {
+      try {
+        const data = await statePersistenceService.loadState(name);
+        if (!data) return null;
+
+        // Ensure we return a proper JSON string, avoiding circular references
+        return JSON.stringify(data, (key, value) => {
+          // Skip functions, undefined values, and circular references
+          if (typeof value === 'function' || value === undefined) {
+            return null;
+          }
+          // Skip WebSocket objects and other complex objects
+          if (
+            value &&
+            typeof value === 'object' &&
+            value.constructor !== Object &&
+            value.constructor !== Array
+          ) {
+            return null;
+          }
+          return value;
+        });
+      } catch (error) {
+        console.warn('Storage getItem error:', error);
+        return null;
+      }
+    },
+    setItem: async (name: string, value: any): Promise<void> => {
+      try {
+        // Value should already be a JSON string from Zustand persist
+        let parsedValue;
+        try {
+          parsedValue = JSON.parse(value);
+        } catch (parseError) {
+          // If parsing fails, skip persisting this value to avoid corruption
+          console.warn(
+            'Skipping persistence for invalid JSON:',
+            typeof value === 'string' ? value.substring(0, 100) + '...' : value
+          );
+          return;
+        }
+
+        return await statePersistenceService.saveState(name, parsedValue, {
+          version: 2,
+          compression: true,
+          ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
+        });
+      } catch (error) {
+        console.warn('Storage setItem error:', error);
+      }
+    },
+    removeItem: async (name: string): Promise<void> => {
+      try {
+        return await statePersistenceService.removeState(name);
+      } catch (error) {
+        console.warn('Storage removeItem error:', error);
+      }
+    },
+  };
+};
+
+const persistenceStorage = createPersistenceStorage();
 
 // ============================================================================
 // System Store Interface
@@ -600,58 +680,7 @@ export const useSystemStore = create<SystemState>()(
         }),
         version: 2,
         // Custom storage implementation using our enhanced service
-        storage: {
-          getItem: async (name: string): Promise<any> => {
-            try {
-              const data = await statePersistenceService.loadState(name);
-              if (!data) return null;
-
-              // Ensure we return a proper JSON string, avoiding circular references
-              return JSON.stringify(data, (key, value) => {
-                // Skip functions, undefined values, and circular references
-                if (typeof value === 'function' || value === undefined) {
-                  return null;
-                }
-                // Skip WebSocket objects and other complex objects
-                if (value && typeof value === 'object' && value.constructor !== Object && value.constructor !== Array) {
-                  return null;
-                }
-                return value;
-              });
-            } catch (error) {
-              console.warn('Storage getItem error:', error);
-              return null;
-            }
-          },
-          setItem: async (name: string, value: any): Promise<void> => {
-            try {
-              // Value should already be a JSON string from Zustand persist
-              let parsedValue;
-              try {
-                parsedValue = JSON.parse(value);
-              } catch (parseError) {
-                // If parsing fails, skip persisting this value to avoid corruption
-                console.warn('Skipping persistence for invalid JSON:', typeof value === 'string' ? value.substring(0, 100) + '...' : value);
-                return;
-              }
-
-              return await statePersistenceService.saveState(name, parsedValue, {
-                version: 2,
-                compression: true,
-                ttl: 7 * 24 * 60 * 60 * 1000, // 7 days
-              });
-            } catch (error) {
-              console.warn('Storage setItem error:', error);
-            }
-          },
-          removeItem: async (name: string): Promise<void> => {
-            try {
-              return await statePersistenceService.removeState(name);
-            } catch (error) {
-              console.warn('Storage removeItem error:', error);
-            }
-          },
-        },
+        storage: persistenceStorage,
         migrate: (persistedState: any, version: number) => {
           if (version < 2) {
             // Migration from v1 to v2: add task persistence

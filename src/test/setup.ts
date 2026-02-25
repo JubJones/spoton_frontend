@@ -8,6 +8,15 @@ afterEach(() => {
   cleanup();
 });
 
+// Prevent jsdom navigation errors when components trigger reloads
+if (typeof window !== 'undefined' && window.location) {
+  try {
+    window.location.reload = vi.fn();
+  } catch (error) {
+    // Some environments do not allow redefining reload; ignore if it fails
+  }
+}
+
 // Mock matchMedia for tests
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
