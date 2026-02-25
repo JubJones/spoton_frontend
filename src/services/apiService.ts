@@ -387,6 +387,10 @@ export class APIService {
    * Get task status by ID
    */
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
+    if (!taskId) {
+      throw new ValidationError('Task ID is required');
+    }
+
     try {
       const response = await this.http.get<TaskStatusResponse>(API_ENDPOINTS.TASK_STATUS(taskId));
 
