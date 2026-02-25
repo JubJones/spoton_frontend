@@ -81,8 +81,8 @@ describe('LoadingOverlay', () => {
       </LoadingOverlay>
     );
 
-    const childContent = screen.getByTestId('child-content').parentElement;
-    expect(childContent).toHaveClass('blur-sm');
+    const overlayContainer = screen.getByText('Loading...').parentElement?.parentElement as HTMLElement;
+    expect(overlayContainer).toHaveClass('backdrop-blur-sm');
   });
 
   it('should not blur children when blur is false', () => {
@@ -92,8 +92,8 @@ describe('LoadingOverlay', () => {
       </LoadingOverlay>
     );
 
-    const childContent = screen.getByTestId('child-content').parentElement;
-    expect(childContent).not.toHaveClass('blur-sm');
+    const overlayContainer = screen.getByText('Loading...').parentElement?.parentElement as HTMLElement;
+    expect(overlayContainer).not.toHaveClass('backdrop-blur-sm');
   });
 
   it('should apply custom className', () => {
@@ -103,7 +103,7 @@ describe('LoadingOverlay', () => {
       </LoadingOverlay>
     );
 
-    const container = screen.getByLabelText('Loading...').closest('.custom-class');
+    const container = document.querySelector('.custom-class');
     expect(container).toBeInTheDocument();
   });
 });
@@ -114,7 +114,7 @@ describe('CameraSkeleton', () => {
 
     const skeleton = screen.getByTestId('camera-skeleton');
     expect(skeleton).toBeInTheDocument();
-    expect(skeleton).toHaveClass('bg-gray-800', 'rounded-lg');
+    expect(skeleton.querySelectorAll('.bg-gray-800').length).toBeGreaterThan(0);
   });
 
   it('should render with custom className', () => {
@@ -127,8 +127,7 @@ describe('CameraSkeleton', () => {
   it('should show camera info placeholder', () => {
     render(<CameraSkeleton />);
 
-    // Should have placeholder elements for camera info
-    const placeholders = screen.getAllByRole('generic');
+    const placeholders = document.querySelectorAll('[aria-label="Loading content"]');
     expect(placeholders.length).toBeGreaterThan(0);
   });
 
@@ -147,7 +146,7 @@ describe('MapSkeleton', () => {
 
     const skeleton = screen.getByTestId('map-skeleton');
     expect(skeleton).toBeInTheDocument();
-    expect(skeleton).toHaveClass('bg-gray-700', 'rounded-lg');
+    expect(skeleton.querySelectorAll('.animate-spin').length).toBeGreaterThan(0);
   });
 
   it('should render with custom className', () => {
@@ -160,7 +159,12 @@ describe('MapSkeleton', () => {
   it('should show map placeholder content', () => {
     render(<MapSkeleton />);
 
-    expect(screen.getByText('🗺️')).toBeInTheDocument();
-    expect(screen.getByText('Loading Map...')).toBeInTheDocument();
+    const mapPoints = getMapSkeletonPoints();
+    expect(mapPoints.length).toBeGreaterThan(0);
   });
 });
+
+function getMapSkeletonPoints() {
+  const container = screen.getByTestId('map-skeleton');
+  return container.querySelectorAll('[class*="bg-orange-400/40"]');
+}

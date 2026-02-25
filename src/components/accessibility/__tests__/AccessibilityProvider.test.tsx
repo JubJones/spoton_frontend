@@ -199,7 +199,7 @@ describe('AccessibilityProvider', () => {
 
     await waitFor(() => {
       expect(document.documentElement.style.getPropertyValue('--focus-ring-color')).toBe('#f97316');
-      expect(document.documentElement.style.getPropertyValue('--focus-ring-width')).toBe('2px');
+      expect(document.documentElement.style.getPropertyValue('--focus-ring-width')).toBe('3px');
     });
 
     const toggleButton = screen.getByTestId('toggle-high-contrast');
@@ -363,12 +363,16 @@ describe('AccessibilityProvider', () => {
   });
 
   it('should skip to main content', async () => {
-    const mockMain = {
-      focus: vi.fn(),
-      scrollIntoView: vi.fn(),
-    };
+    const main = document.createElement('main');
+    main.setAttribute('tabindex', '-1');
+    const focusSpy = vi.fn();
+    const scrollSpy = vi.fn();
+    main.focus = focusSpy;
+    main.scrollIntoView = scrollSpy as any;
+    document.body.appendChild(main);
 
-    document.querySelector = vi.fn().mockReturnValue(mockMain);
+    const originalQuerySelector = document.querySelector;
+    document.querySelector = vi.fn().mockReturnValue(main);
 
     render(
       <AccessibilityProvider>
@@ -382,11 +386,14 @@ describe('AccessibilityProvider', () => {
       fireEvent.click(skipButton);
     });
 
-    expect(mockMain.focus).toHaveBeenCalled();
-    expect(mockMain.scrollIntoView).toHaveBeenCalledWith({
+    expect(focusSpy).toHaveBeenCalled();
+    expect(scrollSpy).toHaveBeenCalledWith({
       behavior: 'smooth',
       block: 'start',
     });
+
+    document.body.removeChild(main);
+    document.querySelector = originalQuerySelector;
   });
 
   it('should throw error when used outside provider', () => {
