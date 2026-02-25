@@ -335,15 +335,14 @@ describe('Coordinate Transform Utilities', () => {
 
   describe('DOM Utilities', () => {
     it('should get relative position from mouse event', () => {
-      // Mock element and event
       const mockElement = {
         getBoundingClientRect: () => ({ left: 100, top: 50 }),
       } as HTMLElement;
 
-      const mockEvent = {
+      const mockEvent = new MouseEvent('click', {
         clientX: 150,
         clientY: 100,
-      } as MouseEvent;
+      });
 
       const position = getRelativePosition(mockEvent, mockElement);
       expect(position).toEqual({ x: 50, y: 50 });
