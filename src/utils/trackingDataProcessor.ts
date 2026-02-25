@@ -560,16 +560,21 @@ export function sanitizePersonTrack(track: any): PersonTrack | null {
   // Ensure bounding box coordinates are valid
   const bbox = track.bbox_xyxy.map((coord: number) => Math.max(0, coord));
 
+  const mapCoords = Array.isArray(track.map_coords) ? track.map_coords : [0, 0];
+  const detectionTime = typeof track.detection_time === 'string' ? track.detection_time : new Date().toISOString();
+  const trackingDuration = typeof track.tracking_duration === 'number' ? track.tracking_duration : 0;
+  const isFocused = typeof track.is_focused === 'boolean' ? track.is_focused : false;
+
   return {
     track_id: track.track_id,
     global_id: track.global_id || '', // Default empty if missing
     bbox_xyxy: bbox as [number, number, number, number],
     confidence,
     class_id: track.class_id || 1, // Default to person class
-    map_coords: (track.map_coords || [0, 0]) as [number, number],
-    is_focused: false, // Default
-    detection_time: new Date().toISOString(), // Default
-    tracking_duration: 0, // Default
+    map_coords: mapCoords as [number, number],
+    is_focused: isFocused,
+    detection_time: detectionTime,
+    tracking_duration: trackingDuration,
   };
 }
 
