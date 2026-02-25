@@ -22,7 +22,7 @@ export const LoadingOverlay: React.FC<LoadingOverlayProps> = ({
       {children}
       {isLoading && (
         <div
-          className={`absolute inset-0 bg-gray-900/80 backdrop-blur-sm flex items-center justify-center z-50 ${blur ? 'backdrop-blur-sm' : ''}`}
+          className={`absolute inset-0 bg-gray-900/80 flex items-center justify-center z-50 ${blur ? 'backdrop-blur-sm' : ''}`}
         >
           <div className="text-center">
             <LoadingSpinner size="large" color="orange" />
@@ -83,7 +83,7 @@ export const CameraSkeleton: React.FC<CameraSkeletonProps> = ({ count = 4, layou
   };
 
   return (
-    <div className={`${getGridClasses()} ${className}`}>
+    <div data-testid="camera-skeleton" className={`${getGridClasses()} ${className}`}>
       {Array.from({ length: count }).map((_, index) => (
         <div key={index} className="bg-gray-800 rounded-lg overflow-hidden">
           {/* Camera header skeleton */}
@@ -124,7 +124,7 @@ interface MapSkeletonProps {
 
 export const MapSkeleton: React.FC<MapSkeletonProps> = ({ className = '' }) => {
   return (
-    <div className={`bg-gray-800 rounded-lg overflow-hidden ${className}`}>
+    <div data-testid="map-skeleton" className={`bg-gray-800 rounded-lg overflow-hidden ${className}`}>
       <div className="p-3 border-b border-gray-700">
         <Skeleton width="100px" height="16px" />
       </div>
