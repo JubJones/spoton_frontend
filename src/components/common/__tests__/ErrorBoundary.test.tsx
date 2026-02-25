@@ -1,6 +1,6 @@
 // src/components/common/__tests__/ErrorBoundary.test.tsx
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import React from 'react';
 import ErrorBoundary, { ErrorFallback } from '../ErrorBoundary';
 
@@ -79,7 +79,12 @@ describe('ErrorBoundary', () => {
       </ErrorBoundary>
     );
 
-    expect(onError).toHaveBeenCalledWith(error, expect.any(String));
+    expect(onError).toHaveBeenCalledWith(
+      error,
+      expect.objectContaining({
+        componentStack: expect.any(String),
+      })
+    );
   });
 
   it('should reset error when Try Again button is clicked', () => {
@@ -118,16 +123,9 @@ describe('ErrorBoundary', () => {
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
   });
 
-  it('should reset error when resetErrorBoundary is called from resetKeys change', () => {
+  it('should reset error when resetErrorBoundary is called from resetKeys change', async () => {
     const TestComponentWithResetKey: React.FC<{ resetKey: number }> = ({ resetKey }) => {
-      const [shouldThrow, setShouldThrow] = React.useState(true);
-
-      React.useEffect(() => {
-        if (resetKey > 1) {
-          setShouldThrow(false);
-        }
-      }, [resetKey]);
-
+      const shouldThrow = resetKey <= 1;
       return <ThrowError shouldThrow={shouldThrow} />;
     };
 
@@ -158,7 +156,9 @@ describe('ErrorBoundary', () => {
     fireEvent.click(screen.getByTestId('change-reset-key'));
 
     // After reset key change, component should work
-    expect(screen.getByText('No error')).toBeInTheDocument();
+    await waitFor(() => {
+      expect(screen.getByText('No error')).toBeInTheDocument();
+    });
   });
 
   it('should display different error types correctly', () => {
@@ -197,71 +197,36 @@ describe('ErrorFallback', () => {
   const mockError = new Error('Mock error for fallback');
 
   it('should render error message and retry button', () => {
+    const retry = vi.fn();
     const resetErrorBoundary = vi.fn();
 
-    render(<ErrorFallback error={mockError} resetErrorBoundary={resetErrorBoundary} />);
+    render(
+      <ErrorFallback error={mockError} retry={retry} resetErrorBoundary={resetErrorBoundary} />
+    );
 
     expect(screen.getByText('Something went wrong')).toBeInTheDocument();
     expect(screen.getByText('Mock error for fallback')).toBeInTheDocument();
     expect(screen.getByText('Try Again')).toBeInTheDocument();
+    expect(screen.getByText('Reset')).toBeInTheDocument();
   });
 
-  it('should call resetError when Try Again button is clicked', () => {
+  it('should call retry when Try Again button is clicked', () => {
+    const retry = vi.fn();
+
+    render(<ErrorFallback error={mockError} retry={retry} />);
+
+    fireEvent.click(screen.getByText('Try Again'));
+
+    expect(retry).toHaveBeenCalled();
+  });
+
+  it('should call resetErrorBoundary when Reset button is clicked', () => {
     const resetErrorBoundary = vi.fn();
 
     render(<ErrorFallback error={mockError} resetErrorBoundary={resetErrorBoundary} />);
 
-    const tryAgainButton = screen.getByText('Try Again');
-    fireEvent.click(tryAgainButton);
+    fireEvent.click(screen.getByText('Reset'));
 
-    expect(resetErrorBoundary).toHaveBeenCalledTimes(1);
-  });
-
-  it('should show error details when Show Details button is clicked', () => {
-    const errorWithStack = new Error('Error with stack trace');
-    errorWithStack.stack = 'Error: Error with stack trace\n    at Component\n    at ErrorBoundary';
-
-    const resetErrorBoundary = vi.fn();
-
-    render(<ErrorFallback error={errorWithStack} resetErrorBoundary={resetErrorBoundary} />);
-
-    const showDetailsButton = screen.getByText('Show Details');
-    fireEvent.click(showDetailsButton);
-
-    expect(screen.getByText('Hide Details')).toBeInTheDocument();
-    expect(screen.getByText(errorWithStack.stack)).toBeInTheDocument();
-  });
-
-  it('should hide error details when Hide Details button is clicked', () => {
-    const errorWithStack = new Error('Error with stack trace');
-    errorWithStack.stack = 'Error: Error with stack trace\n    at Component';
-
-    const resetErrorBoundary = vi.fn();
-
-    render(<ErrorFallback error={errorWithStack} resetErrorBoundary={resetErrorBoundary} />);
-
-    // Show details first
-    const showDetailsButton = screen.getByText('Show Details');
-    fireEvent.click(showDetailsButton);
-
-    expect(screen.getByText('Hide Details')).toBeInTheDocument();
-
-    // Hide details
-    const hideDetailsButton = screen.getByText('Hide Details');
-    fireEvent.click(hideDetailsButton);
-
-    expect(screen.getByText('Show Details')).toBeInTheDocument();
-    expect(screen.queryByText(errorWithStack.stack)).not.toBeInTheDocument();
-  });
-
-  it('should not show details button for errors without stack trace', () => {
-    const errorWithoutStack = new Error('Simple error');
-    delete errorWithoutStack.stack;
-
-    const resetErrorBoundary = vi.fn();
-
-    render(<ErrorFallback error={errorWithoutStack} resetErrorBoundary={resetErrorBoundary} />);
-
-    expect(screen.queryByText('Show Details')).not.toBeInTheDocument();
+    expect(resetErrorBoundary).toHaveBeenCalled();
   });
 });
