@@ -5,14 +5,14 @@ import { useCameraConfig } from '../context/CameraConfigContext';
 
 interface FlowDirection {
   direction:
-    | 'north'
-    | 'south'
-    | 'east'
-    | 'west'
-    | 'northeast'
-    | 'northwest'
-    | 'southeast'
-    | 'southwest';
+  | 'north'
+  | 'south'
+  | 'east'
+  | 'west'
+  | 'northeast'
+  | 'northwest'
+  | 'southeast'
+  | 'southwest';
   count: number;
   percentage: number;
   averageSpeed: number; // pixels per second
@@ -81,6 +81,8 @@ interface TrafficFlowAnalysisProps {
   onFlowPatternClick?: (pattern: FlowPattern) => void;
   onCameraTransitionClick?: (from: BackendCameraId, to: BackendCameraId) => void;
   onExportFlowData?: (data: any) => void;
+  trafficFlowData?: TrafficFlowData[];
+  flowMetrics?: FlowMetrics;
 }
 
 const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
@@ -95,6 +97,14 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
   onFlowPatternClick,
   onCameraTransitionClick,
   onExportFlowData,
+  trafficFlowData = [],
+  flowMetrics = {
+    overallThroughput: 0,
+    averageTransitionTime: 0,
+    busyCorridors: [],
+    flowEfficiency: 0,
+    congestionPoints: [],
+  },
 }) => {
   const [activeView, setActiveView] = useState<
     'overview' | 'directions' | 'patterns' | 'transitions'
@@ -105,150 +115,6 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
-  // Generate mock traffic flow data
-  const trafficFlowData: TrafficFlowData[] = useMemo(() => {
-    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
-
-    return cameras.map((cameraId, index) => {
-      const baseMovements = 450 + index * 120;
-      const baseSpeed = 25 + index * 8; // pixels per second
-
-      // Generate flow directions
-      const directions: FlowDirection[] = [
-        {
-          direction: 'north',
-          count: Math.round(baseMovements * 0.25),
-          percentage: 25,
-          averageSpeed: baseSpeed * 0.9,
-          confidence: 0.89,
-        },
-        {
-          direction: 'south',
-          count: Math.round(baseMovements * 0.23),
-          percentage: 23,
-          averageSpeed: baseSpeed * 0.95,
-          confidence: 0.91,
-        },
-        {
-          direction: 'east',
-          count: Math.round(baseMovements * 0.28),
-          percentage: 28,
-          averageSpeed: baseSpeed * 1.1,
-          confidence: 0.87,
-        },
-        {
-          direction: 'west',
-          count: Math.round(baseMovements * 0.24),
-          percentage: 24,
-          averageSpeed: baseSpeed * 1.05,
-          confidence: 0.92,
-        },
-      ];
-
-      // Generate flow patterns
-      const patterns: FlowPattern[] = [
-        {
-          id: `${cameraId}_pattern_1`,
-          name: 'Direct Transit',
-          description: 'Straight path through the monitoring area',
-          frequency: Math.round(baseMovements * 0.4),
-          averageSpeed: baseSpeed * 1.2,
-          path: [
-            { x: 50, y: 200, timestamp: 0 },
-            { x: 200, y: 200, timestamp: 3000 },
-            { x: 350, y: 200, timestamp: 6000 },
-          ],
-          cameraTransitions: [],
-        },
-        {
-          id: `${cameraId}_pattern_2`,
-          name: 'L-Shape Turn',
-          description: 'Movement with 90-degree direction change',
-          frequency: Math.round(baseMovements * 0.25),
-          averageSpeed: baseSpeed * 0.8,
-          path: [
-            { x: 50, y: 300, timestamp: 0 },
-            { x: 200, y: 300, timestamp: 4000 },
-            { x: 200, y: 150, timestamp: 7000 },
-          ],
-          cameraTransitions: [],
-        },
-        {
-          id: `${cameraId}_pattern_3`,
-          name: 'Circular Movement',
-          description: 'Looping or circular path pattern',
-          frequency: Math.round(baseMovements * 0.15),
-          averageSpeed: baseSpeed * 0.6,
-          path: [
-            { x: 200, y: 200, timestamp: 0 },
-            { x: 250, y: 150, timestamp: 2000 },
-            { x: 250, y: 250, timestamp: 4000 },
-            { x: 150, y: 250, timestamp: 6000 },
-            { x: 150, y: 150, timestamp: 8000 },
-            { x: 200, y: 200, timestamp: 10000 },
-          ],
-          cameraTransitions: [],
-        },
-      ];
-
-      return {
-        cameraId,
-        totalMovements: baseMovements,
-        averageSpeed: baseSpeed,
-        peakFlowTime: new Date(Date.now() - Math.random() * 6 * 60 * 60 * 1000),
-        peakFlowCount: Math.round(baseMovements * 0.15),
-        flowDirections: directions,
-        flowPatterns: patterns,
-        entranceExitData: {
-          entrances: Math.round(baseMovements * 0.48),
-          exits: Math.round(baseMovements * 0.52),
-          netFlow: Math.round(baseMovements * 0.04),
-          throughTraffic: Math.round(baseMovements * 0.35),
-        },
-      };
-    });
-  }, [cameraIds]);
-
-  // Generate overall flow metrics
-  const flowMetrics: FlowMetrics = useMemo(() => {
-    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
-
-    const busyCorridors = [];
-    for (let i = 0; i < cameras.length - 1; i++) {
-      for (let j = i + 1; j < cameras.length; j++) {
-        busyCorridors.push({
-          from: cameras[i],
-          to: cameras[j],
-          count: Math.round(50 + Math.random() * 150),
-          avgTime: 15 + Math.random() * 30, // seconds
-        });
-      }
-    }
-
-    return {
-      overallThroughput: trafficFlowData.reduce((sum, data) => sum + data.totalMovements, 0),
-      averageTransitionTime: 22.5,
-      busyCorridors: busyCorridors.sort((a, b) => b.count - a.count).slice(0, 4),
-      flowEfficiency: 78.2,
-      congestionPoints: [
-        {
-          location: `${getDisplayName(cameras[0])} - Main Entrance`,
-          severity: 'medium',
-          description: 'Moderate bottleneck during peak hours',
-        },
-        {
-          location: `${getDisplayName(cameras[1])} - Corridor Junction`,
-          severity: 'low',
-          description: 'Minor slowdown in afternoon',
-        },
-        {
-          location: `${getDisplayName(cameras[2])} - Exit Zone`,
-          severity: 'high',
-          description: 'Significant congestion during shift changes',
-        },
-      ],
-    };
-  }, [cameraIds, trafficFlowData]);
 
   // Filter data based on selected cameras
   const filteredData = useMemo(() => {
@@ -427,11 +293,10 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
             <button
               key={tab.key}
               onClick={() => setActiveView(tab.key as any)}
-              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${
-                activeView === tab.key
+              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${activeView === tab.key
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+                }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -524,13 +389,12 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-white font-semibold">{point.location}</span>
                       <span
-                        className={`text-xs px-2 py-1 rounded ${
-                          point.severity === 'high'
+                        className={`text-xs px-2 py-1 rounded ${point.severity === 'high'
                             ? 'bg-red-500/20 text-red-400'
                             : point.severity === 'medium'
                               ? 'bg-yellow-500/20 text-yellow-400'
                               : 'bg-green-500/20 text-green-400'
-                        }`}
+                          }`}
                       >
                         {point.severity.toUpperCase()}
                       </span>
@@ -629,11 +493,10 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                   cameraData.flowPatterns.map((pattern) => (
                     <div
                       key={pattern.id}
-                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${
-                        selectedPattern?.id === pattern.id
+                      className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedPattern?.id === pattern.id
                           ? 'border-orange-400 bg-orange-500/10'
                           : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                      }`}
+                        }`}
                       onClick={() => {
                         setSelectedPattern(selectedPattern?.id === pattern.id ? null : pattern);
                         onFlowPatternClick?.(pattern);
