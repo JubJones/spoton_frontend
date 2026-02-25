@@ -93,17 +93,32 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
     }
   }, [timeRangeMetrics, selectedMetricType]);
 
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 400 });
+
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+    const observer = new ResizeObserver((entries) => {
+      if (entries.length > 0) {
+        const { width, height } = entries[0].contentRect;
+        if (width > 0 && height > 0) {
+          setContainerSize({ width, height });
+        }
+      }
+    });
+    observer.observe(chartContainerRef.current);
+    return () => observer.disconnect();
+  }, []);
+
   // Calculate chart dimensions and scales
   const chartDimensions = useMemo(() => {
     const padding = { top: 40, right: 40, bottom: 60, left: 60 };
-    const width = 800;
-    const height = 400;
+    const { width, height } = containerSize;
 
     const chartWidth = width - padding.left - padding.right;
-    const chartHeight = height - padding.top - padding.bottom;
+    const chartHeight = height - padding.bottom - padding.top;
 
-    const maxValue = Math.max(...chartData.map((d) => d.value));
-    const minValue = Math.min(...chartData.map((d) => d.value));
+    const maxValue = Math.max(...chartData.map((d) => d.value), 1);
+    const minValue = Math.min(...chartData.map((d) => d.value), 0);
     const valueRange = maxValue - minValue;
 
     const timeRange =
@@ -122,7 +137,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       timeRange,
       firstTimestamp: chartData[0]?.timestamp.getTime() || Date.now(),
     };
-  }, [chartData]);
+  }, [chartData, containerSize]);
 
   // Convert data values to chart coordinates
   const getChartCoordinates = useCallback(
@@ -130,11 +145,11 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       const { padding, chartWidth, chartHeight, maxValue, minValue, timeRange, firstTimestamp } =
         chartDimensions;
 
-      const x = padding.left + (index / (chartData.length - 1)) * chartWidth;
+      const x = padding.left + (index / Math.max(chartData.length - 1, 1)) * chartWidth;
       const y =
         padding.top +
         chartHeight -
-        ((dataPoint.value - minValue) / (maxValue - minValue)) * chartHeight;
+        ((dataPoint.value - minValue) / Math.max(maxValue - minValue, 1)) * chartHeight;
 
       return { x, y };
     },
@@ -459,9 +474,9 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
   ]);
 
   return (
-    <div className={`bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg ${className}`}>
+    <div className={`bg-black/30 backdrop-blur-sm border border-gray-700 rounded-lg flex flex-col overflow-hidden ${className}`}>
       {/* Header */}
-      <div className="p-4 border-b border-gray-700">
+      <div className="p-4 border-b border-gray-700 shrink-0">
         <div className="flex items-center justify-between mb-3">
           <div>
             <h3 className="text-lg font-semibold text-white">Analytics Charts</h3>
@@ -524,11 +539,11 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       </div>
 
       {/* Chart Container */}
-      <div className="p-4">
-        <div ref={chartContainerRef} className="relative">
+      <div className="p-4 flex-1 min-h-0 flex flex-col overflow-hidden">
+        <div ref={chartContainerRef} className="relative flex-1 min-h-0 w-full mb-4">
           <canvas
             ref={canvasRef}
-            className="w-full max-w-full border border-gray-600 rounded bg-gray-900 cursor-crosshair"
+            className="absolute top-0 left-0 w-full h-full border border-gray-600 rounded bg-gray-900 cursor-crosshair"
             onMouseMove={handleCanvasMouseMove}
             onMouseLeave={() => setHoveredPoint(null)}
             onClick={handleCanvasClick}
@@ -570,7 +585,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
         </div>
 
         {/* Chart Summary */}
-        <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+        <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div className="text-center">
             <div className="text-orange-400 font-semibold">
               {chartData.length > 0
@@ -605,10 +620,10 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
             <div className="text-purple-400 font-semibold">
               {chartData.length > 0
                 ? Math.round(
-                    (chartData.reduce((sum, d) => sum + (d.confidence || 0.8), 0) /
-                      chartData.length) *
-                      100
-                  )
+                  (chartData.reduce((sum, d) => sum + (d.confidence || 0.8), 0) /
+                    chartData.length) *
+                  100
+                )
                 : 0}
               %
             </div>
