@@ -8,6 +8,11 @@ import {
   Server, Clock, Zap, AlertTriangle, Monitor, Globe, Cpu, Database, Eye, Activity, Users, Video, BarChart2, CheckCircle
 } from 'lucide-react';
 import { getCameraDisplayName, getEnvironmentCameraIds } from '../config/environments';
+import PersonStatistics from '../components/PersonStatistics';
+import DwellTimeAnalysis from '../components/DwellTimeAnalysis';
+import TrafficFlowAnalysis from '../components/TrafficFlowAnalysis';
+import TrafficHeatmap from '../components/TrafficHeatmap';
+import { useTrackingStore } from '../stores/trackingStore';
 
 // Create API service instance
 // In a real app we might want to get this from a context or a hook like useSpotOnBackend
@@ -23,6 +28,10 @@ const AnalyticsPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [timeWindowHours, setTimeWindowHours] = useState<number>(24);
   const [lastRefreshed, setLastRefreshed] = useState<Date>(new Date());
+
+  // Subscribe to live tracking store stats for detailed analytics
+  const getPersonStatistics = useTrackingStore((state) => state.actions.getPersonStatistics);
+  const realTimeStats = useMemo(() => getPersonStatistics(), [dashboardData, lastRefreshed, getPersonStatistics]);
 
   // AnalyticsCharts state
   const [selectedMetricType, setSelectedMetricType] = useState<'detections' | 'occupancy' | 'flow' | 'dwell'>('detections');
@@ -404,6 +413,90 @@ const AnalyticsPage: React.FC = () => {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* 5. Detailed Metric Breakdowns (Real-time Store Backed) */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3 border-b border-white/10 pb-2">
+            <Activity className="w-6 h-6 text-indigo-400" />
+            <h2 className="text-2xl font-semibold text-white">Live Tracking Details</h2>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PersonStatistics
+              environment={environment}
+              timeRange={timeRangeMetrics.timeRange}
+              selectedCameras={selectedCameras}
+              personMetrics={{
+                totalDetections: realTimeStats.totalDetections || dashboardData?.summary.total_detections || 0,
+                uniquePersons: realTimeStats.uniquePersons || dashboardData?.summary.total_cameras || 0,
+                averageDetectionTime: 0,
+                detectionAccuracy: (dashboardData?.summary.average_confidence_percent || 0) / 100,
+                falsePositiveRate: 0,
+                personTurnover: 0
+              }}
+              personDistribution={realTimeStats.cameraStats ? Object.entries(realTimeStats.cameraStats).map(([cameraId, stats]) => ({
+                cameraId: cameraId as BackendCameraId,
+                personCount: stats.detections,
+                percentage: (stats.detections / (dashboardData?.summary.total_detections || 1)) * 100,
+                avgConfidence: stats.avgConfidence,
+                peakTime: new Date().toISOString()
+              })) : dashboardData?.cameras.map(c => ({
+                cameraId: c.camera_id as BackendCameraId,
+                personCount: c.detections,
+                percentage: (c.detections / (dashboardData.summary.total_detections || 1)) * 100,
+                avgConfidence: c.average_confidence_percent / 100,
+                peakTime: new Date().toISOString()
+              })) || []}
+              behaviorData={{
+                dwellTimeDistribution: [],
+                movementPatterns: [],
+                confidenceDistribution: []
+              }}
+            />
+
+            <DwellTimeAnalysis
+              environment={environment}
+              timeRange={timeRangeMetrics.timeRange}
+              selectedCameras={selectedCameras}
+              dwellTimeData={[]}
+              dwellTimeTrends={{
+                hourlyTrends: [],
+                dailyComparison: { today: 0, yesterday: 0, weekAvg: 0, trend: 'stable' },
+                behaviorInsights: []
+              }}
+            />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pt-6">
+            <TrafficFlowAnalysis
+              environment={environment}
+              timeRange={timeRangeMetrics.timeRange}
+              selectedCameras={selectedCameras}
+              trafficFlowData={[]}
+              flowMetrics={{
+                overallThroughput: 0,
+                averageTransitionTime: 0,
+                busyCorridors: [],
+                flowEfficiency: 0,
+                congestionPoints: []
+              }}
+            />
+
+            <TrafficHeatmap
+              environment={environment}
+              timeRange={timeRangeMetrics.timeRange}
+              selectedCameras={selectedCameras}
+              heatmapData={{
+                zones: [],
+                overallMetrics: {
+                  totalOccupancyEvents: 0,
+                  averageOccupancy: 0,
+                  peakOccupancyTime: new Date(),
+                  peakOccupancyCount: 0
+                }
+              }}
+            />
           </div>
         </section>
 
