@@ -440,6 +440,9 @@ const GroupViewPage: React.FC = () => {
   const wsRef = useRef<WebSocket | null>(null);
   const focusWsRef = useRef<WebSocket | null>(null);
 
+  // Track if stream has successfully started to prevent premature reloads
+  const hasStreamedRef = useRef<boolean>(false);
+
   // Camera frame data stored as base64 strings - REMOVED
   // const [cameraFrames, setCameraFrames] = useState<{ [jsonCameraId: string]: string }>({});
 
@@ -1401,6 +1404,7 @@ const GroupViewPage: React.FC = () => {
       console.log('📤 Sending subscribe message');
       ws.send(JSON.stringify({ type: 'subscribe_tracking' }));
       setIsStreaming(true);
+      hasStreamedRef.current = true;
       setError(null);
 
       // Reset states for clean start
@@ -1462,7 +1466,7 @@ const GroupViewPage: React.FC = () => {
   useEffect(() => {
     // If we transition to not streaming, and we actually had a task (not just initial load), reload
     // We skip the reload if there's a tab conflict, because we show a special UI for that
-    if (!isStreaming && taskId && !isTabConflict) {
+    if (!isStreaming && taskId && hasStreamedRef.current && !isTabConflict) {
       console.log('🔄 Stream stopped or dropped, auto-refreshing page state...');
       setTimeout(() => {
         window.location.reload();
