@@ -45,6 +45,9 @@ interface PersonStatisticsProps {
   className?: string;
   onPersonClick?: (personId: string) => void;
   onExportData?: (data: any) => void;
+  personMetrics?: PersonMetrics;
+  personDistribution?: PersonDistribution[];
+  behaviorData?: PersonBehaviorData;
 }
 
 const PersonStatistics: React.FC<PersonStatisticsProps> = ({
@@ -54,99 +57,40 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
   className = '',
   onPersonClick,
   onExportData,
+  personMetrics = {
+    totalDetections: 0,
+    uniquePersons: 0,
+    averageDetectionTime: 0,
+    detectionAccuracy: 0,
+    falsePositiveRate: 0,
+    personTurnover: 0,
+  },
+  personDistribution = [],
+  behaviorData = {
+    dwellTimeDistribution: [],
+    movementPatterns: [],
+    confidenceDistribution: [],
+  },
 }) => {
   const [activeTab, setActiveTab] = useState<'overview' | 'distribution' | 'behavior'>('overview');
   const [sortBy, setSortBy] = useState<'count' | 'confidence' | 'camera'>('count');
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
-  // Generate mock data based on environment and time range
-  const personMetrics: PersonMetrics = useMemo(() => {
-    const baseMetrics = {
-      totalDetections: 1247,
-      uniquePersons: 89,
-      averageDetectionTime: 4.2,
-      detectionAccuracy: 87.5,
-      falsePositiveRate: 2.3,
-      personTurnover: 15.2,
-    };
-
-    // Adjust based on time range
-    const multipliers = {
-      '1h': 0.1,
-      '6h': 0.4,
-      '24h': 1,
-      '7d': 6.8,
-      '30d': 28.5,
-    };
-
-    const multiplier = multipliers[timeRange];
-    return {
-      ...baseMetrics,
-      totalDetections: Math.round(baseMetrics.totalDetections * multiplier),
-      uniquePersons: Math.round(baseMetrics.uniquePersons * multiplier * 0.8),
-    };
-  }, [timeRange]);
-
-  const personDistribution: PersonDistribution[] = useMemo(() => {
-    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
-
-    const baseDistribution = [0.28, 0.35, 0.22, 0.15];
-    const normalizedDistribution = cameras.map((_, index) => baseDistribution[index] ?? 1 / Math.max(1, cameras.length));
-    const sum = normalizedDistribution.reduce((acc, value) => acc + value, 0) || 1;
-    const distribution = normalizedDistribution.map((value) => value / sum);
-    const total = personMetrics.totalDetections;
-
-    return cameras
-      .map((cameraId, index) => {
-        const count = Math.round(total * distribution[index]);
-        return {
-          cameraId,
-          personCount: count,
-          percentage: (count / total) * 100,
-          avgConfidence: 0.82 + index * 0.04,
-          peakTime: ['09:30', '14:15', '11:45', '16:20'][index],
-        };
-      })
-      .sort((a, b) => {
-        switch (sortBy) {
-          case 'count':
-            return b.personCount - a.personCount;
-          case 'confidence':
-            return b.avgConfidence - a.avgConfidence;
-          case 'camera':
-            return a.cameraId.localeCompare(b.cameraId);
-          default:
-            return 0;
-        }
-      });
-  }, [cameraIds, personMetrics.totalDetections, sortBy]);
-
-  const behaviorData: PersonBehaviorData = useMemo(
-    () => ({
-      dwellTimeDistribution: [
-        { range: '< 1 min', count: 245, percentage: 35.2 },
-        { range: '1-3 min', count: 198, percentage: 28.4 },
-        { range: '3-5 min', count: 124, percentage: 17.8 },
-        { range: '5-10 min', count: 89, percentage: 12.8 },
-        { range: '> 10 min', count: 40, percentage: 5.8 },
-      ],
-      movementPatterns: [
-        { pattern: 'Direct Transit', count: 342, description: 'Straight path through area' },
-        { pattern: 'Loitering', count: 156, description: 'Minimal movement in area' },
-        { pattern: 'Circular Path', count: 89, description: 'Circular or loop movement' },
-        { pattern: 'Erratic', count: 45, description: 'Unpredictable movement patterns' },
-      ],
-      confidenceDistribution: [
-        { range: '90-100%', count: 456, percentage: 65.4 },
-        { range: '80-89%', count: 167, percentage: 23.9 },
-        { range: '70-79%', count: 54, percentage: 7.7 },
-        { range: '60-69%', count: 18, percentage: 2.6 },
-        { range: '< 60%', count: 3, percentage: 0.4 },
-      ],
-    }),
-    []
-  );
+  const sortedDistribution = useMemo(() => {
+    return [...personDistribution].sort((a, b) => {
+      switch (sortBy) {
+        case 'count':
+          return b.personCount - a.personCount;
+        case 'confidence':
+          return b.avgConfidence - a.avgConfidence;
+        case 'camera':
+          return a.cameraId.localeCompare(b.cameraId);
+        default:
+          return 0;
+      }
+    });
+  }, [personDistribution, sortBy]);
 
   // Get metric trend indicator
   const getTrendIndicator = (current: number, baseline: number) => {
@@ -212,11 +156,10 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
             <button
               key={tab.key}
               onClick={() => setActiveTab(tab.key as any)}
-              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${
-                activeTab === tab.key
+              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${activeTab === tab.key
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+                }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -379,7 +322,7 @@ const PersonStatistics: React.FC<PersonStatisticsProps> = ({
 
             {/* Distribution Chart */}
             <div className="space-y-3">
-              {personDistribution.map((dist) => (
+              {sortedDistribution.map((dist) => (
                 <div key={dist.cameraId} className="bg-gray-800/30 rounded-lg p-3">
                   <div className="flex items-center justify-between mb-2">
                     <div className="flex items-center space-x-3">

@@ -57,6 +57,8 @@ interface DwellTimeAnalysisProps {
   onDwellTimeRangeClick?: (range: string, cameraId?: BackendCameraId) => void;
   onTimeOfDayClick?: (hour: number, cameraId?: BackendCameraId) => void;
   onExportAnalysis?: (data: any) => void;
+  dwellTimeData?: DwellTimeData[];
+  dwellTimeTrends?: DwellTimeTrends;
 }
 
 const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
@@ -71,6 +73,12 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
   onDwellTimeRangeClick,
   onTimeOfDayClick,
   onExportAnalysis,
+  dwellTimeData = [],
+  dwellTimeTrends = {
+    hourlyTrends: [],
+    dailyComparison: { today: 0, yesterday: 0, weekAvg: 0, trend: 'stable' },
+    behaviorInsights: [],
+  },
 }) => {
   const [activeView, setActiveView] = useState<'overview' | 'distribution' | 'trends' | 'insights'>(
     'overview'
@@ -79,124 +87,7 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
-  // Generate mock dwell time data
-  const dwellTimeData: DwellTimeData[] = useMemo(() => {
-    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
 
-    return cameras.map((cameraId, index) => {
-      const baseAvgDwell = 3.5 + index * 0.8;
-      const variability = 0.5 + index * 0.2;
-
-      return {
-        cameraId,
-        averageDwellTime: baseAvgDwell,
-        medianDwellTime: baseAvgDwell * 0.8,
-        minDwellTime: 0.5,
-        maxDwellTime: baseAvgDwell * 3.2,
-        dwellTimeDistribution: [
-          {
-            range: '< 1 min',
-            count: 145 + index * 20,
-            percentage: 25.2 + index * 2,
-            avgConfidence: 0.92,
-          },
-          {
-            range: '1-3 min',
-            count: 198 + index * 15,
-            percentage: 34.5 + index * 1.5,
-            avgConfidence: 0.89,
-          },
-          {
-            range: '3-5 min',
-            count: 124 + index * 10,
-            percentage: 21.6 - index * 1,
-            avgConfidence: 0.87,
-          },
-          {
-            range: '5-10 min',
-            count: 78 + index * 8,
-            percentage: 13.6 - index * 0.8,
-            avgConfidence: 0.85,
-          },
-          {
-            range: '> 10 min',
-            count: 32 + index * 5,
-            percentage: 5.1 - index * 0.2,
-            avgConfidence: 0.83,
-          },
-        ],
-        timeOfDayPatterns: Array.from({ length: 24 }, (_, hour) => {
-          const businessHours = hour >= 8 && hour <= 18;
-          const lunchTime = hour >= 12 && hour <= 14;
-          const baseCount = businessHours ? 15 + Math.random() * 25 : 2 + Math.random() * 8;
-          const dwellMultiplier = lunchTime ? 1.4 : businessHours ? 1.0 : 0.6;
-
-          return {
-            hour,
-            avgDwellTime: baseAvgDwell * dwellMultiplier + (Math.random() - 0.5) * variability,
-            personCount: Math.round(baseCount),
-          };
-        }),
-      };
-    });
-  }, [cameraIds]);
-
-  // Generate trend analysis data
-  const dwellTimeTrends: DwellTimeTrends = useMemo(() => {
-    const hourlyTrends = Array.from({ length: 24 }, (_, hour) => {
-      const businessHours = hour >= 8 && hour <= 18;
-      const avgDwell = businessHours
-        ? 4.2 + Math.sin((hour / 24) * Math.PI * 2) * 1.5
-        : 2.1 + Math.random() * 1.0;
-
-      return {
-        hour,
-        avgDwellTime: avgDwell,
-        personCount: Math.round(businessHours ? 20 + Math.random() * 30 : 3 + Math.random() * 7),
-        confidenceScore: 0.85 + Math.random() * 0.1,
-      };
-    });
-
-    const todayAvg = 4.2;
-    const yesterdayAvg = 3.9;
-    const weekAvg = 4.0;
-
-    return {
-      hourlyTrends,
-      dailyComparison: {
-        today: todayAvg,
-        yesterday: yesterdayAvg,
-        weekAvg,
-        trend: todayAvg > weekAvg * 1.05 ? 'up' : todayAvg < weekAvg * 0.95 ? 'down' : 'stable',
-      },
-      behaviorInsights: [
-        {
-          category: 'Peak Dwell Time',
-          description: 'Longest dwell times occur during lunch hours (12-2 PM)',
-          impact: 'neutral',
-          confidence: 0.89,
-        },
-        {
-          category: 'Quick Transit',
-          description: 'Morning rush shows shorter dwell times, indicating efficient movement',
-          impact: 'positive',
-          confidence: 0.92,
-        },
-        {
-          category: 'Extended Presence',
-          description: 'Increased dwell times in afternoon may indicate congestion',
-          impact: 'negative',
-          confidence: 0.76,
-        },
-        {
-          category: 'Weekend Pattern',
-          description: 'Weekend dwell times are 25% shorter than weekday average',
-          impact: 'neutral',
-          confidence: 0.84,
-        },
-      ],
-    };
-  }, []);
 
   // Filter data based on selected cameras
   const filteredData = useMemo(() => {
@@ -327,11 +218,10 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
             <button
               key={tab.key}
               onClick={() => setActiveView(tab.key as any)}
-              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${
-                activeView === tab.key
+              className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${activeView === tab.key
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-              }`}
+                }`}
             >
               <span>{tab.icon}</span>
               <span>{tab.label}</span>
@@ -555,11 +445,10 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
                   {dwellTimeTrends.hourlyTrends.map((trend) => (
                     <div
                       key={trend.hour}
-                      className={`text-center cursor-pointer transition-colors ${
-                        selectedTimeSlot === trend.hour
+                      className={`text-center cursor-pointer transition-colors ${selectedTimeSlot === trend.hour
                           ? 'bg-orange-500 text-white'
                           : 'bg-gray-800/30 hover:bg-gray-700/50 text-gray-300'
-                      }`}
+                        }`}
                       onClick={() => {
                         setSelectedTimeSlot(selectedTimeSlot === trend.hour ? null : trend.hour);
                         onTimeOfDayClick?.(trend.hour);
@@ -611,25 +500,23 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
                 <div className="flex items-start justify-between mb-2">
                   <div className="flex items-center space-x-2">
                     <span
-                      className={`w-2 h-2 rounded-full ${
-                        insight.impact === 'positive'
+                      className={`w-2 h-2 rounded-full ${insight.impact === 'positive'
                           ? 'bg-green-400'
                           : insight.impact === 'negative'
                             ? 'bg-red-400'
                             : 'bg-gray-400'
-                      }`}
+                        }`}
                     />
                     <span className="text-white font-semibold">{insight.category}</span>
                   </div>
                   <div className="flex items-center space-x-2">
                     <span
-                      className={`text-xs px-2 py-1 rounded ${
-                        insight.impact === 'positive'
+                      className={`text-xs px-2 py-1 rounded ${insight.impact === 'positive'
                           ? 'bg-green-500/20 text-green-400'
                           : insight.impact === 'negative'
                             ? 'bg-red-500/20 text-red-400'
                             : 'bg-gray-500/20 text-gray-400'
-                      }`}
+                        }`}
                     >
                       {insight.impact}
                     </span>

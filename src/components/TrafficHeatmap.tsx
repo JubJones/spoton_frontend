@@ -40,6 +40,7 @@ interface TrafficHeatmapProps {
   onZoneClick?: (zone: HeatmapZone) => void;
   onZoneHover?: (zone: HeatmapZone | null) => void;
   onExportHeatmap?: (data: HeatmapData) => void;
+  heatmapData?: HeatmapData;
 }
 
 const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
@@ -54,6 +55,7 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
   onZoneClick,
   onZoneHover,
   onExportHeatmap,
+  heatmapData = { zones: [], overallMetrics: { totalOccupancyEvents: 0, averageOccupancy: 0, peakOccupancyTime: new Date(), peakOccupancyCount: 0 } },
 }) => {
   const [hoveredZone, setHoveredZone] = useState<HeatmapZone | null>(null);
   const [selectedZone, setSelectedZone] = useState<HeatmapZone | null>(null);
@@ -63,82 +65,6 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
   const { environmentCameras, getDisplayName } = useCameraConfig();
   const cameraIds: BackendCameraId[] = environmentCameras[environment] ?? [];
 
-  // Generate mock heatmap data based on environment
-  const heatmapData: HeatmapData = useMemo(() => {
-    const cameras = cameraIds.length ? cameraIds : ([] as BackendCameraId[]);
-
-    const zones: HeatmapZone[] = cameras.flatMap((cameraId, cameraIndex) => {
-      // Create 2-4 zones per camera
-      const zoneCount = 2 + Math.floor(Math.random() * 3);
-      return Array.from({ length: zoneCount }, (_, zoneIndex) => {
-        const zoneId = `${cameraId}_zone_${zoneIndex + 1}`;
-
-        // Generate occupancy data based on time range
-        const dataPoints = timeRange === '1h' ? 12 : timeRange === '6h' ? 36 : 48;
-        const now = Date.now();
-        const rangeMs = {
-          '1h': 60 * 60 * 1000,
-          '6h': 6 * 60 * 60 * 1000,
-          '24h': 24 * 60 * 60 * 1000,
-          '7d': 7 * 24 * 60 * 60 * 1000,
-          '30d': 30 * 24 * 60 * 60 * 1000,
-        }[timeRange];
-
-        const occupancyData = Array.from({ length: dataPoints }, (_, i) => {
-          const timestamp = new Date(now - rangeMs + (i * rangeMs) / dataPoints);
-          const baseOccupancy = 3 + Math.floor(Math.random() * 8);
-          const dwellMultiplier = 1 + Math.sin((i / dataPoints) * Math.PI * 2) * 0.5;
-
-          return {
-            timestamp,
-            personCount: Math.round(baseOccupancy * dwellMultiplier),
-            avgDwellTime: 2 + Math.random() * 8, // 2-10 minutes
-            peakOccupancy: Math.round(baseOccupancy * dwellMultiplier * 1.5),
-          };
-        });
-
-        return {
-          id: zoneId,
-          name: `${getDisplayName(cameraId)} Zone ${zoneIndex + 1}`,
-          coordinates: [
-            [50 + cameraIndex * 200 + zoneIndex * 80, 50 + zoneIndex * 60],
-            [130 + cameraIndex * 200 + zoneIndex * 80, 50 + zoneIndex * 60],
-            [130 + cameraIndex * 200 + zoneIndex * 80, 110 + zoneIndex * 60],
-            [50 + cameraIndex * 200 + zoneIndex * 80, 110 + zoneIndex * 60],
-          ],
-          cameraId,
-          occupancyData,
-        };
-      });
-    });
-
-    const totalOccupancyEvents = zones.reduce(
-      (sum, zone) =>
-        sum + zone.occupancyData.reduce((zoneSum, data) => zoneSum + data.personCount, 0),
-      0
-    );
-
-    const allDataPoints = zones.flatMap((zone) => zone.occupancyData);
-    const averageOccupancy =
-      allDataPoints.length > 0
-        ? allDataPoints.reduce((sum, data) => sum + data.personCount, 0) / allDataPoints.length
-        : 0;
-
-    const peakData = allDataPoints.reduce(
-      (peak, current) => (current.personCount > peak.personCount ? current : peak),
-      { personCount: 0, timestamp: new Date() }
-    );
-
-    return {
-      zones,
-      overallMetrics: {
-        totalOccupancyEvents,
-        averageOccupancy,
-        peakOccupancyTime: peakData.timestamp,
-        peakOccupancyCount: peakData.personCount,
-      },
-    };
-  }, [cameraIds, environment, timeRange]);
 
   // Filter zones based on selected cameras
   const filteredZones = useMemo(() => {
