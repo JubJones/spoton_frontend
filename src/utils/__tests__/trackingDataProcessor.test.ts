@@ -606,6 +606,7 @@ describe('Tracking Data Processor', () => {
           is_focused: false,
           detection_time: '2024-01-01T00:00:00Z',
           tracking_duration: 0,
+          map_coords: [10, 20],
         };
 
         const sanitized = sanitizePersonTrack(track);
