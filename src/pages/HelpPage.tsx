@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import Header from '../components/common/Header';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
+import FeedbackForm from '../components/feedback/FeedbackForm';
 import {
   BookOpen,
   Map,
@@ -325,6 +326,31 @@ const HelpPage: React.FC = () => {
                 Thumbnails are cropped from the live MJPEG stream. If the stream hasn't loaded yet or there's a cross-origin issue, a placeholder with the person's dimensions and confidence color is shown instead.
               </p>
             </div>
+          </div>
+        </div>
+      )
+    },
+    {
+      id: 'feedback',
+      title: 'Share Feedback',
+      content: (
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+          <div className="space-y-3">
+            <h2 className="text-3xl font-bold text-white">Help Us Improve</h2>
+            <p className="text-gray-400 max-w-3xl">
+              Drop a quick note below whenever you spot a bug, have an idea, or simply want to tell us how SpotOn feels to use. Your submission is stored locally first so you can collect feedback ideas even when offline.
+            </p>
+          </div>
+
+          <FeedbackForm />
+
+          <div className="rounded-xl border border-gray-800 bg-black/30 p-4 text-sm text-gray-400">
+            <p className="mb-2 font-semibold text-white">What happens to my feedback?</p>
+            <ul className="list-disc list-inside space-y-1">
+              <li>Entries are stored securely in this browser until they can be synced or shared.</li>
+              <li>Include contact details if you'd like a follow-up.</li>
+              <li>You can clear your stored feedback anytime by clearing browser storage.</li>
+            </ul>
           </div>
         </div>
       )
