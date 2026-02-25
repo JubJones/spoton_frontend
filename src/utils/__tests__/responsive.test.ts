@@ -49,6 +49,8 @@ describe('Responsive Utilities', () => {
     vi.clearAllMocks();
     mockWindow.innerWidth = 1024;
     mockWindow.innerHeight = 768;
+    window.innerWidth = 1024;
+    window.innerHeight = 768;
   });
 
   afterEach(() => {
@@ -181,17 +183,17 @@ describe('Responsive Utilities', () => {
 
     it('should determine correct screen size based on width', () => {
       // Test mobile
-      mockWindow.innerWidth = 500;
+      window.innerWidth = 500;
       const { result: mobileResult } = renderHook(() => useViewportSize());
       expect(mobileResult.current.screenSize).toBe('mobile');
 
       // Test tablet
-      mockWindow.innerWidth = 800;
+      window.innerWidth = 800;
       const { result: tabletResult } = renderHook(() => useViewportSize());
       expect(tabletResult.current.screenSize).toBe('tablet');
 
       // Test desktop
-      mockWindow.innerWidth = 1200;
+      window.innerWidth = 1200;
       const { result: desktopResult } = renderHook(() => useViewportSize());
       expect(desktopResult.current.screenSize).toBe('desktop');
     });
