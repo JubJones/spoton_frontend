@@ -32,8 +32,6 @@ import {
   AnalyticsDashboardResponse,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
-import { MOCK_CONFIG } from '../config/mock';
-import { mockAPI } from '../mocks/mockServices';
 
 // ============================================================================
 // API Service Configuration
@@ -367,12 +365,6 @@ export class APIService {
   async startProcessingTask(
     request: ProcessingTaskStartRequest
   ): Promise<ProcessingTaskCreateResponse> {
-    // Use mock service if enabled
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock startProcessingTask');
-      return mockAPI.startProcessingTask(request.environment_id);
-    }
-
     try {
       const response = await this.http.post<ProcessingTaskCreateResponse>(
         API_ENDPOINTS.START_TASK,
@@ -395,12 +387,6 @@ export class APIService {
    * Get task status by ID
    */
   async getTaskStatus(taskId: string): Promise<TaskStatusResponse> {
-    // Use mock service if enabled
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock getTaskStatus');
-      return mockAPI.getTaskStatus(taskId);
-    }
-
     try {
       const response = await this.http.get<TaskStatusResponse>(API_ENDPOINTS.TASK_STATUS(taskId));
 
@@ -419,16 +405,6 @@ export class APIService {
    * Pause active processing task playback
    */
   async pauseTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock pauseTaskPlayback');
-      return {
-        task_id: taskId,
-        state: 'paused',
-        last_transition_at: new Date().toISOString(),
-        last_frame_index: 0,
-      };
-    }
-
     try {
       return await this.http.post<PlaybackStatusResponse>(
         API_ENDPOINTS.PLAYBACK_PAUSE(taskId)
@@ -442,16 +418,6 @@ export class APIService {
    * Resume processing task playback
    */
   async resumeTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock resumeTaskPlayback');
-      return {
-        task_id: taskId,
-        state: 'playing',
-        last_transition_at: new Date().toISOString(),
-        last_frame_index: 0,
-      };
-    }
-
     try {
       return await this.http.post<PlaybackStatusResponse>(
         API_ENDPOINTS.PLAYBACK_RESUME(taskId)
@@ -465,16 +431,6 @@ export class APIService {
    * Retrieve playback status for task
    */
   async getPlaybackStatus(taskId: string): Promise<PlaybackStatusResponse> {
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock getPlaybackStatus');
-      return {
-        task_id: taskId,
-        state: 'playing',
-        last_transition_at: new Date().toISOString(),
-        last_frame_index: 0,
-      };
-    }
-
     try {
       return await this.http.get<PlaybackStatusResponse>(
         API_ENDPOINTS.PLAYBACK_STATUS(taskId)
@@ -488,11 +444,6 @@ export class APIService {
    * Get detection processing environments and their camera lists
    */
   async getDetectionProcessingEnvironments(): Promise<DetectionProcessingEnvironmentsResponse> {
-    if (MOCK_CONFIG.services.api) {
-      console.log('🎭 Using mock detection environments');
-      return DEFAULT_DETECTION_ENVIRONMENTS;
-    }
-
     try {
       const response = await this.http.get<any>(API_ENDPOINTS.DETECTION_ENVIRONMENTS);
 
@@ -584,12 +535,6 @@ export class APIService {
    * Get system health status
    */
   async getSystemHealth(): Promise<SystemHealthResponse> {
-    // Use mock service if enabled
-    if (MOCK_CONFIG.services.systemHealth) {
-      console.log('🎭 Using mock getSystemHealth');
-      return mockAPI.checkSystemHealth();
-    }
-
     try {
       const response = await this.http.get<SystemHealthResponse>(API_ENDPOINTS.HEALTH);
 
@@ -784,13 +729,6 @@ export class APIService {
     windowHours: number = 24
   ): Promise<AnalyticsDashboardResponse> {
     try {
-      // Use mock service if enabled (fallback logic can be added here)
-      if (MOCK_CONFIG.services.api || true) { // Force Mock for now as backend might not implement it yet, or remove `|| true` if confirmed
-        // For now, let's try to fetch real data, but if it fails/not implemented, handle gracefully? 
-        // Actually user said "integrate real analytics", so we should try to fetch real.
-        // Reverting the "force mock" thought.
-      }
-
       const params = new URLSearchParams({
         environment_id: environmentId,
         window_hours: windowHours.toString(),
@@ -801,36 +739,11 @@ export class APIService {
       );
 
       if (!response || response.status !== 'success') {
-        // Fallback to mock data if real endpoint fails (optional, but good for demo stability)
-        console.warn('Backend analytics dashboard endpoint failed or invalid, using partial mock data');
-        return {
-          status: 'success',
-          data: {
-            generated_at: new Date().toISOString(),
-            summary: {
-              total_detections: 0,
-              average_confidence_percent: 0,
-              system_uptime_percent: 100,
-              uptime_delta_percent: 0,
-              total_cameras: 10,
-            },
-            cameras: [],
-            charts: {
-              detections_per_bucket: [],
-              average_confidence_trend: [],
-              uptime_trend: []
-            }
-          }
-        }
+        throw new ValidationError('Invalid dashboard analytics response format');
       }
 
       return response;
     } catch (error) {
-      // If endpoint 404s, mock it for the demo per user request 'integrate endpoint' 
-      // but if it doesn't exist yet, we don't want to break the page.
-      // However, the strict instruction is "integrate real endpoints".
-      // So I will assume the endpoint exists or throw error.
-      // Let's wrap it in a try-catch that logs but tries to return structure.
       console.error('Failed to fetch dashboard analytics', error);
       throw error;
     }

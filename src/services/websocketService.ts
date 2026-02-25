@@ -12,8 +12,6 @@ import {
   isValidWebSocketMessageType,
 } from '../types/api';
 import { getWebSocketUrl, APP_CONFIG } from '../config/app';
-import { MOCK_CONFIG } from '../config/mock';
-import { mockAPI } from '../mocks/mockServices';
 
 // ============================================================================
 // WebSocket Service Configuration
@@ -108,11 +106,6 @@ export class WebSocketService {
       return;
     }
 
-    // Use mock WebSocket if enabled
-    if (MOCK_CONFIG.services.websocket) {
-      return this.connectMock(endpoint);
-    }
-
     this.url = endpoint.startsWith('ws') ? endpoint : getWebSocketUrl(endpoint);
     this.setConnectionState(WebSocketConnectionState.CONNECTING);
     this.connectionStartTime = Date.now();
@@ -129,57 +122,11 @@ export class WebSocketService {
   }
 
   /**
-   * Connect to mock WebSocket service
-   */
-  private async connectMock(endpoint: string): Promise<void> {
-    console.log('🎭 Using mock WebSocket service for endpoint:', endpoint);
-
-    // Extract task ID from endpoint for mock service
-    const taskIdMatch = endpoint.match(/\/ws\/tracking\/(.+)$/);
-    const taskId = taskIdMatch ? taskIdMatch[1] : 'mock-task';
-
-    this.setConnectionState(WebSocketConnectionState.CONNECTING);
-    this.connectionStartTime = Date.now();
-
-    // Simulate connection delay
-    await new Promise(resolve => setTimeout(resolve, 100));
-
-    // Connect to mock service
-    const disconnect = mockAPI.connectWebSocket(taskId, (message) => {
-      this.handleMockMessage(message);
-    });
-
-    // Store disconnect function
-    (this as any).mockDisconnect = disconnect;
-
-    this.setConnectionState(WebSocketConnectionState.CONNECTED);
-    this.startHeartbeat();
-
-    console.log('🎭 Mock WebSocket connected successfully');
-  }
-
-  /**
-   * Handle mock WebSocket messages
-   */
-  private handleMockMessage(message: WebSocketMessage): void {
-    this.lastMessageTime = Date.now();
-    this.messageCount++;
-    this.processMessage(message);
-  }
-
-  /**
    * Disconnect from WebSocket
    */
   disconnect(): void {
     this.clearReconnectTimer();
     this.clearHeartbeatTimer();
-
-    // Handle mock disconnection
-    if (MOCK_CONFIG.services.websocket && (this as any).mockDisconnect) {
-      console.log('🎭 Disconnecting from mock WebSocket service');
-      (this as any).mockDisconnect();
-      (this as any).mockDisconnect = null;
-    }
 
     if (this.ws) {
       this.ws.close(1000, 'Client disconnecting');
