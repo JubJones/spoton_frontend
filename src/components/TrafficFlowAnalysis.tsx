@@ -255,8 +255,10 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
   }, [filteredData, flowMetrics, environment, timeRange, selectedCameras, onExportFlowData]);
 
   // Format time
-  const formatTime = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  // Formats time handling both Date objects and ISO strings
+  const formatTime = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });
@@ -294,8 +296,8 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
               key={tab.key}
               onClick={() => setActiveView(tab.key as any)}
               className={`px-3 py-1 text-sm rounded transition-colors flex items-center space-x-1 ${activeView === tab.key
-                  ? 'bg-orange-500 text-white'
-                  : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                ? 'bg-orange-500 text-white'
+                : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                 }`}
             >
               <span>{tab.icon}</span>
@@ -390,10 +392,10 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                       <span className="text-white font-semibold">{point.location}</span>
                       <span
                         className={`text-xs px-2 py-1 rounded ${point.severity === 'high'
-                            ? 'bg-red-500/20 text-red-400'
-                            : point.severity === 'medium'
-                              ? 'bg-yellow-500/20 text-yellow-400'
-                              : 'bg-green-500/20 text-green-400'
+                          ? 'bg-red-500/20 text-red-400'
+                          : point.severity === 'medium'
+                            ? 'bg-yellow-500/20 text-yellow-400'
+                            : 'bg-green-500/20 text-green-400'
                           }`}
                       >
                         {point.severity.toUpperCase()}
@@ -494,8 +496,8 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
                     <div
                       key={pattern.id}
                       className={`p-3 rounded-lg border cursor-pointer transition-colors ${selectedPattern?.id === pattern.id
-                          ? 'border-orange-400 bg-orange-500/10'
-                          : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
+                        ? 'border-orange-400 bg-orange-500/10'
+                        : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
                         }`}
                       onClick={() => {
                         setSelectedPattern(selectedPattern?.id === pattern.id ? null : pattern);

@@ -68,9 +68,9 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
     const avgFocusTime =
       totalPersons > 0
         ? focusedPersons.reduce(
-            (sum, person) => sum + (now.getTime() - person.focusStartTime.getTime()) / 1000,
-            0
-          ) / totalPersons
+          (sum, person) => sum + (now.getTime() - person.focusStartTime.getTime()) / 1000,
+          0
+        ) / totalPersons
         : 0;
 
     return {
@@ -80,9 +80,9 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
       sessionDuration:
         totalPersons > 0
           ? Math.round(
-              (now.getTime() - Math.min(...focusedPersons.map((p) => p.focusStartTime.getTime()))) /
-                1000
-            )
+            (now.getTime() - Math.min(...focusedPersons.map((p) => p.focusStartTime.getTime()))) /
+            1000
+          )
           : 0,
     };
   }, [focusedPersons]);
@@ -118,8 +118,9 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
   }, []);
 
   // Format timestamp
-  const formatTime = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTime = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -142,11 +143,10 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
           <div className="flex items-center space-x-2">
             <button
               onClick={() => onFollowModeToggle?.(!isFollowModeEnabled)}
-              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                isFollowModeEnabled
+              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${isFollowModeEnabled
                   ? 'bg-green-500 hover:bg-green-600 text-white'
                   : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-              }`}
+                }`}
               title="Automatically switch cameras when focused person moves"
             >
               {isFollowModeEnabled ? '👁️ Following' : '👁️ Follow'}
@@ -154,11 +154,10 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
 
             <button
               onClick={() => onAutoSwitchToggle?.(!autoSwitchEnabled)}
-              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                autoSwitchEnabled
+              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${autoSwitchEnabled
                   ? 'bg-blue-500 hover:bg-blue-600 text-white'
                   : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-              }`}
+                }`}
               title="Automatically switch to best camera view"
             >
               🔄 Auto
@@ -203,11 +202,10 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
             <button
               key={mode.value}
               onClick={() => onFocusIntensityChange?.(mode.value as any)}
-              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${
-                focusIntensity === mode.value
+              className={`flex-1 px-3 py-2 rounded-lg text-sm font-medium transition-colors ${focusIntensity === mode.value
                   ? 'bg-orange-500 text-white'
                   : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-              }`}
+                }`}
             >
               <span className="mr-2">{mode.icon}</span>
               {mode.label}
@@ -258,11 +256,10 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
               return (
                 <div
                   key={person.personId}
-                  className={`p-3 rounded-lg border transition-colors ${
-                    isSelected
+                  className={`p-3 rounded-lg border transition-colors ${isSelected
                       ? 'border-orange-400 bg-orange-500/10'
                       : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                  }`}
+                    }`}
                 >
                   {/* Person Header */}
                   <div className="flex items-center justify-between mb-2">
@@ -285,13 +282,12 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
                     <div className="flex items-center space-x-1">
                       {/* Confidence Indicator */}
                       <div
-                        className={`px-2 py-1 rounded text-xs font-semibold ${
-                          person.confidenceScore >= 80
+                        className={`px-2 py-1 rounded text-xs font-semibold ${person.confidenceScore >= 80
                             ? 'bg-green-500/20 text-green-400'
                             : person.confidenceScore >= 60
                               ? 'bg-yellow-500/20 text-yellow-400'
                               : 'bg-red-500/20 text-red-400'
-                        }`}
+                          }`}
                       >
                         {Math.round(person.confidenceScore)}%
                       </div>
@@ -352,11 +348,10 @@ const FocusTrackControls: React.FC<FocusTrackControlsProps> = ({
                             <button
                               key={cameraId}
                               onClick={() => onCameraSwitchForPerson?.(person.personId, cameraId)}
-                              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                                person.currentCamera === cameraId
+                              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${person.currentCamera === cameraId
                                   ? 'bg-blue-500 text-white'
                                   : 'bg-gray-700 hover:bg-gray-600 text-gray-300'
-                              }`}
+                                }`}
                             >
                               {getCameraDisplayName(cameraId, environment)}
                             </button>

@@ -471,6 +471,7 @@ export interface DatabaseServiceStats {
     cache_misses: number;
     success_rate: number;
     cache_hit_rate: number;
+    avg_query_latency_ms?: number;
   };
   integrated_service: {
     cache_stats: {
@@ -544,6 +545,18 @@ export interface AnalyticsDashboardResponse {
       detections_per_bucket: Array<{ timestamp: string; detections: number }>;
       average_confidence_trend: Array<{ timestamp: string; confidence_percent: number }>;
       uptime_trend: Array<{ date: string; uptime_percent: number }>;
+    };
+    dwell_time?: {
+      data: any[];
+      trends: any;
+    };
+    traffic_flow?: {
+      data: any[];
+      metrics: any;
+    };
+    heatmap?: {
+      zones: any[];
+      overallMetrics: any;
     };
   };
 }

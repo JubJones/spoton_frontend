@@ -103,8 +103,9 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
   }, [personId, bookmarkLabel, onBookmark]);
 
   // Format timestamp
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTimestamp = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -137,11 +138,10 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
           <div className="flex items-center space-x-2">
             <button
               onClick={handleFocusToggle}
-              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${
-                isFocused
+              className={`px-3 py-1 rounded-lg text-sm font-semibold transition-colors ${isFocused
                   ? 'bg-orange-500 hover:bg-orange-600 text-white'
                   : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-              }`}
+                }`}
             >
               {isFocused ? '🎯 Focused' : 'Focus'}
             </button>
@@ -169,13 +169,12 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
           <div>
             <span className="text-gray-500">Confidence:</span>
             <div
-              className={`font-semibold ${
-                realTimeMetrics.currentConfidence >= 80
+              className={`font-semibold ${realTimeMetrics.currentConfidence >= 80
                   ? 'text-green-400'
                   : realTimeMetrics.currentConfidence >= 60
                     ? 'text-yellow-400'
                     : 'text-red-400'
-              }`}
+                }`}
             >
               {realTimeMetrics.currentConfidence}%
             </div>
@@ -199,11 +198,10 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
           <div>
             <span className="text-gray-500">Status:</span>
             <div
-              className={`font-semibold ${
-                realTimeMetrics.positionStability === 'Stable'
+              className={`font-semibold ${realTimeMetrics.positionStability === 'Stable'
                   ? 'text-green-400'
                   : 'text-yellow-400'
-              }`}
+                }`}
             >
               {realTimeMetrics.positionStability}
             </div>
@@ -248,11 +246,10 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
           <button
             key={tab.id}
             onClick={() => setSelectedTab(tab.id as any)}
-            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${
-              selectedTab === tab.id
+            className={`flex-1 px-4 py-3 text-sm font-medium transition-colors ${selectedTab === tab.id
                 ? 'text-orange-400 border-b-2 border-orange-400 bg-orange-500/10'
                 : 'text-gray-400 hover:text-gray-300'
-            }`}
+              }`}
           >
             <span className="mr-2">{tab.icon}</span>
             {tab.label}
@@ -370,13 +367,12 @@ const PersonDetailPanel: React.FC<PersonDetailPanelProps> = ({
                 <div>
                   <span className="text-gray-500">Re-ID Confidence:</span>
                   <div
-                    className={`font-semibold ${
-                      identityInfo.reidentificationConfidence >= 0.8
+                    className={`font-semibold ${identityInfo.reidentificationConfidence >= 0.8
                         ? 'text-green-400'
                         : identityInfo.reidentificationConfidence >= 0.6
                           ? 'text-yellow-400'
                           : 'text-red-400'
-                    }`}
+                      }`}
                   >
                     {Math.round(identityInfo.reidentificationConfidence * 100)}%
                   </div>

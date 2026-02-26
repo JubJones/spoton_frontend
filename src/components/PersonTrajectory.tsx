@@ -100,8 +100,9 @@ const PersonTrajectory: React.FC<PersonTrajectoryProps> = ({
   );
 
   // Format timestamp for display
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTimestamp = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -217,18 +218,17 @@ const PersonTrajectory: React.FC<PersonTrajectoryProps> = ({
               const isCurrentPoint = index === currentTimeIndex;
               const opacity = showVelocity
                 ? Math.max(
-                    0.3,
-                    (point.velocity || 0) /
-                      Math.max(...trajectoryData.path.map((p) => p.velocity || 0))
-                  )
+                  0.3,
+                  (point.velocity || 0) /
+                  Math.max(...trajectoryData.path.map((p) => p.velocity || 0))
+                )
                 : 0.7;
 
               return (
                 <div
                   key={index}
-                  className={`absolute w-1 h-full transition-all duration-200 ${
-                    isCurrentPoint ? 'bg-orange-400 h-8 z-10' : 'bg-blue-400'
-                  }`}
+                  className={`absolute w-1 h-full transition-all duration-200 ${isCurrentPoint ? 'bg-orange-400 h-8 z-10' : 'bg-blue-400'
+                    }`}
                   style={{
                     left: `${position}%`,
                     opacity: isCurrentPoint ? 1 : opacity,

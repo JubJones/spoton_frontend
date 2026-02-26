@@ -7,7 +7,7 @@ import AnalyticsCharts from '../components/AnalyticsCharts';
 import {
   Server, Clock, Zap, AlertTriangle, Monitor, Globe, Cpu, Database, Eye, Activity, Users, Video, BarChart2, CheckCircle
 } from 'lucide-react';
-import { getCameraDisplayName, getEnvironmentCameraIds } from '../config/environments';
+import { getCameraDisplayName, getAllCameraIds } from '../config/environments';
 import PersonStatistics from '../components/PersonStatistics';
 import DwellTimeAnalysis from '../components/DwellTimeAnalysis';
 import TrafficFlowAnalysis from '../components/TrafficFlowAnalysis';
@@ -35,8 +35,14 @@ const AnalyticsPage: React.FC = () => {
 
   // AnalyticsCharts state
   const [selectedMetricType, setSelectedMetricType] = useState<'detections' | 'occupancy' | 'flow' | 'dwell'>('detections');
-  const availableCameras = getEnvironmentCameraIds(environment);
+  // Use ALL cameras across environments instead of just the selected environment
+  const availableCameras = getAllCameraIds();
   const [selectedCameras, setSelectedCameras] = useState<Set<BackendCameraId>>(new Set(availableCameras));
+
+  // Reset selected cameras if available cameras change (e.g. if we ever switch approaches)
+  useEffect(() => {
+    setSelectedCameras(new Set(availableCameras));
+  }, [environment]);
 
   const fetchAnalytics = useCallback(async () => {
     try {
@@ -228,7 +234,7 @@ const AnalyticsPage: React.FC = () => {
             />
             <KpiCard
               title="Unique Entities (Est)"
-              value={dashboardData && dashboardData.cameras ? dashboardData.cameras.reduce((sum, c) => sum + c.unique_entities, 0).toLocaleString() : "..."}
+              value={dashboardData && dashboardData.cameras && dashboardData.cameras.length > 0 ? dashboardData.cameras.reduce((sum, c) => sum + (c.unique_entities || 0), 0).toLocaleString() : "0"}
               unit="people"
               icon={Users}
               colorClass="purple"
@@ -355,19 +361,19 @@ const AnalyticsPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">PostgreSQL Status</span>
-                  <span className={`text-sm font-medium ${systemStats?.database_service?.postgres_status === 'connected' ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {systemStats?.database_service?.postgres_status || 'Checking...'}
+                  <span className={`text-sm font-medium ${systemStats?.database_service?.integrated_service?.database_status?.connected ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {systemStats?.database_service?.integrated_service?.database_status?.connected ? 'Connected' : 'Checking...'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Redis Cache Status</span>
-                  <span className={`text-sm font-medium ${systemStats?.database_service?.redis_status === 'connected' ? 'text-green-400' : 'text-yellow-400'}`}>
-                    {systemStats?.database_service?.redis_status || 'Checking...'}
+                  <span className={`text-sm font-medium ${systemStats?.database_service?.integrated_service?.cache_stats?.redis_info ? 'text-green-400' : 'text-yellow-400'}`}>
+                    {systemStats?.database_service?.integrated_service?.cache_stats?.redis_info ? 'Connected' : 'Checking...'}
                   </span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Total Active Sessions</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.database_service?.total_active_sessions ?? '0'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.database_service?.integrated_service?.cache_stats?.redis_info?.connected_clients ?? '0'}</span>
                 </div>
               </div>
             </div>
@@ -380,15 +386,15 @@ const AnalyticsPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Avg Query latency</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.average_query_time_ms ? `${systemStats.analytics_engine.average_query_time_ms.toFixed(1)} ms` : 'N/A'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.database_service?.integration_layer?.avg_query_latency_ms ? `${systemStats.database_service.integration_layer.avg_query_latency_ms} ms` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Cache Hit Rate</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.cache_hit_rate ? `${(systemStats.analytics_engine.cache_hit_rate * 100).toFixed(1)} %` : 'N/A'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.database_service?.integration_layer?.cache_hit_rate ? `${(systemStats.database_service.integration_layer.cache_hit_rate * 100).toFixed(1)} %` : 'N/A'}</span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Queries Processed</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.total_queries_processed?.toLocaleString() || '0'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.database_service?.integration_layer?.total_operations?.toLocaleString() || '0'}</span>
                 </div>
               </div>
             </div>
@@ -401,11 +407,11 @@ const AnalyticsPage: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Behavior Analysis</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.total_behavior_analyses?.toLocaleString() || '0'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.analytics_stats?.behavior_profiles_created?.toLocaleString() || '0'}</span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Path Predictions</span>
-                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.total_path_predictions?.toLocaleString() || '0'}</span>
+                  <span className="text-sm text-white font-medium">{systemStats?.analytics_engine?.analytics_stats?.predictions_made?.toLocaleString() || '0'}</span>
                 </div>
                 <div className="flex justify-between items-center bg-black/20 p-2 rounded">
                   <span className="text-sm text-gray-400">Service Uptime</span>
@@ -436,19 +442,19 @@ const AnalyticsPage: React.FC = () => {
                 falsePositiveRate: 0,
                 personTurnover: 0
               }}
-              personDistribution={realTimeStats.cameraStats ? Object.entries(realTimeStats.cameraStats).map(([cameraId, stats]) => ({
+              personDistribution={realTimeStats.cameraStats && Object.keys(realTimeStats.cameraStats).length > 0 ? Object.entries(realTimeStats.cameraStats).map(([cameraId, stats]) => ({
                 cameraId: cameraId as BackendCameraId,
                 personCount: stats.detections,
                 percentage: (stats.detections / (dashboardData?.summary.total_detections || 1)) * 100,
                 avgConfidence: stats.avgConfidence,
                 peakTime: new Date().toISOString()
-              })) : dashboardData?.cameras.map(c => ({
+              })) : (dashboardData?.cameras || []).map(c => ({
                 cameraId: c.camera_id as BackendCameraId,
                 personCount: c.detections,
-                percentage: (c.detections / (dashboardData.summary.total_detections || 1)) * 100,
+                percentage: (c.detections / ((dashboardData?.summary.total_detections) || 1)) * 100,
                 avgConfidence: c.average_confidence_percent / 100,
                 peakTime: new Date().toISOString()
-              })) || []}
+              }))}
               behaviorData={{
                 dwellTimeDistribution: [],
                 movementPatterns: [],
@@ -460,8 +466,8 @@ const AnalyticsPage: React.FC = () => {
               environment={environment}
               timeRange={timeRangeMetrics.timeRange}
               selectedCameras={selectedCameras}
-              dwellTimeData={[]}
-              dwellTimeTrends={{
+              dwellTimeData={dashboardData?.dwell_time?.data || []}
+              dwellTimeTrends={dashboardData?.dwell_time?.trends || {
                 hourlyTrends: [],
                 dailyComparison: { today: 0, yesterday: 0, weekAvg: 0, trend: 'stable' },
                 behaviorInsights: []
@@ -473,8 +479,8 @@ const AnalyticsPage: React.FC = () => {
               environment={environment}
               timeRange={timeRangeMetrics.timeRange}
               selectedCameras={selectedCameras}
-              trafficFlowData={[]}
-              flowMetrics={{
+              trafficFlowData={dashboardData?.traffic_flow?.data || []}
+              flowMetrics={dashboardData?.traffic_flow?.metrics || {
                 overallThroughput: 0,
                 averageTransitionTime: 0,
                 busyCorridors: [],
@@ -487,7 +493,7 @@ const AnalyticsPage: React.FC = () => {
               environment={environment}
               timeRange={timeRangeMetrics.timeRange}
               selectedCameras={selectedCameras}
-              heatmapData={{
+              heatmapData={dashboardData?.heatmap || {
                 zones: [],
                 overallMetrics: {
                   totalOccupancyEvents: 0,

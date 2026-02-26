@@ -269,19 +269,20 @@ const Timeline: React.FC<TimelineProps> = ({
     [handleZoom]
   );
 
-  // Format time for display
-  const formatTime = useCallback((timestamp: Date) => {
+  // Formats time handling both Date objects and ISO strings
+  const formatTime = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
     const now = new Date();
-    const isToday = timestamp.toDateString() === now.toDateString();
+    const isToday = dateObj.toDateString() === now.toDateString();
 
     if (isToday) {
-      return timestamp.toLocaleTimeString([], {
+      return dateObj.toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
         second: '2-digit',
       });
     } else {
-      return `${timestamp.toLocaleDateString()} ${timestamp.toLocaleTimeString([], {
+      return `${dateObj.toLocaleDateString()} ${dateObj.toLocaleTimeString([], {
         hour: '2-digit',
         minute: '2-digit',
       })}`;
@@ -376,11 +377,10 @@ const Timeline: React.FC<TimelineProps> = ({
                   : [...showEventTypes, type as any];
                 console.log('Toggle event type:', type, newTypes);
               }}
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                showEventTypes.includes(type as any)
+              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${showEventTypes.includes(type as any)
                   ? 'bg-gray-600 text-white'
                   : 'bg-gray-800 text-gray-400 hover:bg-gray-700'
-              }`}
+                }`}
               style={{
                 borderLeft: `3px solid ${config.color}`,
               }}

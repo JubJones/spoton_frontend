@@ -134,7 +134,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
       maxValue: maxValue + valueRange * 0.1,
       minValue: Math.max(0, minValue - valueRange * 0.1),
       timeRange,
-      firstTimestamp: chartData[0]?.timestamp.getTime() || Date.now(),
+      firstTimestamp: chartData.length > 0 && chartData[0]?.timestamp ? chartData[0].timestamp.getTime() : Date.now(),
     };
   }, [chartData, containerSize]);
 
@@ -337,7 +337,7 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
     for (let i = 0; i < Math.min(6, chartData.length); i++) {
       const dataIndex = Math.floor((i * (chartData.length - 1)) / 5);
       const coord = coordinates[dataIndex];
-      const timestamp = chartData[dataIndex].timestamp;
+      const timestamp = new Date(chartData[dataIndex].timestamp);
       const label = timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       ctx.fillText(label, coord.x, chartDimensions.padding.top + chartDimensions.chartHeight + 20);
@@ -583,11 +583,10 @@ const AnalyticsCharts: React.FC<AnalyticsChartsProps> = ({
           )}
         </div>
 
-        {/* Chart Summary */}
         <div className="shrink-0 grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
           <div className="text-center">
             <div className="text-orange-400 font-semibold">
-              {chartData.length > 0
+              {chartData.length > 0 && chartData[chartData.length - 1]
                 ? selectedMetricType === 'dwell'
                   ? chartData[chartData.length - 1].value.toFixed(1)
                   : chartData[chartData.length - 1].value

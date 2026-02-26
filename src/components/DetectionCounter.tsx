@@ -177,8 +177,9 @@ const DetectionCounter: React.FC<DetectionCounterProps> = ({
   );
 
   // Format timestamp
-  const formatTime = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTime = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -242,9 +243,8 @@ const DetectionCounter: React.FC<DetectionCounterProps> = ({
           </div>
           <div className="text-center">
             <div
-              className={`text-2xl font-bold ${
-                activeAlerts.length > 0 ? 'text-red-400' : 'text-gray-400'
-              }`}
+              className={`text-2xl font-bold ${activeAlerts.length > 0 ? 'text-red-400' : 'text-gray-400'
+                }`}
             >
               {activeAlerts.length}
             </div>
@@ -266,13 +266,12 @@ const DetectionCounter: React.FC<DetectionCounterProps> = ({
                 <div className="flex items-center justify-between">
                   <div className="flex items-center space-x-2">
                     <div
-                      className={`w-2 h-2 rounded-full ${
-                        alert.severity === 'high'
+                      className={`w-2 h-2 rounded-full ${alert.severity === 'high'
                           ? 'bg-red-500'
                           : alert.severity === 'medium'
                             ? 'bg-yellow-500'
                             : 'bg-blue-500'
-                      }`}
+                        }`}
                     />
                     <span className="text-white text-sm font-medium">
                       {getCameraDisplayName(alert.cameraId, environment)}
@@ -309,20 +308,18 @@ const DetectionCounter: React.FC<DetectionCounterProps> = ({
             return (
               <div
                 key={stat.cameraId}
-                className={`p-3 rounded-lg border transition-colors cursor-pointer ${
-                  isSelected
+                className={`p-3 rounded-lg border transition-colors cursor-pointer ${isSelected
                     ? 'border-orange-400 bg-orange-500/10'
                     : 'border-gray-600 bg-gray-800/30 hover:border-gray-500'
-                }`}
+                  }`}
                 onClick={() => handleCameraClick(stat.cameraId)}
               >
                 {/* Camera Header */}
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center space-x-3">
                     <div
-                      className={`w-3 h-3 rounded-full ${
-                        stat.currentCount > 0 ? 'bg-green-400' : 'bg-gray-500'
-                      }`}
+                      className={`w-3 h-3 rounded-full ${stat.currentCount > 0 ? 'bg-green-400' : 'bg-gray-500'
+                        }`}
                     />
                     <span className="text-white font-semibold">
                       {getCameraDisplayName(stat.cameraId, environment)}
@@ -404,7 +401,7 @@ const DetectionCounter: React.FC<DetectionCounterProps> = ({
               const now = new Date();
               const start = new Date(
                 now.getTime() -
-                  (timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : 24) * 60 * 60 * 1000
+                (timeRange === '1h' ? 1 : timeRange === '6h' ? 6 : 24) * 60 * 60 * 1000
               );
               onExportData?.(
                 detectionStats.map((stat) => stat.cameraId),

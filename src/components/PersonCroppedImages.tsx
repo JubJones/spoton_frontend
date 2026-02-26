@@ -219,8 +219,9 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
   }, [processedCrops, selectedCrops, onCropExport]);
 
   // Format timestamp
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTimestamp = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -294,11 +295,10 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
               <button
                 key={quality}
                 onClick={() => onQualityFilter?.(quality as any)}
-                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                  filterBy.quality?.includes(quality as any) || !filterBy.quality
+                className={`px-2 py-1 rounded text-xs font-medium transition-colors ${filterBy.quality?.includes(quality as any) || !filterBy.quality
                     ? `${config.color} text-white`
                     : 'bg-gray-700 text-gray-400 hover:bg-gray-600'
-                }`}
+                  }`}
               >
                 {config.label}
               </button>
@@ -358,15 +358,14 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
                       cropRefs.current.delete(cropKey);
                     }
                   }}
-                  className={`relative bg-gray-800 rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer ${
-                    isPersonSelected
+                  className={`relative bg-gray-800 rounded-lg overflow-hidden border-2 transition-all duration-200 cursor-pointer ${isPersonSelected
                       ? 'border-yellow-400 shadow-lg shadow-yellow-400/25'
                       : isCropSelected
                         ? 'border-blue-400 shadow-lg shadow-blue-400/25'
                         : isHovered
                           ? 'border-gray-500 shadow-md'
                           : 'border-gray-600 hover:border-gray-500'
-                  }`}
+                    }`}
                   style={{
                     width: sizeConfig.width,
                     height: sizeConfig.height + 40, // Extra space for labels
@@ -391,9 +390,8 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
                     {(isPersonSelected || isCropSelected) && (
                       <div className="absolute top-1 right-1">
                         <div
-                          className={`w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold ${
-                            isPersonSelected ? 'bg-yellow-400 text-black' : 'bg-blue-400 text-white'
-                          }`}
+                          className={`w-4 h-4 rounded-full flex items-center justify-center text-xs font-bold ${isPersonSelected ? 'bg-yellow-400 text-black' : 'bg-blue-400 text-white'
+                            }`}
                         >
                           ✓
                         </div>
@@ -431,13 +429,12 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
 
                       {showConfidence && (
                         <span
-                          className={`font-semibold ${
-                            crop.confidence >= 0.8
+                          className={`font-semibold ${crop.confidence >= 0.8
                               ? 'text-green-400'
                               : crop.confidence >= 0.6
                                 ? 'text-yellow-400'
                                 : 'text-red-400'
-                          }`}
+                            }`}
                         >
                           {Math.round(crop.confidence * 100)}%
                         </span>
@@ -497,13 +494,12 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
                     <div className="flex justify-between">
                       <span className="text-gray-400">Confidence:</span>
                       <span
-                        className={`font-semibold ${
-                          expandedView.confidence >= 0.8
+                        className={`font-semibold ${expandedView.confidence >= 0.8
                             ? 'text-green-400'
                             : expandedView.confidence >= 0.6
                               ? 'text-yellow-400'
                               : 'text-red-400'
-                        }`}
+                          }`}
                       >
                         {Math.round(expandedView.confidence * 100)}%
                       </span>
@@ -511,13 +507,12 @@ const PersonCroppedImages: React.FC<PersonCroppedImagesProps> = ({
                     <div className="flex justify-between">
                       <span className="text-gray-400">Quality:</span>
                       <span
-                        className={`font-semibold ${
-                          expandedView.quality === 'high'
+                        className={`font-semibold ${expandedView.quality === 'high'
                             ? 'text-green-400'
                             : expandedView.quality === 'medium'
                               ? 'text-yellow-400'
                               : 'text-red-400'
-                        }`}
+                          }`}
                       >
                         {expandedView.quality.charAt(0).toUpperCase() +
                           expandedView.quality.slice(1)}

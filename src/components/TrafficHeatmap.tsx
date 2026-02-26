@@ -279,8 +279,10 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
   );
 
   // Format time for display
-  const formatTime = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  // Formats time handling both Date objects and ISO strings
+  const formatTime = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
     });

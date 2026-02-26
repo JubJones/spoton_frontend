@@ -161,8 +161,9 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
   }, []);
 
   // Format timestamp
-  const formatTimestamp = useCallback((timestamp: Date) => {
-    return timestamp.toLocaleTimeString([], {
+  const formatTimestamp = useCallback((timestamp: Date | string) => {
+    const dateObj = timestamp instanceof Date ? timestamp : new Date(timestamp);
+    return dateObj.toLocaleTimeString([], {
       hour: '2-digit',
       minute: '2-digit',
       second: '2-digit',
@@ -243,16 +244,14 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
               <div
                 className="absolute top-0 h-full bg-blue-500/40 border-l-2 border-r-2 border-blue-500"
                 style={{
-                  left: `${
-                    ((selectedStartTime.getTime() - playbackState.startTime.getTime()) /
+                  left: `${((selectedStartTime.getTime() - playbackState.startTime.getTime()) /
                       (playbackState.endTime.getTime() - playbackState.startTime.getTime())) *
                     100
-                  }%`,
-                  width: `${
-                    ((selectedEndTime.getTime() - selectedStartTime.getTime()) /
+                    }%`,
+                  width: `${((selectedEndTime.getTime() - selectedStartTime.getTime()) /
                       (playbackState.endTime.getTime() - playbackState.startTime.getTime())) *
                     100
-                  }%`,
+                    }%`,
                 }}
               />
             )}
@@ -319,11 +318,10 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             {/* Live Toggle */}
             <button
               onClick={handleLiveToggle}
-              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                playbackState.isLive
+              className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${playbackState.isLive
                   ? 'bg-red-500 hover:bg-red-600 text-white'
                   : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-              }`}
+                }`}
               title="Toggle live mode (L)"
             >
               {playbackState.isLive ? '🔴 LIVE' : '📺 GO LIVE'}
@@ -366,11 +364,10 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
             {showRecordingControls && (
               <button
                 onClick={isRecording ? onStopRecording : onStartRecording}
-                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                  isRecording
+                className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${isRecording
                     ? 'bg-red-500 hover:bg-red-600 text-white'
                     : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-                }`}
+                  }`}
               >
                 {isRecording ? '⏹️ Stop Recording' : '🔴 Record'}
               </button>
@@ -381,11 +378,10 @@ const PlaybackControls: React.FC<PlaybackControlsProps> = ({
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => setIsSelecting(!isSelecting)}
-                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${
-                    isSelecting
+                  className={`px-3 py-2 rounded-lg text-sm font-semibold transition-colors ${isSelecting
                       ? 'bg-blue-500 hover:bg-blue-600 text-white'
                       : 'bg-gray-600 hover:bg-gray-500 text-gray-300'
-                  }`}
+                    }`}
                 >
                   {isSelecting ? '✂️ Selecting...' : '✂️ Select Segment'}
                 </button>
