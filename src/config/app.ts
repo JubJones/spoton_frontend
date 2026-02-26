@@ -17,18 +17,17 @@ export const APP_CONFIG = {
 
   // Feature Flags
   ENABLE_ANALYTICS: import.meta.env.VITE_ENABLE_ANALYTICS === 'true',
-  ENABLE_MOCK_DATA: import.meta.env.VITE_ENABLE_MOCK_DATA === 'true',
   ENABLE_DEBUG_MODE: import.meta.env.VITE_ENABLE_DEBUG_MODE === 'true',
   ENABLE_PERFORMANCE_MONITORING: import.meta.env.VITE_ENABLE_PERFORMANCE_MONITORING === 'true',
 
   // Performance Settings
   DETECTION_CONFIDENCE_THRESHOLD: parseFloat(
     import.meta.env.VITE_DETECTION_CONFIDENCE_THRESHOLD ||
-      String(DEFAULT_CONFIG.DETECTION_CONFIDENCE_THRESHOLD)
+    String(DEFAULT_CONFIG.DETECTION_CONFIDENCE_THRESHOLD)
   ),
   REID_SIMILARITY_THRESHOLD: parseFloat(
     import.meta.env.VITE_REID_SIMILARITY_THRESHOLD ||
-      String(DEFAULT_CONFIG.REID_SIMILARITY_THRESHOLD)
+    String(DEFAULT_CONFIG.REID_SIMILARITY_THRESHOLD)
   ),
   TARGET_FPS: parseInt(import.meta.env.VITE_TARGET_FPS || String(DEFAULT_CONFIG.TARGET_FPS)),
   FRAME_JPEG_QUALITY: parseInt(
@@ -169,7 +168,6 @@ export const FEATURE_FLAGS = {
 
   // Development features
   DEBUG_PANEL: APP_CONFIG.ENABLE_DEBUG_MODE,
-  MOCK_DATA_MODE: APP_CONFIG.ENABLE_MOCK_DATA,
   PERFORMANCE_MONITORING: APP_CONFIG.ENABLE_PERFORMANCE_MONITORING,
 
   // Experimental features (disabled by default)
@@ -226,10 +224,6 @@ export function validateAppConfig(): {
   }
 
   // Development warnings
-  if (APP_CONFIG.DEV_MODE && APP_CONFIG.ENABLE_MOCK_DATA) {
-    warnings.push('Mock data mode is enabled - ensure this is intentional');
-  }
-
   return {
     isValid: errors.length === 0,
     errors,

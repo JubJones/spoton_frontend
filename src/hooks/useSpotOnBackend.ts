@@ -61,7 +61,7 @@ export interface SpotOnBackendActions {
   connectWebSocket: (taskId: string) => void;
   disconnectWebSocket: () => void;
 
-  // Analytics (mock endpoints)
+  // Analytics
   getRealtimeMetrics: () => Promise<RealTimeMetrics | null>;
   getActivePersons: () => Promise<ActivePerson[] | null>;
 
