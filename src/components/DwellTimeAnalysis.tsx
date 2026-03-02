@@ -118,13 +118,14 @@ const DwellTimeAnalysis: React.FC<DwellTimeAnalysisProps> = ({
   }, [filteredData]);
 
   // Get trend indicator
-  const getTrendIndicator = useCallback((trend: 'up' | 'down' | 'stable') => {
+  const getTrendIndicator = useCallback((trend: 'up' | 'down' | 'stable' | string) => {
     switch (trend) {
       case 'up':
         return { icon: '📈', color: 'text-green-400', label: 'Increasing' };
       case 'down':
         return { icon: '📉', color: 'text-red-400', label: 'Decreasing' };
       case 'stable':
+      default:
         return { icon: '➡️', color: 'text-gray-400', label: 'Stable' };
     }
   }, []);

@@ -19,7 +19,7 @@ import { useTrackingStore } from '../stores/trackingStore';
 const apiService = new APIService();
 
 const AnalyticsPage: React.FC = () => {
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const environment = (searchParams.get('environment') || 'factory') as EnvironmentId;
 
   const [dashboardData, setDashboardData] = useState<AnalyticsDashboardResponse['data'] | null>(null);
@@ -167,25 +167,39 @@ const AnalyticsPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex items-center gap-4 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
-            <span className="text-sm text-gray-400 px-2">Time Window:</span>
-            <select
-              className="bg-gray-900 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-orange-500"
-              value={timeWindowHours}
-              onChange={(e) => setTimeWindowHours(Number(e.target.value))}
-            >
-              <option value={1}>Last Hour</option>
-              <option value={6}>Last 6 Hours</option>
-              <option value={24}>Last 24 Hours</option>
-              <option value={168}>Last 7 Days</option>
-            </select>
-            <button
-              onClick={() => fetchAnalytics()}
-              disabled={loading}
-              className="px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm disabled:opacity-50 transition-colors"
-            >
-              {loading ? 'Refreshing...' : 'Refresh'}
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
+              <span className="text-sm text-gray-400 px-2">Environment:</span>
+              <select
+                className="bg-gray-900 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-orange-500"
+                value={environment}
+                onChange={(e) => setSearchParams({ environment: e.target.value })}
+              >
+                <option value="factory">Factory</option>
+                <option value="campus">Campus</option>
+              </select>
+            </div>
+
+            <div className="flex items-center gap-2 bg-gray-800/80 p-2 rounded-lg border border-gray-700">
+              <span className="text-sm text-gray-400 px-2">Time Window:</span>
+              <select
+                className="bg-gray-900 text-white border border-gray-600 rounded px-3 py-1.5 text-sm focus:outline-none focus:border-orange-500"
+                value={timeWindowHours}
+                onChange={(e) => setTimeWindowHours(Number(e.target.value))}
+              >
+                <option value={1}>Last Hour</option>
+                <option value={6}>Last 6 Hours</option>
+                <option value={24}>Last 24 Hours</option>
+                <option value={168}>Last 7 Days</option>
+              </select>
+              <button
+                onClick={() => fetchAnalytics()}
+                disabled={loading}
+                className="ml-2 px-3 py-1.5 bg-orange-600 hover:bg-orange-700 text-white rounded text-sm disabled:opacity-50 transition-colors"
+              >
+                {loading ? 'Refreshing...' : 'Refresh'}
+              </button>
+            </div>
           </div>
         </div>
 

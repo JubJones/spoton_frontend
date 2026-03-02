@@ -146,6 +146,8 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
         return 'text-yellow-400';
       case 'high':
         return 'text-red-400';
+      default:
+        return 'text-gray-400';
     }
   }, []);
 
@@ -349,62 +351,77 @@ const TrafficFlowAnalysis: React.FC<TrafficFlowAnalysisProps> = ({
             {/* Busy Corridors */}
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-3">Busiest Corridors</h4>
-              <div className="space-y-2">
-                {flowMetrics.busyCorridors.map((corridor, index) => (
-                  <div
-                    key={index}
-                    className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30 transition-colors"
-                    onClick={() => onCameraTransitionClick?.(corridor.from, corridor.to)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <span className="text-blue-400 font-semibold">
-                        {getDisplayName(corridor.from)}
-                      </span>
-                      <span className="text-gray-400">→</span>
-                      <span className="text-green-400 font-semibold">
-                        {getDisplayName(corridor.to)}
-                      </span>
-                    </div>
-                    <div className="flex items-center space-x-4">
-                      <div className="text-right">
-                        <div className="text-orange-400 font-semibold">{corridor.count}</div>
-                        <div className="text-xs text-gray-400">movements</div>
+              {flowMetrics.busyCorridors.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 bg-gray-800/20 border border-gray-700/50 rounded-lg border-dashed">
+                  <div className="text-gray-500 mb-1">No corridor data available</div>
+                  <div className="text-xs text-gray-600">Waiting for camera transition events...</div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {flowMetrics.busyCorridors.map((corridor, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-800/30 rounded-lg cursor-pointer hover:bg-gray-700/30 transition-colors"
+                      onClick={() => onCameraTransitionClick?.(corridor.from, corridor.to)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <span className="text-blue-400 font-semibold">
+                          {getDisplayName(corridor.from)}
+                        </span>
+                        <span className="text-gray-400">→</span>
+                        <span className="text-green-400 font-semibold">
+                          {getDisplayName(corridor.to)}
+                        </span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-purple-400 font-semibold">
-                          {corridor.avgTime.toFixed(1)}s
+                      <div className="flex items-center space-x-4">
+                        <div className="text-right">
+                          <div className="text-orange-400 font-semibold">{corridor.count}</div>
+                          <div className="text-xs text-gray-400">movements</div>
                         </div>
-                        <div className="text-xs text-gray-400">avg time</div>
+                        <div className="text-right">
+                          <div className="text-purple-400 font-semibold">
+                            {corridor.avgTime.toFixed(1)}s
+                          </div>
+                          <div className="text-xs text-gray-400">avg time</div>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Congestion Points */}
             <div>
               <h4 className="text-sm font-semibold text-gray-300 mb-3">Congestion Analysis</h4>
-              <div className="space-y-2">
-                {flowMetrics.congestionPoints.map((point, index) => (
-                  <div key={index} className="p-3 bg-gray-800/30 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-white font-semibold">{point.location}</span>
-                      <span
-                        className={`text-xs px-2 py-1 rounded ${point.severity === 'high'
-                          ? 'bg-red-500/20 text-red-400'
-                          : point.severity === 'medium'
-                            ? 'bg-yellow-500/20 text-yellow-400'
-                            : 'bg-green-500/20 text-green-400'
-                          }`}
-                      >
-                        {point.severity.toUpperCase()}
-                      </span>
+              {flowMetrics.congestionPoints.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-8 bg-green-900/10 border border-green-500/20 rounded-lg border-dashed">
+                  <div className="text-green-500/70 mb-1 text-xl">✓</div>
+                  <div className="text-gray-400 font-medium text-sm">No congestion detected</div>
+                  <div className="text-xs text-gray-500 mt-1">Flow efficiency is optimal</div>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {flowMetrics.congestionPoints.map((point, index) => (
+                    <div key={index} className="p-3 bg-gray-800/30 rounded-lg">
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-white font-semibold">{point.location}</span>
+                        <span
+                          className={`text-xs px-2 py-1 rounded ${point.severity === 'high'
+                            ? 'bg-red-500/20 text-red-400'
+                            : point.severity === 'medium'
+                              ? 'bg-yellow-500/20 text-yellow-400'
+                              : 'bg-green-500/20 text-green-400'
+                            }`}
+                        >
+                          {point.severity.toUpperCase()}
+                        </span>
+                      </div>
+                      <div className="text-sm text-gray-400">{point.description}</div>
                     </div>
-                    <div className="text-sm text-gray-400">{point.description}</div>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}

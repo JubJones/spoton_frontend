@@ -76,14 +76,16 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
   const getOccupancyIntensity = useCallback(
     (occupancyCount: number) => {
       const maxOccupancy = Math.max(
+        0,
         ...filteredZones.flatMap((zone) => zone.occupancyData.map((data) => data.personCount))
       );
 
-      const normalizedIntensity = occupancyCount / maxOccupancy;
+      // Prevent division by zero if all occupancies are 0
+      const normalizedIntensity = maxOccupancy === 0 ? 0 : occupancyCount / maxOccupancy;
       const intensityMultiplier =
         heatmapIntensity === 'low' ? 0.5 : heatmapIntensity === 'high' ? 1.5 : 1;
 
-      return Math.min(1, normalizedIntensity * intensityMultiplier);
+      return Math.min(1, Math.max(0, normalizedIntensity * intensityMultiplier));
     },
     [filteredZones, heatmapIntensity]
   );
@@ -154,6 +156,39 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
     canvas.height = 400;
 
     if (visualizationMode === 'heatmap' || visualizationMode === 'combined') {
+      // Calculate dynamic bounding box
+      let minX = Infinity;
+      let minY = Infinity;
+      let maxX = -Infinity;
+      let maxY = -Infinity;
+
+      filteredZones.forEach((zone) => {
+        if (!zone.coordinates) return;
+        zone.coordinates.forEach(([x, y]) => {
+          if (x < minX) minX = x;
+          if (y < minY) minY = y;
+          if (x > maxX) maxX = x;
+          if (y > maxY) maxY = y;
+        });
+      });
+
+      const padding = 5; // 5 units padding
+      minX = minX === Infinity ? 0 : minX - padding;
+      minY = minY === Infinity ? 0 : minY - padding;
+      maxX = maxX === -Infinity ? 100 : maxX + padding;
+      maxY = maxY === -Infinity ? 100 : maxY + padding;
+
+      const rangeX = maxX - minX;
+      const rangeY = maxY - minY;
+
+      // Preserve aspect ratio
+      const scale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+      const offsetX = (canvas.width - rangeX * scale) / 2;
+      const offsetY = (canvas.height - rangeY * scale) / 2;
+
+      const mapX = (x: number) => offsetX + (x - minX) * scale;
+      const mapY = (y: number) => offsetY + (y - minY) * scale;
+
       // Draw heatmap zones
       filteredZones.forEach((zone) => {
         const currentOccupancy =
@@ -162,28 +197,53 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
         const color = getOccupancyColor(intensity);
 
         // Draw zone polygon
-        ctx.beginPath();
-        ctx.moveTo(zone.coordinates[0][0], zone.coordinates[0][1]);
-        zone.coordinates.slice(1).forEach(([x, y]) => {
-          ctx.lineTo(x, y);
-        });
-        ctx.closePath();
-        ctx.fillStyle = color;
-        ctx.fill();
+        if (zone.coordinates && zone.coordinates.length > 0) {
+          ctx.beginPath();
+          ctx.moveTo(mapX(zone.coordinates[0][0]), mapY(zone.coordinates[0][1]));
+          zone.coordinates.slice(1).forEach(([x, y]) => {
+            ctx.lineTo(mapX(x), mapY(y));
+          });
+          ctx.closePath();
+          ctx.fillStyle = color;
+          ctx.fill();
 
-        // Draw zone border
-        ctx.strokeStyle = hoveredZone?.id === zone.id ? '#FFA500' : '#FFFFFF';
-        ctx.lineWidth = hoveredZone?.id === zone.id ? 3 : 1;
-        ctx.stroke();
+          // Draw zone border
+          ctx.strokeStyle = hoveredZone?.id === zone.id ? '#FFA500' : '#FFFFFF';
+          ctx.lineWidth = hoveredZone?.id === zone.id ? 3 : 1;
+          ctx.stroke();
+        }
       });
     }
 
     if (visualizationMode === 'zones' || visualizationMode === 'combined') {
+      // Recalculate dynamic bounding box (code duplication for simplicity or we can extract it)
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      filteredZones.forEach(z => z.coordinates?.forEach(([x, y]) => {
+        if (x < minX) minX = x; if (y < minY) minY = y;
+        if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+      }));
+      const padding = 5;
+      minX = minX === Infinity ? 0 : minX - padding;
+      minY = minY === Infinity ? 0 : minY - padding;
+      maxX = maxX === -Infinity ? 100 : maxX + padding;
+      maxY = maxY === -Infinity ? 100 : maxY + padding;
+      const rangeX = maxX - minX;
+      const rangeY = maxY - minY;
+      const scale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+      const offsetX = (canvas.width - rangeX * scale) / 2;
+      const offsetY = (canvas.height - rangeY * scale) / 2;
+      const mapX = (x: number) => offsetX + (x - minX) * scale;
+      const mapY = (y: number) => offsetY + (y - minY) * scale;
+
       // Draw zone outlines and labels
       filteredZones.forEach((zone) => {
-        const centerX = zone.coordinates.reduce((sum, [x]) => sum + x, 0) / zone.coordinates.length;
-        const centerY =
-          zone.coordinates.reduce((sum, [, y]) => sum + y, 0) / zone.coordinates.length;
+        if (!zone.coordinates || zone.coordinates.length === 0) return;
+
+        const rawCenterX = zone.coordinates.reduce((sum, [x]) => sum + x, 0) / zone.coordinates.length;
+        const rawCenterY = zone.coordinates.reduce((sum, [, y]) => sum + y, 0) / zone.coordinates.length;
+
+        const centerX = mapX(rawCenterX);
+        const centerY = mapY(rawCenterY);
 
         if (showZoneLabels) {
           ctx.fillStyle = '#FFFFFF';
@@ -221,15 +281,34 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      filteredZones.forEach(z => z.coordinates?.forEach(([qx, qy]) => {
+        if (qx < minX) minX = qx; if (qy < minY) minY = qy;
+        if (qx > maxX) maxX = qx; if (qy > maxY) maxY = qy;
+      }));
+      const padding = 5;
+      minX = minX === Infinity ? 0 : minX - padding;
+      minY = minY === Infinity ? 0 : minY - padding;
+      maxX = maxX === -Infinity ? 100 : maxX + padding;
+      maxY = maxY === -Infinity ? 100 : maxY + padding;
+      const rangeX = maxX - minX;
+      const rangeY = maxY - minY;
+      const scale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+      const offsetX = (canvas.width - rangeX * scale) / 2;
+      const offsetY = (canvas.height - rangeY * scale) / 2;
+      const mapX = (xVal: number) => offsetX + (xVal - minX) * scale;
+      const mapY = (yVal: number) => offsetY + (yVal - minY) * scale;
+
       // Check if click is inside any zone
       for (const zone of filteredZones) {
+        if (!zone.coordinates || zone.coordinates.length === 0) continue;
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
         ctx.beginPath();
-        ctx.moveTo(zone.coordinates[0][0], zone.coordinates[0][1]);
+        ctx.moveTo(mapX(zone.coordinates[0][0]), mapY(zone.coordinates[0][1]));
         zone.coordinates.slice(1).forEach(([coordX, coordY]) => {
-          ctx.lineTo(coordX, coordY);
+          ctx.lineTo(mapX(coordX), mapY(coordY));
         });
         ctx.closePath();
 
@@ -252,16 +331,35 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
       const x = event.clientX - rect.left;
       const y = event.clientY - rect.top;
 
+      let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+      filteredZones.forEach(z => z.coordinates?.forEach(([qx, qy]) => {
+        if (qx < minX) minX = qx; if (qy < minY) minY = qy;
+        if (qx > maxX) maxX = qx; if (qy > maxY) maxY = qy;
+      }));
+      const padding = 5;
+      minX = minX === Infinity ? 0 : minX - padding;
+      minY = minY === Infinity ? 0 : minY - padding;
+      maxX = maxX === -Infinity ? 100 : maxX + padding;
+      maxY = maxY === -Infinity ? 100 : maxY + padding;
+      const rangeX = maxX - minX;
+      const rangeY = maxY - minY;
+      const scale = Math.min(canvas.width / rangeX, canvas.height / rangeY);
+      const offsetX = (canvas.width - rangeX * scale) / 2;
+      const offsetY = (canvas.height - rangeY * scale) / 2;
+      const mapX = (xVal: number) => offsetX + (xVal - minX) * scale;
+      const mapY = (yVal: number) => offsetY + (yVal - minY) * scale;
+
       // Check if mouse is over any zone
       let foundZone: HeatmapZone | null = null;
       for (const zone of filteredZones) {
+        if (!zone.coordinates || zone.coordinates.length === 0) continue;
         const ctx = canvas.getContext('2d');
         if (!ctx) continue;
 
         ctx.beginPath();
-        ctx.moveTo(zone.coordinates[0][0], zone.coordinates[0][1]);
+        ctx.moveTo(mapX(zone.coordinates[0][0]), mapY(zone.coordinates[0][1]));
         zone.coordinates.slice(1).forEach(([coordX, coordY]) => {
-          ctx.lineTo(coordX, coordY);
+          ctx.lineTo(mapX(coordX), mapY(coordY));
         });
         ctx.closePath();
 
