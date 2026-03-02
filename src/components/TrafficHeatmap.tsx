@@ -191,8 +191,11 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
 
       // Draw heatmap zones
       filteredZones.forEach((zone) => {
-        const currentOccupancy =
-          zone.occupancyData[zone.occupancyData.length - 1]?.personCount || 0;
+        const sumOccupancy = zone.occupancyData.reduce((sum, data) => sum + data.personCount, 0);
+        const currentOccupancy = zone.occupancyData.length > 0
+          ? Math.round(sumOccupancy / zone.occupancyData.length)
+          : 0;
+
         const intensity = getOccupancyIntensity(currentOccupancy);
         const color = getOccupancyColor(intensity);
 
@@ -252,9 +255,12 @@ const TrafficHeatmap: React.FC<TrafficHeatmapProps> = ({
           ctx.fillText(zone.name, centerX, centerY - 10);
         }
 
-        if (showOccupancyNumbers) {
-          const currentOccupancy =
-            zone.occupancyData[zone.occupancyData.length - 1]?.personCount || 0;
+        if (showOccupancyNumbers && zone.occupancyData) {
+          const sumOccupancy = zone.occupancyData.reduce((sum, data) => sum + data.personCount, 0);
+          const currentOccupancy = zone.occupancyData.length > 0
+            ? Math.round(sumOccupancy / zone.occupancyData.length)
+            : 0;
+
           ctx.fillStyle = '#FFA500';
           ctx.font = 'bold 14px sans-serif';
           ctx.fillText(currentOccupancy.toString(), centerX, centerY + 10);
