@@ -30,6 +30,8 @@ import {
   BackendCameraId,
   EnvironmentId,
   AnalyticsDashboardResponse,
+  ReIdentificationFeedbackPayload,
+  ReIdentificationFeedbackResponse,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
 
@@ -865,6 +867,23 @@ export class APIService {
   }
 
   // ========================================================================
+  // Feedback APIs
+  // ========================================================================
+
+  async submitReIdentificationFeedback(
+    payload: ReIdentificationFeedbackPayload
+  ): Promise<ReIdentificationFeedbackResponse> {
+    try {
+      return await this.http.post<ReIdentificationFeedbackResponse>(
+        API_ENDPOINTS.REIDENTIFICATION_FEEDBACK,
+        payload
+      );
+    } catch (error) {
+      throw this.handleError('Failed to submit re-identification feedback', error);
+    }
+  }
+
+  // ========================================================================
   // Utility Methods
   // ========================================================================
 
@@ -987,4 +1006,3 @@ export function getErrorMessage(error: unknown): string {
 
   return 'An unknown error occurred';
 }
-
