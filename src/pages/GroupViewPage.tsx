@@ -2240,6 +2240,11 @@ const GroupViewPage: React.FC = () => {
             }}
             activeCameraId={activeTab === 'all' ? null : activeTab}
             allCameraIds={cameraIds}
+            environmentId={environment}
+            sessionId={taskId ?? tabIdRef.current}
+            frameNumber={currentFrameData?.global_frame_index ?? null}
+            eventTimestamp={currentFrameData?.timestamp_processed_utc ?? null}
+            focusedPersonGlobalId={focusedPerson?.globalId}
           />
         </div>
       </div>

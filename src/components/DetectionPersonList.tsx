@@ -1,7 +1,12 @@
 // src/components/DetectionPersonList.tsx
 import React, { useState, useCallback, useRef, useEffect, memo, useMemo } from 'react';
 import { useCameraConfig } from '../context/CameraConfigContext';
-import type { BackendCameraId } from '../types/api';
+import type {
+  BackendCameraId,
+  EnvironmentId,
+  ReIdentificationFeedbackDecision,
+} from '../types/api';
+import { apiService } from '../services/apiService';
 
 interface DetectedPerson {
   detection_id: string;
@@ -28,6 +33,7 @@ interface DetectedPerson {
   track_assignment_iou?: number;
   track_assignment_center_distance?: number;
   metadata?: Record<string, unknown>;
+  processing_time?: number;
 }
 
 interface CameraDetection {
@@ -44,6 +50,19 @@ interface DetectionPersonListProps {
   selectedPersonKey?: string | null;
   activeCameraId?: string | null;
   allCameraIds?: string[];
+  environmentId: EnvironmentId;
+  sessionId: string;
+  frameNumber?: number | null;
+  eventTimestamp?: string | null;
+  focusedPersonGlobalId?: string;
+}
+
+type FeedbackStatus = 'idle' | 'loading' | 'success' | 'error';
+
+interface DetectionFeedbackState {
+  status: FeedbackStatus;
+  decision?: ReIdentificationFeedbackDecision;
+  error?: string;
 }
 
 // Memoized to prevent re-renders when props haven't changed
@@ -54,11 +73,17 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
   selectedPersonKey = null,
   activeCameraId = null,
   allCameraIds = [],
+  environmentId,
+  sessionId,
+  frameNumber = null,
+  eventTimestamp = null,
+  focusedPersonGlobalId,
 }) => {
   console.log('DetectionPersonList render:', { activeCameraId, allCameraIdsLength: allCameraIds.length });
 
   const [croppedImages, setCroppedImages] = useState<{ [key: string]: string }>({});
   const [selectedPerson, setSelectedPerson] = useState<string | null>(selectedPersonKey);
+  const [feedbackStates, setFeedbackStates] = useState<Record<string, DetectionFeedbackState>>({});
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { getDisplayName } = useCameraConfig();
 
@@ -157,6 +182,74 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
     setSelectedPerson(willSelect ? personKey : null);
     onPersonClick?.(detection, camera_id, willSelect);
   }, [selectedPerson, onPersonClick]);
+
+  const handleFeedback = useCallback(
+    async (detection: DetectedPerson, decision: ReIdentificationFeedbackDecision) => {
+      const detectionKey = `${detection.camera_id}-${detection.detection_id}`;
+      const detectionGlobalId =
+        detection.global_id !== undefined && detection.global_id !== null
+          ? String(detection.global_id)
+          : undefined;
+      const resolvedGlobalPersonId = focusedPersonGlobalId || detectionGlobalId;
+      const fallbackPersonId =
+        resolvedGlobalPersonId ||
+        (detection.detection_id ? `detection:${detection.detection_id}` : null) ||
+        (typeof detection.track_id === 'number' ? `track:${detection.track_id}` : null) ||
+        detection.tracking_key ||
+        detectionKey;
+
+      if (!fallbackPersonId) {
+        return;
+      }
+
+      setFeedbackStates((prev) => ({
+        ...prev,
+        [detectionKey]: { status: 'loading', decision },
+      }));
+
+      try {
+        await apiService.submitReIdentificationFeedback({
+          global_person_id: fallbackPersonId,
+          candidate_person_id:
+            focusedPersonGlobalId && detectionGlobalId && detectionGlobalId !== focusedPersonGlobalId
+              ? detectionGlobalId
+              : null,
+          match_id: detection.detection_id || null,
+          environment_id: environmentId,
+          camera_id: detection.camera_id,
+          frame_number: typeof frameNumber === 'number' ? frameNumber : null,
+          decision,
+          event_timestamp: eventTimestamp ?? new Date().toISOString(),
+          session_id: sessionId || null,
+          source: 'web_reid_review',
+          confidence: typeof detection.confidence === 'number' ? detection.confidence : null,
+          notes: null,
+          metadata: {
+            detection_id: detection.detection_id,
+            track_id: detection.track_id ?? null,
+            bbox: detection.bbox,
+            camera_id: detection.camera_id,
+            is_selected: selectedPerson === detectionKey,
+            focused_person_global_id: focusedPersonGlobalId ?? null,
+            processing_time_ms: detection.processing_time ?? null,
+          },
+        });
+
+        setFeedbackStates((prev) => ({
+          ...prev,
+          [detectionKey]: { status: 'success', decision },
+        }));
+      } catch (error) {
+        const errorMessage =
+          error instanceof Error ? error.message : 'Failed to submit feedback. Please try again.';
+        setFeedbackStates((prev) => ({
+          ...prev,
+          [detectionKey]: { status: 'error', decision, error: errorMessage },
+        }));
+      }
+    },
+    [environmentId, eventTimestamp, focusedPersonGlobalId, frameNumber, selectedPerson, sessionId]
+  );
 
   // Memoized: Get all detections across all cameras, deduplicated by track_id, sorted by confidence
   const sortedDetections = useMemo(() => {
@@ -308,18 +401,36 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                             ? `Detection ${detection.detection_id.slice(-4)}`
                             : 'Detection';
                         const primaryLabel = trackLabel ?? fallbackLabel;
+                        const detectionGlobalId =
+                          detection.global_id !== undefined && detection.global_id !== null
+                            ? String(detection.global_id)
+                            : undefined;
+        const resolvedGlobalPersonId = focusedPersonGlobalId || detectionGlobalId;
+        const fallbackPersonId =
+          resolvedGlobalPersonId ||
+          (detection.detection_id ? `detection:${detection.detection_id}` : null) ||
+          (typeof detection.track_id === 'number' ? `track:${detection.track_id}` : null) ||
+          detection.tracking_key ||
+          cropKey;
+        const feedbackState = feedbackStates[cropKey];
+        const isSubmitting = feedbackState?.status === 'loading';
+        const submitted = feedbackState?.status === 'success';
+        const canSubmitFeedback = Boolean(fallbackPersonId);
+        const disableFeedback = !canSubmitFeedback || isSubmitting || submitted;
 
                         return (
                           <div
                             key={cropKey}
-                            onClick={() => handlePersonClick(detection, detection.camera_id)}
-                            className={`
-                            flex-shrink-0 flex items-center bg-gray-700 rounded-lg overflow-hidden cursor-pointer transition-all duration-200 hover:bg-gray-600 w-64 h-20
-                            ${isSelected ? 'ring-2 ring-blue-500 bg-blue-600' : 'hover:shadow-lg'}
-                          `}
+                            className={`w-36 flex-shrink-0 bg-gray-700 rounded-xl overflow-hidden transition-all duration-200 ${isSelected
+                                ? 'ring-2 ring-blue-500 bg-blue-600 shadow-lg shadow-blue-500/20'
+                                : 'hover:bg-gray-600 hover:shadow-lg'
+                              }`}
                           >
-                            {/* Left: Image */}
-                            <div className="relative w-20 h-20 flex-shrink-0 bg-black">
+                            <button
+                              type="button"
+                              className="relative h-40 bg-black w-full text-left"
+                              onClick={() => handlePersonClick(detection, detection.camera_id)}
+                            >
                               {croppedImage ? (
                                 <img
                                   src={croppedImage}
@@ -330,31 +441,81 @@ const DetectionPersonList = memo<DetectionPersonListProps>(({
                                 <div className={`w-full h-full flex items-center justify-center ${detection.confidence >= 0.8 ? 'bg-green-900/40' :
                                   detection.confidence >= 0.6 ? 'bg-yellow-900/40' : 'bg-red-900/40'
                                   }`}>
-                                  <span className="text-2xl">👤</span>
+                                  <span className="text-3xl">👤</span>
                                 </div>
                               )}
 
                               {/* Confidence Badge */}
-                              <div className="absolute bottom-0 right-0 bg-black/60 px-1 py-0.5 text-[10px] text-white">
+                              <div className="absolute bottom-1 right-1 bg-black/70 px-1 py-0.5 text-[11px] text-white rounded">
                                 {Math.round(detection.confidence * 100)}%
                               </div>
-                            </div>
+                            </button>
 
-                            {/* Right: Info */}
-                            <div className="flex-1 p-2 min-w-0 flex flex-col justify-center h-full">
-                              <div className="flex items-center justify-between">
-                                <span className="text-white font-bold text-sm truncate">
-                                  {primaryLabel}
-                                </span>
-                                {isSelected && <span className="text-blue-200 text-xs">✓</span>}
+                            <button
+                              type="button"
+                              className="p-2 space-y-1 text-xs w-full text-left"
+                              onClick={() => handlePersonClick(detection, detection.camera_id)}
+                            >
+                              <div className="flex items-center justify-between text-sm">
+                                <span className="text-white font-semibold truncate pr-1">{primaryLabel}</span>
+                                {isSelected && <span className="text-blue-200">✓</span>}
                               </div>
+                              <div className="text-gray-400">Box: {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}</div>
+                            </button>
 
-                              <div className="text-xs text-gray-400 mt-1 truncate">
-                                Box: {Math.round(detection.bbox.width)}×{Math.round(detection.bbox.height)}
+                            <div className="px-2 pb-2">
+                              <div
+                                className="flex items-center gap-1 pt-1 text-xs"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                {(['thumbs_up', 'thumbs_down'] as ReIdentificationFeedbackDecision[]).map(
+                                  (decision) => {
+                                    const isPositive = decision === 'thumbs_up';
+                                    const isActive = submitted && feedbackState?.decision === decision;
+                                    const baseTitle = isPositive
+                                      ? 'Mark as correct match'
+                                      : 'Mark as incorrect match';
+                                    const buttonTitle = !canSubmitFeedback
+                                      ? 'Waiting for a global ID before recording feedback'
+                                      : isSubmitting
+                                        ? 'Sending feedback...'
+                                        : submitted
+                                          ? 'Feedback recorded'
+                                          : baseTitle;
+
+                                    return (
+                                      <button
+                                        key={decision}
+                                        type="button"
+                                        title={buttonTitle}
+                                        aria-label={buttonTitle}
+                                        className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${isActive
+                                            ? isPositive
+                                              ? 'bg-green-600 text-white'
+                                              : 'bg-red-600 text-white'
+                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                          } ${disableFeedback && !isActive ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                        disabled={disableFeedback && !isActive}
+                                        onClick={(event) => {
+                                          event.stopPropagation();
+                                          if (disableFeedback && !isActive) {
+                                            return;
+                                          }
+                                          handleFeedback(detection, decision);
+                                        }}
+                                      >
+                                        {isPositive ? '👍' : '👎'}
+                                      </button>
+                                    );
+                                  }
+                                )}
                               </div>
-
-                              {/* Attributes if available */}
-
+                              {feedbackState?.status === 'success' && (
+                                <div className="text-[10px] text-green-400 mt-1">Thanks for the feedback!</div>
+                              )}
+                              {feedbackState?.status === 'error' && (
+                                <div className="text-[10px] text-red-400 mt-1">{feedbackState.error}</div>
+                              )}
                             </div>
                           </div>
                         );
