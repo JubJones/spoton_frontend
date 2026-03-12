@@ -5,6 +5,7 @@ import type {
   BackendCameraId,
   EnvironmentId,
   ReIdentificationFeedbackDecision,
+  ReIdentificationFeedbackResponse,
 } from '../types/api';
 import { apiService } from '../services/apiService';
 
@@ -56,6 +57,11 @@ interface DetectionPersonListProps {
   frameNumber?: number | null;
   eventTimestamp?: string | null;
   focusedPersonGlobalId?: string;
+  onFeedbackSubmitted?: (data: {
+    detection: DetectedPerson;
+    decision: ReIdentificationFeedbackDecision;
+    response: ReIdentificationFeedbackResponse;
+  }) => void;
 }
 
 type FeedbackStatus = 'idle' | 'loading' | 'success' | 'error';
@@ -80,6 +86,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
     frameNumber = null,
     eventTimestamp = null,
     focusedPersonGlobalId,
+    onFeedbackSubmitted,
   }) => {
     console.log('DetectionPersonList render:', {
       activeCameraId,
@@ -227,7 +234,7 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
         }));
 
         try {
-          await apiService.submitReIdentificationFeedback({
+          const response = await apiService.submitReIdentificationFeedback({
             global_person_id: fallbackPersonId,
             candidate_person_id:
               focusedPersonGlobalId &&
@@ -260,6 +267,8 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
             ...prev,
             [detectionKey]: { status: 'success', decision },
           }));
+
+          onFeedbackSubmitted?.({ detection, decision, response });
         } catch (error) {
           const errorMessage =
             error instanceof Error ? error.message : 'Failed to submit feedback. Please try again.';
@@ -269,7 +278,15 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
           }));
         }
       },
-      [environmentId, eventTimestamp, focusedPersonGlobalId, frameNumber, selectedPerson, sessionId]
+      [
+        environmentId,
+        eventTimestamp,
+        focusedPersonGlobalId,
+        frameNumber,
+        onFeedbackSubmitted,
+        selectedPerson,
+        sessionId,
+      ]
     );
 
     // Memoized: Get all detections across all cameras, deduplicated by track_id, sorted by confidence

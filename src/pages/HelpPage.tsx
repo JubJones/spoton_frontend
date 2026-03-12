@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import Header from '../components/common/Header';
 import { useSpotOnBackend } from '../hooks/useSpotOnBackend';
 import FeedbackForm from '../components/feedback/FeedbackForm';
+import ReidFeedbackPanel from '../components/ReidFeedbackPanel';
 import {
   BookOpen,
   Map,
@@ -351,6 +352,11 @@ const HelpPage: React.FC = () => {
               <li>Include contact details if you'd like a follow-up.</li>
               <li>You can clear your stored feedback anytime by clearing browser storage.</li>
             </ul>
+          </div>
+
+          <div className="pt-4 border-t border-gray-800">
+            <h3 className="text-xl font-semibold text-white mb-4">Recent Re-ID Feedback</h3>
+            <ReidFeedbackPanel className="mt-2" requireSelection={false} />
           </div>
         </div>
       )

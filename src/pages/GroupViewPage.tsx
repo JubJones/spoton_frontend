@@ -487,6 +487,7 @@ const GroupViewPage: React.FC = () => {
   }, []);
 
   const environment = getEnvironmentFromUrl();
+  const sessionIdentifier = taskId ?? tabIdRef.current;
 
   // Memoize cameraIds to prevent recalculation on every render
   const cameraIds = useMemo<BackendCameraId[]>(
@@ -2211,6 +2212,7 @@ const GroupViewPage: React.FC = () => {
                 </div>
               </div>
             </div>
+
           </div>
         </div>
 
@@ -2241,7 +2243,7 @@ const GroupViewPage: React.FC = () => {
             activeCameraId={activeTab === 'all' ? null : activeTab}
             allCameraIds={cameraIds}
             environmentId={environment}
-            sessionId={taskId ?? tabIdRef.current}
+            sessionId={sessionIdentifier}
             frameNumber={currentFrameData?.global_frame_index ?? null}
             eventTimestamp={currentFrameData?.timestamp_processed_utc ?? null}
             focusedPersonGlobalId={focusedPerson?.globalId}
