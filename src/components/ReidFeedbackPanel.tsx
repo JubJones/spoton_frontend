@@ -220,16 +220,19 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
     setOffset((prev) => prev + limit);
   };
 
-  const metadataPreview = (metadata: Record<string, unknown> | null) => {
-    if (!metadata || Object.keys(metadata).length === 0) {
-      return null;
+  const formatMetadataValue = (value: unknown): string => {
+    if (value === null || value === undefined) {
+      return '—';
     }
-    try {
-      return JSON.stringify(metadata, null, 2);
-    } catch (error) {
-      console.warn('Failed to stringify feedback metadata', error);
-      return null;
+    if (typeof value === 'object') {
+      try {
+        return JSON.stringify(value);
+      } catch (error) {
+        console.warn('Failed to stringify feedback metadata', error);
+        return '[object]';
+      }
     }
+    return String(value);
   };
 
   return (
@@ -321,47 +324,61 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
 
         {canLoadData &&
           items.map((item) => {
-            const metadata = metadataPreview(item.metadata);
+            const metadataEntries = item.metadata ? Object.entries(item.metadata) : [];
             return (
-            <div
-              key={item.feedback_id}
-              className="border border-gray-700/60 rounded-lg p-3 bg-black/20"
-            >
-              <div className="flex items-start gap-3">
-                <div className={`text-2xl ${item.decision === 'thumbs_up' ? 'text-green-400' : 'text-red-400'}`}>
-                  {item.decision === 'thumbs_up' ? '👍' : '👎'}
-                </div>
-                <div className="flex-1 text-sm text-gray-200">
-                  <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                    <span>Event {formatTimestamp(item.event_timestamp)}</span>
-                    <span>•</span>
-                    <span>Recorded {formatTimestamp(item.recorded_at)}</span>
+              <div
+                key={item.feedback_id}
+                className="border border-gray-700/60 rounded-lg p-3 bg-black/20"
+              >
+                <div className="flex items-start gap-3">
+                  <div className={`text-2xl ${item.decision === 'thumbs_up' ? 'text-green-400' : 'text-red-400'}`}>
+                    {item.decision === 'thumbs_up' ? '👍' : '👎'}
                   </div>
-                  <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-300">
-                    <span className="font-semibold text-gray-100">
-                      {cameraDisplayName(item.camera_id)} ({item.camera_id})
-                    </span>
-                    <span>Env: {item.environment_id}</span>
-                    {item.session_id && <span>Session: {item.session_id.slice(0, 8)}…</span>}
-                    {typeof item.confidence === 'number' && (
-                      <span>Confidence: {Math.round(item.confidence * 100)}%</span>
+                  <div className="flex-1 text-sm text-gray-200">
+                    <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
+                      <span>Event {formatTimestamp(item.event_timestamp)}</span>
+                      <span>•</span>
+                      <span>Recorded {formatTimestamp(item.recorded_at)}</span>
+                    </div>
+                    <div className="mt-1 flex flex-wrap gap-3 text-xs text-gray-300">
+                      <span className="font-semibold text-gray-100">
+                        {cameraDisplayName(item.camera_id)} ({item.camera_id})
+                      </span>
+                      <span>Env: {item.environment_id}</span>
+                      {item.session_id && <span>Session: {item.session_id.slice(0, 8)}…</span>}
+                      {typeof item.confidence === 'number' && (
+                        <span>Confidence: {Math.round(item.confidence * 100)}%</span>
+                      )}
+                      {item.source && <span>Source: {item.source}</span>}
+                      {item.match_id && <span>Match: {item.match_id}</span>}
+                    </div>
+                    {item.notes && (
+                      <p className="mt-2 text-xs text-gray-300 italic">“{item.notes}”</p>
                     )}
-                    {item.source && <span>Source: {item.source}</span>}
-                    {item.match_id && <span>Match: {item.match_id}</span>}
+                    {metadataEntries.length > 0 && (
+                      <div className="mt-3 text-[11px] text-gray-300">
+                        <div className="uppercase tracking-wide text-gray-500 text-[10px] font-semibold mb-1">
+                          Metadata
+                        </div>
+                        <dl className="bg-gray-900/40 border border-gray-800 rounded-md divide-y divide-gray-800">
+                          {metadataEntries.map(([key, value]) => (
+                            <div key={key} className="grid grid-cols-[120px_minmax(0,1fr)]">
+                              <dt className="py-1 px-2 text-gray-500 border-r border-gray-800">
+                                {key}
+                              </dt>
+                              <dd className="py-1 px-2 text-gray-200 break-words">
+                                {formatMetadataValue(value)}
+                              </dd>
+                            </div>
+                          ))}
+                        </dl>
+                      </div>
+                    )}
                   </div>
-                  {item.notes && (
-                    <p className="mt-2 text-xs text-gray-300 italic">“{item.notes}”</p>
-                  )}
-                  {metadata && (
-                    <pre className="mt-2 text-[11px] text-gray-400 bg-gray-900/60 border border-gray-800 rounded p-2 overflow-x-auto">
-                      {metadata}
-                    </pre>
-                  )}
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })}
       </div>
 
       <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
