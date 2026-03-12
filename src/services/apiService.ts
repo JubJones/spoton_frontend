@@ -32,6 +32,8 @@ import {
   AnalyticsDashboardResponse,
   ReIdentificationFeedbackPayload,
   ReIdentificationFeedbackResponse,
+  ReIdentificationFeedbackListResponse,
+  ReIdentificationFeedbackQuery,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
 
@@ -880,6 +882,30 @@ export class APIService {
       );
     } catch (error) {
       throw this.handleError('Failed to submit re-identification feedback', error);
+    }
+  }
+
+  async getReIdentificationFeedback(
+    params: ReIdentificationFeedbackQuery = {}
+  ): Promise<ReIdentificationFeedbackListResponse> {
+    try {
+      const query = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          return;
+        }
+
+        query.append(key, typeof value === 'number' ? value.toString() : value);
+      });
+
+      const endpoint = query.toString()
+        ? `${API_ENDPOINTS.REIDENTIFICATION_FEEDBACK}?${query.toString()}`
+        : API_ENDPOINTS.REIDENTIFICATION_FEEDBACK;
+
+      return await this.http.get<ReIdentificationFeedbackListResponse>(endpoint);
+    } catch (error) {
+      throw this.handleError('Failed to fetch re-identification feedback', error);
     }
   }
 

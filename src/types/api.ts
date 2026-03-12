@@ -226,6 +226,36 @@ export interface ReIdentificationFeedbackResponse {
   metadata: Record<string, unknown> | null;
 }
 
+export interface ReIdentificationFeedbackItem extends ReIdentificationFeedbackResponse {
+  camera_id: string;
+  environment_id: string;
+  frame_number: number | null;
+  session_id: string | null;
+  event_timestamp: string;
+  source: string | null;
+  confidence: number | null;
+  notes: string | null;
+}
+
+export interface ReIdentificationFeedbackListResponse {
+  total: number;
+  items: ReIdentificationFeedbackItem[];
+}
+
+export interface ReIdentificationFeedbackQuery {
+  global_person_id?: string;
+  candidate_person_id?: string;
+  match_id?: string;
+  camera_id?: string;
+  environment_id?: string;
+  session_id?: string;
+  decision?: ReIdentificationFeedbackDecision;
+  start_time?: string;
+  end_time?: string;
+  limit?: number;
+  offset?: number;
+}
+
 // ============================================================================
 // Authentication Types
 // ============================================================================
