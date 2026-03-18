@@ -24,6 +24,13 @@ const DECISION_OPTIONS: Array<{ label: string; value: '' | ReIdentificationFeedb
   { value: 'thumbs_down', label: 'Thumbs down' },
 ];
 
+type FeedbackViewMode = 'cards' | 'table';
+
+const VIEW_MODES: Array<{ label: string; value: FeedbackViewMode }> = [
+  { value: 'cards', label: 'Cards' },
+  { value: 'table', label: 'Table' },
+];
+
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 const formatTimestamp = (value: string) => {
@@ -58,6 +65,7 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [localRefreshTick, setLocalRefreshTick] = useState(0);
+  const [viewMode, setViewMode] = useState<FeedbackViewMode>('cards');
   const { getDisplayName } = useCameraConfig();
 
   const hasSelectionContext = Boolean(globalPersonId || (cameraId && sessionId));
@@ -237,7 +245,7 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
 
   return (
     <div className={`bg-gray-900/50 border border-gray-700 rounded-xl p-4 ${className}`}>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-semibold text-gray-200">Re-ID Feedback</h3>
           {shouldRequireSelection && !hasSelectionContext ? (
@@ -246,16 +254,39 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
             <p className="text-xs text-gray-500">{total} submission{total === 1 ? '' : 's'} found</p>
           )}
         </div>
-        <div className="text-xs text-gray-400 text-right">
-          <div>{resultRangeLabel}</div>
-          <button
-            type="button"
-            className="text-blue-400 hover:text-blue-300"
-            onClick={handleRefreshClick}
-            disabled={!canLoadData}
-          >
-            Refresh
-          </button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-2 text-xs text-gray-400">
+            <span className="uppercase tracking-wide text-[10px] text-gray-500">View</span>
+            <div className="inline-flex overflow-hidden rounded-lg border border-gray-700 bg-gray-800/70">
+              {VIEW_MODES.map((mode) => (
+                <button
+                  key={mode.value}
+                  type="button"
+                  aria-pressed={viewMode === mode.value}
+                  className={`px-3 py-1 text-xs font-semibold transition-colors ${
+                    viewMode === mode.value
+                      ? 'bg-orange-500 text-white'
+                      : 'text-gray-300 hover:text-white'
+                  }`}
+                  onClick={() => setViewMode(mode.value)}
+                  disabled={viewMode === mode.value}
+                >
+                  {mode.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="text-xs text-gray-400 text-right">
+            <div>{resultRangeLabel}</div>
+            <button
+              type="button"
+              className="text-blue-400 hover:text-blue-300"
+              onClick={handleRefreshClick}
+              disabled={!canLoadData}
+            >
+              Refresh
+            </button>
+          </div>
         </div>
       </div>
 
@@ -323,6 +354,10 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
         )}
 
         {canLoadData &&
+          viewMode === 'cards' &&
+          !loading &&
+          !error &&
+          items.length > 0 &&
           items.map((item) => {
             const metadataEntries = item.metadata ? Object.entries(item.metadata) : [];
             return (
@@ -379,6 +414,85 @@ const ReidFeedbackPanel: React.FC<ReidFeedbackPanelProps> = ({
               </div>
             );
           })}
+
+        {canLoadData &&
+          viewMode === 'table' &&
+          !loading &&
+          !error &&
+          items.length > 0 && (
+            <div className="overflow-x-auto rounded-lg border border-gray-800">
+              <table className="min-w-full text-left text-xs text-gray-300">
+                <thead className="bg-gray-900/70 text-[11px] uppercase tracking-wide text-gray-400">
+                  <tr>
+                    <th className="px-3 py-2 font-semibold">Decision</th>
+                    <th className="px-3 py-2 font-semibold">Timing</th>
+                    <th className="px-3 py-2 font-semibold">Camera</th>
+                    <th className="px-3 py-2 font-semibold">Session</th>
+                    <th className="px-3 py-2 font-semibold">Confidence</th>
+                    <th className="px-3 py-2 font-semibold">Source</th>
+                    <th className="px-3 py-2 font-semibold">Match</th>
+                    <th className="px-3 py-2 font-semibold">Notes</th>
+                    <th className="px-3 py-2 font-semibold">Metadata</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map((item) => {
+                    const metadataEntries = item.metadata ? Object.entries(item.metadata) : [];
+                    const metadataSummary = metadataEntries.length
+                      ? metadataEntries
+                          .slice(0, 2)
+                          .map(([key, value]) => `${key}: ${formatMetadataValue(value)}`)
+                          .join('; ') + (metadataEntries.length > 2 ? ' …' : '')
+                      : '—';
+                    const decisionIcon = item.decision === 'thumbs_up' ? '👍' : '👎';
+                    const decisionColor =
+                      item.decision === 'thumbs_up' ? 'text-green-400' : 'text-red-400';
+                    return (
+                      <tr
+                        key={item.feedback_id}
+                        className="border-t border-gray-800 hover:bg-gray-800/40"
+                      >
+                        <td className="px-3 py-2 whitespace-nowrap">
+                          <span className={`text-lg ${decisionColor}`}>{decisionIcon}</span>
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-400">
+                          <div>Event {formatTimestamp(item.event_timestamp)}</div>
+                          <div>Recorded {formatTimestamp(item.recorded_at)}</div>
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="text-sm text-gray-100">
+                            {cameraDisplayName(item.camera_id)}
+                          </div>
+                          <div className="text-[11px] text-gray-500">{item.camera_id}</div>
+                          <div className="text-[11px] text-gray-500">Env: {item.environment_id}</div>
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-300">
+                          {item.session_id ? item.session_id : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-300">
+                          {typeof item.confidence === 'number'
+                            ? `${Math.round(item.confidence * 100)}%`
+                            : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-300">
+                          {item.source || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-300">
+                          {item.match_id || '—'}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-200 max-w-[240px]">
+                          {item.notes ? item.notes : '—'}
+                        </td>
+                        <td className="px-3 py-2 text-[11px] text-gray-300">
+                          {metadataSummary}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
       </div>
 
       <div className="mt-4 flex items-center justify-between text-xs text-gray-400">
