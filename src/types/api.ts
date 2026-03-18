@@ -195,6 +195,68 @@ export interface SystemStatusPayload {
 }
 
 // ============================================================================
+// Feedback Types
+// ============================================================================
+
+export type ReIdentificationFeedbackDecision = 'thumbs_up' | 'thumbs_down';
+
+export interface ReIdentificationFeedbackPayload {
+  global_person_id: string;
+  candidate_person_id: string | null;
+  match_id: string | null;
+  environment_id: string;
+  camera_id: string;
+  frame_number: number | null;
+  decision: ReIdentificationFeedbackDecision;
+  event_timestamp: string | null;
+  session_id: string | null;
+  source: string | null;
+  confidence: number | null;
+  notes: string | null;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface ReIdentificationFeedbackResponse {
+  feedback_id: string;
+  global_person_id: string;
+  candidate_person_id: string | null;
+  match_id: string | null;
+  decision: ReIdentificationFeedbackDecision;
+  recorded_at: string;
+  metadata: Record<string, unknown> | null;
+}
+
+export interface ReIdentificationFeedbackItem extends ReIdentificationFeedbackResponse {
+  camera_id: string;
+  environment_id: string;
+  frame_number: number | null;
+  session_id: string | null;
+  event_timestamp: string;
+  source: string | null;
+  confidence: number | null;
+  notes: string | null;
+}
+
+export interface ReIdentificationFeedbackListResponse {
+  total: number;
+  items: ReIdentificationFeedbackItem[];
+}
+
+export interface ReIdentificationFeedbackQuery {
+  global_person_id?: string;
+  candidate_person_id?: string;
+  match_id?: string;
+  camera_id?: string;
+  environment_id?: string;
+  session_id?: string;
+  decision?: ReIdentificationFeedbackDecision;
+  start_time?: string;
+  end_time?: string;
+  limit?: number;
+  offset?: number;
+}
+
+// ============================================================================
 // Authentication Types
 // ============================================================================
 
@@ -866,6 +928,9 @@ export const API_ENDPOINTS = {
   ACTIVE_PERSONS: '/api/v1/analytics/real-time/active-persons',
   SYSTEM_STATISTICS: '/api/v1/analytics/system/statistics',
   ANALYTICS_DASHBOARD: '/api/v1/analytics/dashboard',
+
+  // Feedback
+  REIDENTIFICATION_FEEDBACK: '/api/v1/feedback/reidentification',
 } as const;
 
 export const WEBSOCKET_ENDPOINTS = {

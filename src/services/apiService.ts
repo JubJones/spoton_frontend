@@ -30,6 +30,10 @@ import {
   BackendCameraId,
   EnvironmentId,
   AnalyticsDashboardResponse,
+  ReIdentificationFeedbackPayload,
+  ReIdentificationFeedbackResponse,
+  ReIdentificationFeedbackListResponse,
+  ReIdentificationFeedbackQuery,
 } from '../types/api';
 import { getApiUrl, APP_CONFIG } from '../config/app';
 
@@ -410,9 +414,7 @@ export class APIService {
    */
   async pauseTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
     try {
-      return await this.http.post<PlaybackStatusResponse>(
-        API_ENDPOINTS.PLAYBACK_PAUSE(taskId)
-      );
+      return await this.http.post<PlaybackStatusResponse>(API_ENDPOINTS.PLAYBACK_PAUSE(taskId));
     } catch (error) {
       throw this.handleError(`Failed to pause playback for ${taskId}`, error);
     }
@@ -423,9 +425,7 @@ export class APIService {
    */
   async resumeTaskPlayback(taskId: string): Promise<PlaybackStatusResponse> {
     try {
-      return await this.http.post<PlaybackStatusResponse>(
-        API_ENDPOINTS.PLAYBACK_RESUME(taskId)
-      );
+      return await this.http.post<PlaybackStatusResponse>(API_ENDPOINTS.PLAYBACK_RESUME(taskId));
     } catch (error) {
       throw this.handleError(`Failed to resume playback for ${taskId}`, error);
     }
@@ -436,9 +436,7 @@ export class APIService {
    */
   async getPlaybackStatus(taskId: string): Promise<PlaybackStatusResponse> {
     try {
-      return await this.http.get<PlaybackStatusResponse>(
-        API_ENDPOINTS.PLAYBACK_STATUS(taskId)
-      );
+      return await this.http.get<PlaybackStatusResponse>(API_ENDPOINTS.PLAYBACK_STATUS(taskId));
     } catch (error) {
       throw this.handleError(`Failed to fetch playback status for ${taskId}`, error);
     }
@@ -489,10 +487,15 @@ export class APIService {
             camera_metadata: Object.keys(cameraMetadata).length > 0 ? cameraMetadata : undefined,
           } as DetectionProcessingEnvironment;
         })
-        .filter((env: any): env is DetectionProcessingEnvironment => Boolean(env) && env.cameras.length > 0);
+        .filter(
+          (env: any): env is DetectionProcessingEnvironment =>
+            Boolean(env) && env.cameras.length > 0
+        );
 
       if (normalized.length === 0) {
-        throw new ValidationError('Detection environment response did not include any valid environments');
+        throw new ValidationError(
+          'Detection environment response did not include any valid environments'
+        );
       }
 
       // Merge with defaults to ensure known environments are always available
@@ -711,7 +714,11 @@ export class APIService {
   async getSystemStatistics(): Promise<SystemStatistics> {
     try {
       // API returns {status: 'success', data: {...}, timestamp: '...'}
-      const response = await this.http.get<{ status: string; data: SystemStatistics; timestamp: string }>(API_ENDPOINTS.SYSTEM_STATISTICS);
+      const response = await this.http.get<{
+        status: string;
+        data: SystemStatistics;
+        timestamp: string;
+      }>(API_ENDPOINTS.SYSTEM_STATISTICS);
 
       // Extract data from wrapper if present
       if (response && typeof response === 'object' && 'data' in response) {
@@ -760,9 +767,7 @@ export class APIService {
   /**
    * Create analytics export job
    */
-  async createAnalyticsExport(
-    request: ExportAnalyticsReportRequest
-  ): Promise<ExportJobResponse> {
+  async createAnalyticsExport(request: ExportAnalyticsReportRequest): Promise<ExportJobResponse> {
     try {
       const response = await this.http.post<ExportJobResponse>(
         '/api/v1/export/analytics-report',
@@ -826,9 +831,7 @@ export class APIService {
    */
   async cancelExportJob(jobId: string): Promise<{ message: string }> {
     try {
-      const response = await this.http.delete<{ message: string }>(
-        `/api/v1/export/jobs/${jobId}`
-      );
+      const response = await this.http.delete<{ message: string }>(`/api/v1/export/jobs/${jobId}`);
 
       return response;
     } catch (error) {
@@ -854,13 +857,55 @@ export class APIService {
         params.append('status_filter', statusFilter);
       }
 
-      const response = await this.http.get<{ jobs: ExportJobStatusResponse[]; total_count: number }>(
-        `/api/v1/export/jobs?${params.toString()}`
-      );
+      const response = await this.http.get<{
+        jobs: ExportJobStatusResponse[];
+        total_count: number;
+      }>(`/api/v1/export/jobs?${params.toString()}`);
 
       return response;
     } catch (error) {
       throw this.handleError('Failed to list export jobs', error);
+    }
+  }
+
+  // ========================================================================
+  // Feedback APIs
+  // ========================================================================
+
+  async submitReIdentificationFeedback(
+    payload: ReIdentificationFeedbackPayload
+  ): Promise<ReIdentificationFeedbackResponse> {
+    try {
+      return await this.http.post<ReIdentificationFeedbackResponse>(
+        API_ENDPOINTS.REIDENTIFICATION_FEEDBACK,
+        payload
+      );
+    } catch (error) {
+      throw this.handleError('Failed to submit re-identification feedback', error);
+    }
+  }
+
+  async getReIdentificationFeedback(
+    params: ReIdentificationFeedbackQuery = {}
+  ): Promise<ReIdentificationFeedbackListResponse> {
+    try {
+      const query = new URLSearchParams();
+
+      Object.entries(params).forEach(([key, value]) => {
+        if (value === undefined || value === null) {
+          return;
+        }
+
+        query.append(key, typeof value === 'number' ? value.toString() : value);
+      });
+
+      const endpoint = query.toString()
+        ? `${API_ENDPOINTS.REIDENTIFICATION_FEEDBACK}?${query.toString()}`
+        : API_ENDPOINTS.REIDENTIFICATION_FEEDBACK;
+
+      return await this.http.get<ReIdentificationFeedbackListResponse>(endpoint);
+    } catch (error) {
+      throw this.handleError('Failed to fetch re-identification feedback', error);
     }
   }
 
@@ -987,4 +1032,3 @@ export function getErrorMessage(error: unknown): string {
 
   return 'An unknown error occurred';
 }
-
