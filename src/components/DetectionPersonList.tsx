@@ -468,17 +468,22 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
                           return (
                             <div
                               key={cropKey}
-                              className={`w-36 flex-shrink-0 bg-gray-700 rounded-xl overflow-hidden transition-all duration-200 ${
+                              role="button"
+                              tabIndex={0}
+                              className={`group flex w-full sm:w-[340px] lg:w-[360px] min-w-[260px] items-stretch bg-gray-700/90 border border-gray-600 rounded-xl overflow-hidden cursor-pointer transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 focus-visible:ring-offset-2 focus-visible:ring-offset-gray-900 ${
                                 isSelected
-                                  ? 'ring-2 ring-blue-500 bg-blue-600 shadow-lg shadow-blue-500/20'
-                                  : 'hover:bg-gray-600 hover:shadow-lg'
+                                  ? 'ring-2 ring-blue-500 border-transparent bg-blue-600/30 shadow-lg shadow-blue-500/20'
+                                  : 'hover:bg-gray-600 hover:border-gray-500'
                               }`}
+                              onClick={() => handlePersonClick(detection, detection.camera_id)}
+                              onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                  event.preventDefault();
+                                  handlePersonClick(detection, detection.camera_id);
+                                }
+                              }}
                             >
-                              <button
-                                type="button"
-                                className="relative h-40 bg-black w-full text-left"
-                                onClick={() => handlePersonClick(detection, detection.camera_id)}
-                              >
+                              <div className="relative w-24 h-24 sm:w-28 sm:h-28 flex-shrink-0 bg-black">
                                 {croppedImage ? (
                                   <img
                                     src={croppedImage}
@@ -498,92 +503,86 @@ const DetectionPersonList = memo<DetectionPersonListProps>(
                                     <span className="text-3xl">👤</span>
                                   </div>
                                 )}
-
-                                {/* Confidence Badge */}
                                 <div className="absolute bottom-1 right-1 bg-black/70 px-1 py-0.5 text-[11px] text-white rounded">
                                   {Math.round(detection.confidence * 100)}%
                                 </div>
-                              </button>
-
-                              <button
-                                type="button"
-                                className="p-2 space-y-1 text-xs w-full text-left"
-                                onClick={() => handlePersonClick(detection, detection.camera_id)}
-                              >
-                                <div className="flex items-center justify-between text-sm">
-                                  <span className="text-white font-semibold truncate pr-1">
-                                    {primaryLabel}
-                                  </span>
-                                  {isSelected && <span className="text-blue-200">✓</span>}
+                              </div>
+                              <div className="flex-1 flex flex-col justify-between py-2 pr-3 min-w-0">
+                                <div>
+                                  <div className="flex items-center justify-between text-sm">
+                                    <span className="text-white font-semibold truncate pr-2">
+                                      {primaryLabel}
+                                    </span>
+                                    {isSelected && <span className="text-blue-200">✓</span>}
+                                  </div>
+                                  <div className="text-xs text-gray-400 mt-1 truncate">
+                                    Box: {Math.round(detection.bbox.width)}×
+                                    {Math.round(detection.bbox.height)}
+                                  </div>
                                 </div>
-                                <div className="text-gray-400">
-                                  Box: {Math.round(detection.bbox.width)}×
-                                  {Math.round(detection.bbox.height)}
-                                </div>
-                              </button>
-
-                              <div className="px-2 pb-2">
                                 <div
-                                  className="flex items-center gap-1 pt-1 text-xs"
+                                  className="pt-2"
                                   onClick={(event) => event.stopPropagation()}
                                 >
-                                  {(
-                                    [
-                                      'thumbs_up',
-                                      'thumbs_down',
-                                    ] as ReIdentificationFeedbackDecision[]
-                                  ).map((decision) => {
-                                    const isPositive = decision === 'thumbs_up';
-                                    const isActive =
-                                      submitted && feedbackState?.decision === decision;
-                                    const baseTitle = isPositive
-                                      ? 'Mark as correct match'
-                                      : 'Mark as incorrect match';
-                                    const buttonTitle = !canSubmitFeedback
-                                      ? 'Waiting for a global ID before recording feedback'
-                                      : isSubmitting
-                                        ? 'Sending feedback...'
-                                        : submitted
-                                          ? 'Feedback recorded'
-                                          : baseTitle;
+                                  <div className="flex flex-wrap items-center gap-1 text-xs">
+                                    {(
+                                      [
+                                        'thumbs_up',
+                                        'thumbs_down',
+                                      ] as ReIdentificationFeedbackDecision[]
+                                    ).map((decision) => {
+                                      const isPositive = decision === 'thumbs_up';
+                                      const isActive =
+                                        submitted && feedbackState?.decision === decision;
+                                      const baseTitle = isPositive
+                                        ? 'Mark as correct match'
+                                        : 'Mark as incorrect match';
+                                      const buttonTitle = !canSubmitFeedback
+                                        ? 'Waiting for a global ID before recording feedback'
+                                        : isSubmitting
+                                          ? 'Sending feedback...'
+                                          : submitted
+                                            ? 'Feedback recorded'
+                                            : baseTitle;
 
-                                    return (
-                                      <button
-                                        key={decision}
-                                        type="button"
-                                        title={buttonTitle}
-                                        aria-label={buttonTitle}
-                                        className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
-                                          isActive
-                                            ? isPositive
-                                              ? 'bg-green-600 text-white'
-                                              : 'bg-red-600 text-white'
-                                            : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
-                                        } ${disableFeedback && !isActive ? 'opacity-60 cursor-not-allowed' : ''}`}
-                                        disabled={disableFeedback && !isActive}
-                                        onClick={(event) => {
-                                          event.stopPropagation();
-                                          if (disableFeedback && !isActive) {
-                                            return;
-                                          }
-                                          handleFeedback(detection, decision);
-                                        }}
-                                      >
-                                        {isPositive ? '👍' : '👎'}
-                                      </button>
-                                    );
-                                  })}
+                                      return (
+                                        <button
+                                          key={decision}
+                                          type="button"
+                                          title={buttonTitle}
+                                          aria-label={buttonTitle}
+                                          className={`px-2 py-1 rounded text-xs font-semibold transition-colors ${
+                                            isActive
+                                              ? isPositive
+                                                ? 'bg-green-600 text-white'
+                                                : 'bg-red-600 text-white'
+                                              : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                                          } ${disableFeedback && !isActive ? 'opacity-60 cursor-not-allowed' : ''}`}
+                                          disabled={disableFeedback && !isActive}
+                                          onClick={(event) => {
+                                            event.stopPropagation();
+                                            if (disableFeedback && !isActive) {
+                                              return;
+                                            }
+                                            handleFeedback(detection, decision);
+                                          }}
+                                        >
+                                          {isPositive ? '👍' : '👎'}
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                  {feedbackState?.status === 'success' && (
+                                    <div className="text-[10px] text-green-400 mt-1">
+                                      Thanks for the feedback!
+                                    </div>
+                                  )}
+                                  {feedbackState?.status === 'error' && (
+                                    <div className="text-[10px] text-red-400 mt-1">
+                                      {feedbackState.error}
+                                    </div>
+                                  )}
                                 </div>
-                                {feedbackState?.status === 'success' && (
-                                  <div className="text-[10px] text-green-400 mt-1">
-                                    Thanks for the feedback!
-                                  </div>
-                                )}
-                                {feedbackState?.status === 'error' && (
-                                  <div className="text-[10px] text-red-400 mt-1">
-                                    {feedbackState.error}
-                                  </div>
-                                )}
                               </div>
                             </div>
                           );
