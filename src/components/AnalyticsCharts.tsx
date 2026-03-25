@@ -4,7 +4,7 @@ import type { BackendCameraId, EnvironmentId } from '../types/api';
 import { getCameraDisplayName } from '../config/environments';
 
 interface TimeRangeMetrics {
-  timeRange: '1h' | '6h' | '24h' | '7d' | '30d';
+  timeRange: '1h' | '6h' | '24h' | '7d' | '30d' | 'all';
   totalDetections: number;
   peakHour: { hour: number; count: number };
   trends: Array<{ timestamp: Date; count: number; confidence: number }>;

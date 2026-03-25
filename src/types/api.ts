@@ -558,6 +558,7 @@ export interface AnalyticsDashboardResponse {
       zones: any[];
       overallMetrics: any;
     };
+    person_statistics?: any;
   };
 }
 

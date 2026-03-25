@@ -40,7 +40,7 @@ interface PersonBehaviorData {
 
 interface PersonStatisticsProps {
   environment: EnvironmentId;
-  timeRange: '1h' | '6h' | '24h' | '7d' | '30d';
+  timeRange: '1h' | '6h' | '24h' | '7d' | '30d' | 'all';
   selectedCameras: Set<BackendCameraId>;
   className?: string;
   onPersonClick?: (personId: string) => void;
